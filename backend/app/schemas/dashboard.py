@@ -1,0 +1,70 @@
+from datetime import date
+from decimal import Decimal
+
+from pydantic import BaseModel
+
+
+class ClientCountStats(BaseModel):
+    total: int
+    faol: int
+    nofaol: int
+
+
+class TopClientItem(BaseModel):
+    client_id: int
+    company_name: str
+    total_paid: Decimal
+    total_debt: Decimal
+
+
+class TopClientLtvItem(BaseModel):
+    client_id: int
+    company_name: str
+    total_paid: Decimal
+    contracts_count: int
+    share_pct: float
+
+
+class ChartPoint(BaseModel):
+    month: str
+    label: str
+    value: Decimal
+
+
+class RevenuePlanPoint(BaseModel):
+    month: str
+    label: str
+    revenue: Decimal
+    plan: Decimal
+    growth_pct: float | None
+
+
+class NamedAmount(BaseModel):
+    name: str
+    amount: Decimal
+
+
+class DashboardCharts(BaseModel):
+    monthly_revenue: list[ChartPoint]
+    revenue_vs_plan: list[RevenuePlanPoint]
+    client_growth: list[ChartPoint]
+    cumulative_clients: list[ChartPoint]
+    contracts_by_month: list[ChartPoint]
+    revenue_by_service: list[NamedAmount]
+    debt_vs_paid: list[NamedAmount]
+
+
+class DashboardStats(BaseModel):
+    total_debt: Decimal
+    total_paid: Decimal
+    monthly_revenue: Decimal
+    monthly_plan: Decimal
+    revenue_growth_pct: float | None
+    collection_rate: float
+    total_contracts: int
+    active_contracts: int
+    clients: ClientCountStats
+    top_clients: list[TopClientItem]
+    charts: DashboardCharts
+    period_start: date
+    period_end: date
