@@ -37,7 +37,7 @@ import { MotionButton, motionTap } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import type { PaymentListItem } from "../types";
-import { formatDate, formatMoney } from "../utils/format";
+import { formatDateWithWeekday, formatMoney } from "../utils/format";
 
 export function PaymentsPage() {
   const { t } = useI18n();
@@ -165,7 +165,7 @@ export function PaymentsPage() {
             <TableBody>
               {payments.map((payment, index) => (
                 <MotionTableRow key={payment.id} {...rowEnter(index)}>
-                  <TableCellDate>{formatDate(payment.paid_at)}</TableCellDate>
+                  <TableCellDate>{formatDateWithWeekday(payment.paid_at)}</TableCellDate>
                   <TableCellCompany
                     to={`/clients/${payment.client_id}`}
                     name={payment.company_name}

@@ -62,7 +62,7 @@ import {
 import type { ChartPoint, DashboardStats, ExpiringContract, TopClientLtvItem } from "../types";
 import { usePreferences } from "../context/PreferencesContext";
 import { useI18n } from "../context/I18nContext";
-import { formatCompactMoney, formatDate, formatMoney, formatPercent, toNumber } from "../utils/format";
+import { formatCompactMoney, formatDateWithWeekday, formatMoney, formatPercent, toNumber } from "../utils/format";
 import { cn } from "@/lib/utils";
 
 const SERVICE_BAR_COLORS = [
@@ -581,7 +581,7 @@ export function DashboardPage() {
               {expiring.map((item) => (
                 <TableRow key={item.contract_id}>
                   <TableCellCompany to={`/clients/${item.client_id}`} name={item.company_name} />
-                  <TableCellDate>{formatDate(item.end_date)}</TableCellDate>
+                  <TableCellDate>{formatDateWithWeekday(item.end_date)}</TableCellDate>
                   <TableCell>
                     <Badge
                       variant={item.days_left <= 7 ? "destructive" : "secondary"}

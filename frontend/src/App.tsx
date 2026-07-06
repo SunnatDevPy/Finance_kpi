@@ -29,6 +29,7 @@ const DashboardPage = lazy(() => import("./pages/Dashboard").then((m) => ({ defa
 const DebtsPage = lazy(() => import("./pages/Debts").then((m) => ({ default: m.DebtsPage })));
 const EmployeesPage = lazy(() => import("./pages/Employees").then((m) => ({ default: m.EmployeesPage })));
 const ExpensesPage = lazy(() => import("./pages/Expenses").then((m) => ({ default: m.ExpensesPage })));
+const FinancePage = lazy(() => import("./pages/Finance").then((m) => ({ default: m.FinancePage })));
 const LoginPage = lazy(() => import("./pages/Login").then((m) => ({ default: m.LoginPage })));
 const PaymentsPage = lazy(() => import("./pages/Payments").then((m) => ({ default: m.PaymentsPage })));
 const ProfilePage = lazy(() => import("./pages/Profile").then((m) => ({ default: m.ProfilePage })));
@@ -54,6 +55,7 @@ export default function App() {
                       <Route path="contracts" element={<ContractsPage />} />
                       <Route path="payments" element={<PaymentsPage />} />
                       <Route path="expenses" element={<ExpensesPage />} />
+                      <Route path="finance" element={<FinancePage />} />
                       <Route path="debts" element={<DebtsPage />} />
                       <Route path="service-types" element={<ServiceTypesPage />} />
                       <Route path="profile" element={<ProfilePage />} />

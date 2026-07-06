@@ -6,7 +6,7 @@ import { api } from "../api/client";
 import { usePreferences } from "../context/PreferencesContext";
 import { useI18n } from "../context/I18nContext";
 import type { ExpiringContract } from "../types";
-import { formatDate, formatMoney } from "../utils/format";
+import { formatDateWithWeekday, formatMoney } from "../utils/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { HEADER_TOOLBAR_BTN } from "./header-toolbar";
@@ -86,7 +86,7 @@ export function NotificationBell() {
                     <div className="min-w-0">
                       <p className="truncate font-medium">{item.company_name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {formatDate(item.end_date)} · {item.days_left} {t("notifications.daysLeft")}
+                        {formatDateWithWeekday(item.end_date, "short")} · {item.days_left} {t("notifications.daysLeft")}
                       </p>
                     </div>
                     <Badge variant={item.days_left <= 7 ? "destructive" : "secondary"}>

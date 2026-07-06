@@ -51,11 +51,16 @@ export function FloatingLabelDatePicker({
 
   const dateLocale = locale === "ru" ? "ru-RU" : "uz-UZ";
   const monthLabel = new Intl.DateTimeFormat(dateLocale, { month: "long", year: "numeric" }).format(viewMonth);
-  const displayLabel = value
+  const displayDate = value
     ? new Intl.DateTimeFormat(dateLocale, { day: "2-digit", month: "2-digit", year: "numeric" }).format(
         parseISODate(value),
       )
     : "";
+  const displayWeekday = value
+    ? new Intl.DateTimeFormat(dateLocale, { weekday: "long" }).format(parseISODate(value))
+    : "";
+  const displayLabel = displayDate;
+
 
   useEffect(() => {
     if (open) {
@@ -134,7 +139,14 @@ export function FloatingLabelDatePicker({
           className,
         )}
       >
-        <span className={cn(!displayLabel && "text-transparent")}>{displayLabel || "—"}</span>
+        <span className={cn("flex min-w-0 items-baseline gap-1.5", !displayLabel && "text-transparent")}>
+          <span className="truncate">{displayLabel || "—"}</span>
+          {displayWeekday && (
+            <span className="shrink-0 truncate text-xs font-normal capitalize text-muted-foreground">
+              {displayWeekday}
+            </span>
+          )}
+        </span>
         <CalendarIcon className="size-4 shrink-0 text-muted-foreground" />
       </button>
       <label htmlFor={inputId} className={cn(labelPeer, floatedLabel)}>

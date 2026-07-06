@@ -29,7 +29,7 @@ import {
 } from "../components/PremiumDataTable";
 import { useI18n } from "../context/I18nContext";
 import type { ServiceType, ServiceTypeStats } from "../types";
-import { formatDate, formatMoney } from "../utils/format";
+import { formatDateWithWeekday, formatMoney } from "../utils/format";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -145,7 +145,7 @@ export function ServiceTypeDetailModal({
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <CalendarIcon className="size-3.5" />
               <span>
-                {t("services.lastUsed")}: {formatDate(displayStats.last_used_at)}
+                {t("services.lastUsed")}: {formatDateWithWeekday(displayStats.last_used_at)}
               </span>
             </div>
           )}

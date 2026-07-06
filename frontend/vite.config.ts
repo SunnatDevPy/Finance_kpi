@@ -34,7 +34,7 @@ export default defineConfig({
     },
     proxy: {
       "/api": {
-        target: process.env.VITE_API_URL || "http://localhost:8002",
+        target: process.env.VITE_API_URL || "http://localhost:8400",
         changeOrigin: true,
       },
     },

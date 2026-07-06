@@ -292,4 +292,17 @@
 
 ---
 
+### 38. "Moliya" moduli — umumiy kirim/chiqim ledger + Excel orqali eski tarixni import qilish (2026-yil iyul)
+- [x] Backend: yangi `Income` modeli (`migratsiya 010`) — shartnomaga bog'liq bo'lmagan "boshqa kirimlar" uchun (`sale`, `service`, `investment`, `loan`, `grant`, `refund`, `other` kategoriyalari); mijozdan shartnoma bo'yicha tushgan pul hamon `Payment` orqali hisoblanadi
+- [x] `Income` uchun to'liq CRUD API (`/incomes` — list/create/get/patch/delete/summary/trash/restore), `Expense` bilan bir xil soft-delete + audit log naqshi
+- [x] Yangi `GET /finance/ledger` — `Payment` (mijoz to'lovlari) + `Income` (boshqa kirim) + `Expense` (chiqim) bitta xronologik ro'yxatga birlashtiriladi, tur/sana/qidiruv bo'yicha filtrlanadi, jami kirim/chiqim/sof balans hisoblab qaytariladi
+- [x] `POST /finance/import` + `GET /finance/import-template` — eski Excel hisobotini (Sana, Turi — Kirim/Chiqim, Nomi, Summa, Kategoriya, Izoh) yuklash; ustunlar moslashuvchan aniqlanadi (o'zbek/rus sarlavhalar), "Turi" ustuni bo'lmasa summaning ishorasidan (manfiy = chiqim) avtomatik aniqlanadi, kategoriya matndan eng yaqin enum qiymatiga moslashtiriladi
+- [x] Dashboard P&L: `total_other_income`/`period_other_income` qo'shildi, sof foyda hisобi endi boshqa kirimlarni ham hisobga oladi (`net_profit = tushum + boshqa_kirim - xarajat`)
+- [x] Export: `incomes` resursi ham `/export/{resource}` ga qo'shildi (xlsx/pdf), `Trash` va `AuditLog` sahifalariga "Kirimlar" bo'limi qo'shildi
+- [x] Frontend: yangi `Moliya` sahifasi (`/finance`) — jami kirim/chiqim/sof balans statistika kartalari, birlashgan jadval (kirim/chiqim/to'lov badge'lari bilan), "Kirim/Chiqim qo'shish" modali, Excel import modali (shablon yuklab olish + natija: nechta kirim/chiqim qo'shilgani va qatordagi xatolar)
+- [x] i18n (`uz.ts`/`ru.ts`) — `finance.*`, `finance.incomeCategories.*`, `nav.finance`, `export.incomes`, `auditLog.entityIncome`, `trash.tabIncomes` kalitlari
+- [x] Backend testlar: `test_incomes.py` (CRUD, summary, soft-delete, dashboard integratsiyasi) va `test_finance.py` (ledger birlashtirish/filtr, import — muvaffaqiyatli, ishoradan tur aniqlash, majburiy ustun yo'qligida xato) — jami 73/73 pytest va frontend build xatosiz o'tdi
+
+---
+
 *Bu fayl loyihaning yagona, yangilanib turadigan ish rejasi hisoblanadi. Yangi vazifalar shu yerga qo'shiladi, bajarilganda `[x]` bilan belgilanadi.*

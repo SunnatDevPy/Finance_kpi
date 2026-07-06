@@ -4,7 +4,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import Client, Contract, ContractLineItem, Expense, Payment, ServiceType
+from app.models import Client, Contract, ContractLineItem, Expense, Income, Payment, ServiceType
 from app.schemas.contract import ContractLineItemRead, ContractRead
 
 
@@ -58,6 +58,15 @@ def get_expense_or_404(db: Session, expense_id: int) -> Expense:
     if expense is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Xarajat topilmadi")
     return expense
+
+
+def get_income_or_404(db: Session, income_id: int) -> Income:
+    income = db.scalars(
+        select(Income).where(Income.id == income_id, Income.deleted_at.is_(None))
+    ).first()
+    if income is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Kirim topilmadi")
+    return income
 
 
 def get_line_item_or_404(db: Session, contract_id: int, line_item_id: int) -> ContractLineItem:

@@ -47,6 +47,18 @@ class ExpenseCategory(str, enum.Enum):
     OTHER = "other"
 
 
+class IncomeCategory(str, enum.Enum):
+    """Shartnomaga bog'liq bo'lmagan kirim turlari (mijoz to'lovlari — Payment orqali)."""
+
+    SALE = "sale"
+    SERVICE = "service"
+    INVESTMENT = "investment"
+    LOAN = "loan"
+    GRANT = "grant"
+    REFUND = "refund"
+    OTHER = "other"
+
+
 class Client(Base):
     __tablename__ = "clients"
     __table_args__ = (
@@ -241,6 +253,42 @@ class Expense(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
     expense_date: Mapped[date] = mapped_column(Date, nullable=False)
+    note: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class Income(Base):
+    """Shartnomaga bog'liq bo'lmagan kirim (investitsiya, kredit, boshqa daromad, ...) —
+    mijozdan shartnoma bo'yicha kelgan pul `Payment` orqali hisoblanadi, bu esa faqat
+    "boshqa kirimlar" uchun."""
+
+    __tablename__ = "incomes"
+    __table_args__ = (
+        Index("ix_incomes_category", "category"),
+        Index("ix_incomes_income_date", "income_date"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    category: Mapped[IncomeCategory] = mapped_column(
+        Enum(
+            IncomeCategory,
+            name="income_category",
+            values_callable=lambda enum: [item.value for item in enum],
+        ),
+        nullable=False,
+    )
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
+    income_date: Mapped[date] = mapped_column(Date, nullable=False)
     note: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

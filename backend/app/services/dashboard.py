@@ -12,6 +12,7 @@ from app.models import (
     ContractLineItem,
     Expense,
     ExpenseCategory,
+    Income,
     Payment,
     ServiceType,
 )
@@ -229,10 +230,25 @@ def get_dashboard_stats(
         )
     ) or Decimal("0")
 
-    net_profit = (period_revenue if has_custom_range else total_paid) - (
-        period_expenses if has_custom_range else total_expenses
+    total_other_income = db.scalar(
+        select(func.coalesce(func.sum(Income.amount), 0)).where(Income.deleted_at.is_(None))
+    ) or Decimal("0")
+
+    period_other_income = db.scalar(
+        select(func.coalesce(func.sum(Income.amount), 0)).where(
+            Income.deleted_at.is_(None),
+            Income.income_date >= period_start,
+            Income.income_date <= period_end,
+        )
+    ) or Decimal("0")
+
+    net_profit = (
+        (period_revenue + period_other_income if has_custom_range else total_paid + total_other_income)
+        - (period_expenses if has_custom_range else total_expenses)
     )
-    profit_base = period_revenue if has_custom_range else total_paid
+    profit_base = (
+        period_revenue + period_other_income if has_custom_range else total_paid + total_other_income
+    )
     profit_margin_pct = float((net_profit / profit_base) * 100) if profit_base > 0 else None
 
     expenses_by_category_rows = db.execute(
@@ -521,6 +537,8 @@ def get_dashboard_stats(
         period_end=period_end,
         period_expenses=period_expenses if has_custom_range else total_expenses,
         total_expenses=total_expenses,
+        period_other_income=period_other_income if has_custom_range else total_other_income,
+        total_other_income=total_other_income,
         net_profit=net_profit,
         profit_margin_pct=profit_margin_pct,
     )

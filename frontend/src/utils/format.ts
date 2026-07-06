@@ -43,6 +43,17 @@ export function formatDate(value: string): string {
   return new Date(value).toLocaleDateString(formatLocale);
 }
 
+/** Berilgan sananing hafta kuni nomini (masalan, "Payshanba") joriy tilda qaytaradi. */
+export function formatWeekday(value: string, style: "long" | "short" = "long"): string {
+  const weekday = new Date(value).toLocaleDateString(formatLocale, { weekday: style });
+  return weekday.charAt(0).toUpperCase() + weekday.slice(1);
+}
+
+/** Sana + hafta kunini birga qaytaradi, masalan "06.07.2026, Payshanba". */
+export function formatDateWithWeekday(value: string, style: "long" | "short" = "long"): string {
+  return `${formatDate(value)}, ${formatWeekday(value, style)}`;
+}
+
 export function statusLabel(status: string, t?: (k: string) => string): string {
   if (t) return t(`status.${status}`);
   return status === "faol" ? "Faol" : "Nofaol";

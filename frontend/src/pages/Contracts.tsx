@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { api } from "../api/client";
 import { ContractStatusBadge } from "../components/ContractStatusBadge";
-import { CancelIcon, DeleteIconBtn, RemoveIconBtn, SaveIconBtn } from "../components/ButtonIcons";
+import { CancelIcon, DeleteIconBtn, LoadingIconBtn, RemoveIconBtn, SaveIconBtn } from "../components/ButtonIcons";
 import { DateRangePicker } from "../components/DateRangePicker";
 import { ExportButtons } from "../components/ExportButtons";
 import { Modal } from "../components/Modal";
@@ -32,7 +32,6 @@ import {
   TableCellCompany,
   TableCellDate,
   TableCellMoney,
-  TableCellMuted,
   TableHead,
   TableHeader,
   TableRow,
@@ -65,7 +64,8 @@ import {
 import type { Client, Contract, ContractFormLineItem, ContractImportResult, ServiceType } from "../types";
 import { useI18n } from "../context/I18nContext";
 import { useListLoading } from "../hooks/useListLoading";
-import { formatDate, formatMoney, toNumber, toWholeAmountDigits } from "../utils/format";
+import { useSubmitGuard } from "../hooks/useSubmitGuard";
+import { formatDate, formatMoney, formatWeekday, toNumber, toWholeAmountDigits } from "../utils/format";
 import { PageHeader, PageShell } from "../components/PageHeader";
 
 export function ContractsPage() {
@@ -78,6 +78,7 @@ export function ContractsPage() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [error, setError] = useState("");
   const { loading, start, finish } = useListLoading();
+  const { submitting, guard } = useSubmitGuard();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [total, setTotal] = useState(0);
@@ -199,7 +200,7 @@ export function ContractsPage() {
     });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = guard(async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     if (!editing && !form.client_id) {
@@ -236,7 +237,7 @@ export function ContractsPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : t("common.error"));
     }
-  };
+  });
 
   const handleDownloadDocument = async (contract: Contract, type: "invoice" | "act") => {
     setError("");
@@ -392,15 +393,26 @@ export function ContractsPage() {
                     name={clientName(contract.client_id)}
                   />
                   <TableCellDate>
-                    <div className="flex flex-col gap-0.5">
+                    <div className="flex flex-col gap-1">
                       {contract.contract_number && (
                         <span className="text-xs font-semibold text-primary/80">
                           №{contract.contract_number}
                         </span>
                       )}
-                      <span>
-                        {formatDate(contract.start_date)} — {formatDate(contract.end_date)}
-                      </span>
+                      <div className="flex flex-col gap-0.5 text-xs leading-tight">
+                        <span className="font-medium text-foreground/90">
+                          {formatDate(contract.start_date)}
+                          <span className="ml-1 font-normal text-muted-foreground">
+                            {formatWeekday(contract.start_date, "short")}
+                          </span>
+                        </span>
+                        <span className="font-medium text-foreground/90">
+                          <span className="text-muted-foreground/60">→</span> {formatDate(contract.end_date)}
+                          <span className="ml-1 font-normal text-muted-foreground">
+                            {formatWeekday(contract.end_date, "short")}
+                          </span>
+                        </span>
+                      </div>
                       {contract.invoice_number && (
                         <span className="text-[10px] font-normal text-muted-foreground">
                           {t("contracts.invoiceNumber")}: {contract.invoice_number}
@@ -418,9 +430,20 @@ export function ContractsPage() {
                       <ContractStatusBadge endDate={contract.end_date} />
                     )}
                   </TableCell>
-                  <TableCellMuted className="max-w-[220px] truncate">
-                    {contract.line_items.map((i) => i.service_type_name).join(", ")}
-                  </TableCellMuted>
+                  <TableCell>
+                    <div className="grid w-64 grid-cols-4 gap-1">
+                      {contract.line_items.map((item, i) => (
+                        <Badge
+                          key={i}
+                          variant="outline"
+                          title={item.service_type_name}
+                          className="min-w-0 justify-center truncate px-1.5 text-[10.5px] font-normal text-muted-foreground"
+                        >
+                          {item.service_type_name}
+                        </Badge>
+                      ))}
+                    </div>
+                  </TableCell>
                   <TableCellMoney tone="neutral">
                     {formatMoney(contract.total_amount)}
                   </TableCellMoney>
@@ -452,26 +475,31 @@ export function ContractsPage() {
                     </MotionButton>
                     <MotionButton
                       variant="ghost"
-                      size="sm"
+                      size="icon-sm"
                       onClick={() => handleDuplicate(contract)}
                       title={t("contracts.duplicate")}
                       {...motionTap}
                     >
                       <CopyIcon data-icon="inline-start" />
                     </MotionButton>
-                    <MotionButton variant="ghost" size="sm" onClick={() => openEdit(contract)} {...motionTap}>
+                    <MotionButton
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => openEdit(contract)}
+                      title={t("common.edit")}
+                      {...motionTap}
+                    >
                       <PencilIcon data-icon="inline-start" />
-                      {t("common.edit")}
                     </MotionButton>
                     <MotionButton
                       variant="ghost"
-                      size="sm"
-                      className="text-destructive hover:text-destructive"
+                      size="icon-sm"
+                      className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                       onClick={() => setDeleteId(contract.id)}
+                      title={t("common.delete")}
                       {...motionTap}
                     >
                       <Trash2Icon data-icon="inline-start" />
-                      {t("common.delete")}
                     </MotionButton>
                   </TableCellActions>
                 </MotionTableRow>
@@ -572,7 +600,7 @@ export function ContractsPage() {
                 transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
                 className="overflow-hidden"
               >
-              <div className="flex flex-col gap-2 rounded-lg border border-border/50 p-2.5 sm:flex-row sm:items-center sm:border-0 sm:p-0">
+              <div className="flex flex-col gap-2 rounded-lg border border-border/50 p-2.5 sm:flex-row sm:items-start sm:border-0 sm:p-0">
                 <Select
                   value={String(item.service_type_id)}
                   onValueChange={(value) => {
@@ -582,7 +610,7 @@ export function ContractsPage() {
                     setForm({ ...form, line_items: items });
                   }}
                 >
-                  <SelectTrigger className="w-full sm:w-auto sm:flex-1">
+                  <SelectTrigger className="w-full data-[size=default]:h-12 sm:mt-3 sm:w-44 sm:shrink-0">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -595,9 +623,9 @@ export function ContractsPage() {
                     </SelectGroup>
                   </SelectContent>
                 </Select>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-1 items-center gap-2">
                   <FloatingLabelMoneyInput
-                    containerClassName="w-full sm:w-40"
+                    containerClassName="w-full flex-1"
                     label={t("common.price")}
                     required
                     value={item.price}
@@ -639,9 +667,9 @@ export function ContractsPage() {
               <CancelIcon />
               {t("common.cancel")}
             </MotionButton>
-            <MotionButton type="submit" {...motionTap}>
-              <SaveIconBtn />
-              {t("common.save")}
+            <MotionButton type="submit" disabled={submitting} {...motionTap}>
+              {submitting ? <LoadingIconBtn /> : <SaveIconBtn />}
+              {submitting ? t("common.saving") : t("common.save")}
             </MotionButton>
           </div>
         </form>

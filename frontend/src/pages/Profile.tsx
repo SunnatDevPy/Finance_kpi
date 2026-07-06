@@ -18,7 +18,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
 import { usePreferences } from "../context/PreferencesContext";
-import { formatDate, toWholeAmountDigits } from "../utils/format";
+import { formatDateWithWeekday, toWholeAmountDigits } from "../utils/format";
 import type { CompanyProfile, LoginHistoryEntry } from "../types";
 import { FloatingLabelInput } from "@/components/ui/floating-label-input";
 import { Button } from "@/components/ui/button";
@@ -401,7 +401,7 @@ export function ProfilePage() {
                     <TableCellMuted>{entry.username}</TableCellMuted>
                     <TableCellMuted>{entry.ip_address ?? "—"}</TableCellMuted>
                     <TableCellDate>
-                      {formatDate(entry.logged_in_at)}{" "}
+                      {formatDateWithWeekday(entry.logged_in_at, "short")}{" "}
                       {new Date(entry.logged_in_at).toLocaleTimeString(undefined, {
                         hour: "2-digit",
                         minute: "2-digit",

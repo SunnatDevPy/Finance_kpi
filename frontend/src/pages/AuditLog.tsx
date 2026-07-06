@@ -28,15 +28,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { AuditAction, AuditEntityType, AuditLogEntry } from "../types";
-import { formatDate } from "../utils/format";
+import { formatDateWithWeekday } from "../utils/format";
 
-const ENTITY_TYPES: AuditEntityType[] = ["client", "contract", "payment", "expense"];
+const ENTITY_TYPES: AuditEntityType[] = ["client", "contract", "payment", "expense", "income"];
 
 function entityLabel(type: string, t: (key: string) => string): string {
   if (type === "client") return t("auditLog.entityClient");
   if (type === "contract") return t("auditLog.entityContract");
   if (type === "payment") return t("auditLog.entityPayment");
   if (type === "expense") return t("auditLog.entityExpense");
+  if (type === "income") return t("auditLog.entityIncome");
   return type;
 }
 
@@ -173,7 +174,7 @@ export function AuditLogPage() {
                   </TableCellMuted>
                   <TableCellMuted>{entry.username}</TableCellMuted>
                   <TableCellDate>
-                    {formatDate(entry.created_at)}{" "}
+                    {formatDateWithWeekday(entry.created_at, "short")}{" "}
                     {new Date(entry.created_at).toLocaleTimeString(undefined, {
                       hour: "2-digit",
                       minute: "2-digit",

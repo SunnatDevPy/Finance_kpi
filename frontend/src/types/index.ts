@@ -187,6 +187,8 @@ export interface DashboardStats {
   period_end: string;
   period_expenses: string;
   total_expenses: string;
+  period_other_income: string;
+  total_other_income: string;
   net_profit: string;
   profit_margin_pct: number | null;
 }
@@ -287,7 +289,7 @@ export interface ExpiringContract {
 }
 
 export type AuditAction = "create" | "update" | "delete" | "restore";
-export type AuditEntityType = "client" | "contract" | "payment" | "expense";
+export type AuditEntityType = "client" | "contract" | "payment" | "expense" | "income";
 
 export type ExpenseCategory =
   | "salary"
@@ -321,6 +323,73 @@ export interface ExpenseSummary {
   by_category: ExpenseCategoryTotal[];
   period_start: string | null;
   period_end: string | null;
+}
+
+export type IncomeCategory =
+  | "sale"
+  | "service"
+  | "investment"
+  | "loan"
+  | "grant"
+  | "refund"
+  | "other";
+
+export interface Income {
+  id: number;
+  category: IncomeCategory;
+  title: string;
+  amount: string;
+  income_date: string;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IncomeCategoryTotal {
+  category: IncomeCategory;
+  total: string;
+}
+
+export interface IncomeSummary {
+  total_income: string;
+  by_category: IncomeCategoryTotal[];
+  period_start: string | null;
+  period_end: string | null;
+}
+
+export type FinanceEntryType = "income" | "expense" | "payment";
+
+export interface FinanceLedgerItem {
+  type: FinanceEntryType;
+  id: number;
+  date: string;
+  title: string;
+  category: string | null;
+  amount: string;
+  note: string | null;
+  client_id: number | null;
+  company_name: string | null;
+}
+
+export interface FinanceLedgerPage {
+  items: FinanceLedgerItem[];
+  total: number;
+  skip: number;
+  limit: number;
+  total_income: string;
+  total_expense: string;
+  net_balance: string;
+}
+
+export interface FinanceImportError {
+  row: number;
+  message: string;
+}
+
+export interface FinanceImportResult {
+  created_income: number;
+  created_expense: number;
+  errors: FinanceImportError[];
 }
 
 export interface AuditLogEntry {

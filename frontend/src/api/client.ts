@@ -16,6 +16,12 @@ import type {
   ExpenseCategory,
   ExpenseSummary,
   ExpiringContract,
+  FinanceEntryType,
+  FinanceImportResult,
+  FinanceLedgerPage,
+  Income,
+  IncomeCategory,
+  IncomeSummary,
   LoginHistoryEntry,
   Payment,
   PaymentListItem,
@@ -40,7 +46,45 @@ export function setOnUnauthorized(handler: () => void) {
   onUnauthorized = handler;
 }
 
+/**
+ * Bir xil so'rovni (metod + yo'l + tana) qisqa vaqt oralig'ida ikki marta
+ * yubormaslik uchun — masalan interfeys "qotib qolib" foydalanuvchi tugmani
+ * ikki marta bossa, yoki bir nechta joydan bir xil so'rov tasodifan chaqirilsa,
+ * ikkinchisi tarmoqqa yangi so'rov yubormasdan birinchisining natijasini kutadi.
+ */
+const inFlightRequests = new Map<string, Promise<unknown>>();
+const DEDUPE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const DEDUPE_GRACE_MS = 800;
+
+function dedupeKey(path: string, options?: RequestInit): string | null {
+  const method = (options?.method ?? "GET").toUpperCase();
+  if (!DEDUPE_METHODS.has(method)) return null;
+  const body = options?.body;
+  if (body !== undefined && typeof body !== "string") return null;
+  return `${method} ${path}\u0000${body ?? ""}`;
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const key = dedupeKey(path, options);
+  if (key) {
+    const existing = inFlightRequests.get(key);
+    if (existing) return existing as Promise<T>;
+  }
+
+  const exec = performRequest<T>(path, options);
+  if (key) {
+    inFlightRequests.set(key, exec);
+    const clear = () => {
+      window.setTimeout(() => {
+        if (inFlightRequests.get(key) === exec) inFlightRequests.delete(key);
+      }, DEDUPE_GRACE_MS);
+    };
+    exec.then(clear, clear);
+  }
+  return exec;
+}
+
+async function performRequest<T>(path: string, options?: RequestInit): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(options?.headers as Record<string, string>),
@@ -241,7 +285,7 @@ export const api = {
 
   export: {
     download: (
-      resource: "clients" | "contracts" | "payments" | "debts" | "expenses",
+      resource: "clients" | "contracts" | "payments" | "debts" | "expenses" | "incomes",
       format: "xlsx" | "pdf",
       params?: { date_from?: string; date_to?: string },
     ) => {
@@ -453,5 +497,85 @@ export const api = {
     delete: (id: number) => request<void>(`/expenses/${id}`, { method: "DELETE" }),
     trash: () => request<Expense[]>("/expenses/trash"),
     restore: (id: number) => request<Expense>(`/expenses/${id}/restore`, { method: "POST" }),
+  },
+
+  incomes: {
+    list: (params?: {
+      category?: IncomeCategory;
+      search?: string;
+      date_from?: string;
+      date_to?: string;
+      skip?: number;
+      limit?: number;
+    }) => {
+      const q = new URLSearchParams();
+      if (params?.category) q.set("category", params.category);
+      if (params?.search) q.set("search", params.search);
+      if (params?.date_from) q.set("date_from", params.date_from);
+      if (params?.date_to) q.set("date_to", params.date_to);
+      if (params?.skip !== undefined) q.set("skip", String(params.skip));
+      if (params?.limit !== undefined) q.set("limit", String(params.limit));
+      const qs = q.toString();
+      return request<Paginated<Income>>(`/incomes${qs ? `?${qs}` : ""}`);
+    },
+    summary: (params?: { date_from?: string; date_to?: string }) => {
+      const q = new URLSearchParams();
+      if (params?.date_from) q.set("date_from", params.date_from);
+      if (params?.date_to) q.set("date_to", params.date_to);
+      const qs = q.toString();
+      return request<IncomeSummary>(`/incomes/summary${qs ? `?${qs}` : ""}`);
+    },
+    create: (data: {
+      category: IncomeCategory;
+      title: string;
+      amount: number;
+      income_date: string;
+      note?: string;
+    }) =>
+      request<Income>("/incomes", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    update: (
+      id: number,
+      data: Partial<{
+        category: IncomeCategory;
+        title: string;
+        amount: number;
+        income_date: string;
+        note: string;
+      }>,
+    ) =>
+      request<Income>(`/incomes/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    delete: (id: number) => request<void>(`/incomes/${id}`, { method: "DELETE" }),
+    trash: () => request<Income[]>("/incomes/trash"),
+    restore: (id: number) => request<Income>(`/incomes/${id}/restore`, { method: "POST" }),
+  },
+
+  finance: {
+    ledger: (params?: {
+      type?: FinanceEntryType;
+      search?: string;
+      date_from?: string;
+      date_to?: string;
+      skip?: number;
+      limit?: number;
+    }) => {
+      const q = new URLSearchParams();
+      if (params?.type) q.set("type", params.type);
+      if (params?.search) q.set("search", params.search);
+      if (params?.date_from) q.set("date_from", params.date_from);
+      if (params?.date_to) q.set("date_to", params.date_to);
+      if (params?.skip !== undefined) q.set("skip", String(params.skip));
+      if (params?.limit !== undefined) q.set("limit", String(params.limit));
+      const qs = q.toString();
+      return request<FinanceLedgerPage>(`/finance/ledger${qs ? `?${qs}` : ""}`);
+    },
+    downloadImportTemplate: () =>
+      download("/finance/import-template", "moliya_tarixi_shabloni.xlsx"),
+    import: (file: File) => uploadFile<FinanceImportResult>("/finance/import", file),
   },
 };

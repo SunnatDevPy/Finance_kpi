@@ -8,7 +8,9 @@ from app.api.contracts import router as contracts_router
 from app.api.debts import router as debts_router
 from app.api.expenses import router as expenses_router
 from app.api.export import router as export_router
+from app.api.finance import router as finance_router
 from app.api.health import router as health_router
+from app.api.incomes import router as incomes_router
 from app.api.notifications import router as notifications_router
 from app.api.payments import router as payments_router
 from app.api.settings import router as settings_router
@@ -29,4 +31,6 @@ api_router.include_router(contracts_router, tags=["contracts"])
 api_router.include_router(debts_router, tags=["debts"])
 api_router.include_router(payments_router, tags=["payments"])
 api_router.include_router(expenses_router, tags=["expenses"])
+api_router.include_router(incomes_router, tags=["incomes"])
+api_router.include_router(finance_router, tags=["finance"])
 api_router.include_router(users_router, tags=["users"])

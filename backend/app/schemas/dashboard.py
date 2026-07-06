@@ -72,5 +72,7 @@ class DashboardStats(BaseModel):
     period_end: date
     period_expenses: Decimal
     total_expenses: Decimal
+    period_other_income: Decimal
+    total_other_income: Decimal
     net_profit: Decimal
     profit_margin_pct: float | None

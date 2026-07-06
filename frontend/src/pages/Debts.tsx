@@ -24,7 +24,7 @@ import { StatCard } from "../components/StatCard";
 import { useI18n } from "../context/I18nContext";
 import { useListLoading } from "../hooks/useListLoading";
 import type { DebtsSummary } from "../types";
-import { formatDate, formatMoney, toNumber } from "../utils/format";
+import { formatDateWithWeekday, formatMoney, toNumber } from "../utils/format";
 
 export function DebtsPage() {
   const { t } = useI18n();
@@ -119,7 +119,7 @@ export function DebtsPage() {
                   <MotionTableRow key={row.contract_id} {...rowEnter(index)}>
                     <TableCellCompany to={`/clients/${row.client_id}`} name={row.company_name} />
                     <TableCellDate>
-                      {formatDate(row.start_date)} — {formatDate(row.end_date)}
+                      {formatDateWithWeekday(row.start_date, "short")} — {formatDateWithWeekday(row.end_date, "short")}
                     </TableCellDate>
                     <TableCellMoney tone="neutral">{formatMoney(row.total_amount)}</TableCellMoney>
                     <TableCellMoney tone="positive">{formatMoney(row.paid_amount)}</TableCellMoney>

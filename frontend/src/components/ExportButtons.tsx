@@ -10,7 +10,7 @@ import { useI18n } from "../context/I18nContext";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-type ExportResource = "clients" | "contracts" | "payments" | "debts" | "expenses";
+type ExportResource = "clients" | "contracts" | "payments" | "debts" | "expenses" | "incomes";
 
 interface ExportButtonsProps {
   resource: ExportResource;
@@ -27,6 +27,7 @@ const LABEL_KEYS: Record<ExportResource, string> = {
   payments: "export.payments",
   debts: "export.debts",
   expenses: "export.expenses",
+  incomes: "export.incomes",
 };
 
 export function ExportButtons({

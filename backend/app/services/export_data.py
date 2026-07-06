@@ -4,7 +4,7 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import Client, Contract, ContractLineItem, Expense, Payment
+from app.models import Client, Contract, ContractLineItem, Expense, Income, Payment
 
 EXPENSE_CATEGORY_NAMES: dict[str, str] = {
     "salary": "Ish haqi",
@@ -15,6 +15,16 @@ EXPENSE_CATEGORY_NAMES: dict[str, str] = {
     "office": "Ofis xarajatlari",
     "tax": "Soliq",
     "bank_fee": "Bank xizmati",
+    "other": "Boshqa",
+}
+
+INCOME_CATEGORY_NAMES: dict[str, str] = {
+    "sale": "Sotuv",
+    "service": "Xizmat",
+    "investment": "Investitsiya",
+    "loan": "Kredit/qarz",
+    "grant": "Grant",
+    "refund": "Qaytarma",
     "other": "Boshqa",
 }
 
@@ -168,6 +178,30 @@ def fetch_expenses_rows(
     ]
 
 
+def fetch_incomes_rows(
+    db: Session,
+    date_from: date | None = None,
+    date_to: date | None = None,
+) -> list[list[str]]:
+    stmt = select(Income).where(Income.deleted_at.is_(None)).order_by(Income.income_date.desc())
+    if date_from is not None:
+        stmt = stmt.where(Income.income_date >= date_from)
+    if date_to is not None:
+        stmt = stmt.where(Income.income_date <= date_to)
+
+    incomes = list(db.scalars(stmt).all())
+    return [
+        [
+            income.income_date.isoformat(),
+            INCOME_CATEGORY_NAMES.get(income.category.value, income.category.value),
+            income.title,
+            _money(income.amount),
+            income.note or "",
+        ]
+        for income in incomes
+    ]
+
+
 CLIENT_HEADERS = ["Korxona", "Mas'ul", "Telefon", "Shahar", "Holat"]
 CONTRACT_HEADERS = [
     "Mijoz",
@@ -183,6 +217,7 @@ CONTRACT_HEADERS = [
 PAYMENT_HEADERS = ["Sana", "Kontrakt ID", "Mijoz", "Summa", "Izoh"]
 DEBT_HEADERS = ["Korxona", "Mas'ul", "Telefon", "Qarz"]
 EXPENSE_HEADERS = ["Sana", "Kategoriya", "Nomi", "Summa", "Izoh"]
+INCOME_HEADERS = ["Sana", "Kategoriya", "Nomi", "Summa", "Izoh"]
 
 EXPORT_TITLES = {
     "clients": "Mijozlar",
@@ -190,4 +225,5 @@ EXPORT_TITLES = {
     "payments": "To'lovlar",
     "debts": "Qarzdorlik",
     "expenses": "Xarajatlar",
+    "incomes": "Kirimlar",
 }

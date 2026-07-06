@@ -10,6 +10,7 @@ import {
 import { api } from "../api/client";
 import {
   CancelIcon,
+  LoadingIconBtn,
   SaveIconBtn,
 } from "../components/ButtonIcons";
 import { Modal } from "../components/Modal";
@@ -19,6 +20,7 @@ import { ServiceTypeCard } from "../components/ServiceTypeCard";
 import { ServiceTypeDetailModal } from "../components/ServiceTypeDetailModal";
 import { StatCard } from "../components/StatCard";
 import { useListLoading } from "../hooks/useListLoading";
+import { useSubmitGuard } from "../hooks/useSubmitGuard";
 import { useI18n } from "../context/I18nContext";
 import {
   AlertDialog,
@@ -48,6 +50,7 @@ export function ServiceTypesPage() {
   const [error, setError] = useState("");
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
   const { loading, start, finish } = useListLoading();
+  const { submitting, guard } = useSubmitGuard();
   const menuRef = useRef<HTMLDivElement>(null);
 
   const load = (silent = false) => {
@@ -98,7 +101,7 @@ export function ServiceTypesPage() {
     return items.filter((item) => item.name.toLowerCase().includes(query));
   }, [items, search]);
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleCreate = guard(async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     try {
@@ -109,7 +112,7 @@ export function ServiceTypesPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : t("common.error"));
     }
-  };
+  });
 
   const toggleActive = useCallback(async (item: ServiceType) => {
     const nextActive = !item.is_active;
@@ -261,9 +264,9 @@ export function ServiceTypesPage() {
               <CancelIcon />
               {t("common.cancel")}
             </MotionButton>
-            <MotionButton type="submit" {...motionTap}>
-              <SaveIconBtn />
-              {t("common.save")}
+            <MotionButton type="submit" disabled={submitting} {...motionTap}>
+              {submitting ? <LoadingIconBtn /> : <SaveIconBtn />}
+              {submitting ? t("common.saving") : t("common.save")}
             </MotionButton>
           </div>
         </form>

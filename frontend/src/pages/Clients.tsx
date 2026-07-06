@@ -13,7 +13,7 @@ import {
 import { api } from "../api/client";
 import { ClientLogoUploader } from "../components/ClientLogoUploader";
 import { ExportButtons } from "../components/ExportButtons";
-import { CancelIcon, DeleteIconBtn, SaveIconBtn } from "../components/ButtonIcons";
+import { CancelIcon, DeleteIconBtn, LoadingIconBtn, SaveIconBtn } from "../components/ButtonIcons";
 import { Modal } from "../components/Modal";
 import { PageError } from "../components/PageError";
 import { Pagination } from "../components/Pagination";
@@ -60,6 +60,7 @@ import { emptyClientForm } from "../utils/format";
 import { PageHeader, PageShell } from "../components/PageHeader";
 import { StatusBadge } from "../components/StatusBadge";
 import { useListLoading } from "../hooks/useListLoading";
+import { useSubmitGuard } from "../hooks/useSubmitGuard";
 
 export function ClientsPage() {
   const { t } = useI18n();
@@ -72,6 +73,7 @@ export function ClientsPage() {
   const [error, setError] = useState("");
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const { loading, start, finish } = useListLoading();
+  const { submitting, guard } = useSubmitGuard();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [total, setTotal] = useState(0);
@@ -133,7 +135,7 @@ export function ClientsPage() {
     setModalOpen(true);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = guard(async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     try {
@@ -158,7 +160,7 @@ export function ClientsPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : t("common.error"));
     }
-  };
+  });
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -420,9 +422,9 @@ export function ClientsPage() {
               <CancelIcon />
               {t("common.cancel")}
             </MotionButton>
-            <MotionButton type="submit" {...motionTap}>
-              <SaveIconBtn />
-              {t("common.save")}
+            <MotionButton type="submit" disabled={submitting} {...motionTap}>
+              {submitting ? <LoadingIconBtn /> : <SaveIconBtn />}
+              {submitting ? t("common.saving") : t("common.save")}
             </MotionButton>
           </div>
         </form>

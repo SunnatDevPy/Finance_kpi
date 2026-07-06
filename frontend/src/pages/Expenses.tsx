@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { PencilIcon, PlusIcon, Trash2Icon, WalletIcon } from "lucide-react";
 import { api } from "../api/client";
-import { CancelIcon, DeleteIconBtn, SaveIconBtn } from "../components/ButtonIcons";
+import { CancelIcon, DeleteIconBtn, LoadingIconBtn, SaveIconBtn } from "../components/ButtonIcons";
 import { DateRangePicker } from "../components/DateRangePicker";
 import { ExportButtons } from "../components/ExportButtons";
 import { Modal } from "../components/Modal";
@@ -25,6 +25,7 @@ import {
 } from "../components/PremiumDataTable";
 import { useI18n } from "../context/I18nContext";
 import { useListLoading } from "../hooks/useListLoading";
+import { useSubmitGuard } from "../hooks/useSubmitGuard";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -56,7 +57,7 @@ import {
 } from "@/components/ui/select";
 import type { Expense, ExpenseCategory } from "../types";
 import { EXPENSE_CATEGORIES, expenseCategoryLabel } from "../utils/expenseCategory";
-import { formatDate, formatMoney, toWholeAmountDigits } from "../utils/format";
+import { formatDateWithWeekday, formatMoney, toWholeAmountDigits } from "../utils/format";
 
 interface ExpenseForm {
   category: ExpenseCategory;
@@ -89,6 +90,7 @@ export function ExpensesPage() {
   const [pageSize, setPageSize] = useState(20);
   const [error, setError] = useState("");
   const { loading, start, finish } = useListLoading();
+  const { submitting, guard } = useSubmitGuard();
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Expense | null>(null);
@@ -148,7 +150,7 @@ export function ExpensesPage() {
     setModalOpen(true);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = guard(async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     if (!form.expense_date) {
@@ -174,7 +176,7 @@ export function ExpensesPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : t("common.error"));
     }
-  };
+  });
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -290,7 +292,7 @@ export function ExpensesPage() {
             <TableBody>
               {expenses.map((expense, index) => (
                 <MotionTableRow key={expense.id} {...rowEnter(index)}>
-                  <TableCellDate>{formatDate(expense.expense_date)}</TableCellDate>
+                  <TableCellDate>{formatDateWithWeekday(expense.expense_date)}</TableCellDate>
                   <TableCellMuted>
                     <Badge variant="outline">{expenseCategoryLabel(t, expense.category)}</Badge>
                   </TableCellMuted>
@@ -387,9 +389,9 @@ export function ExpensesPage() {
               <CancelIcon />
               {t("common.cancel")}
             </MotionButton>
-            <MotionButton type="submit" {...motionTap}>
-              <SaveIconBtn />
-              {t("common.save")}
+            <MotionButton type="submit" disabled={submitting} {...motionTap}>
+              {submitting ? <LoadingIconBtn /> : <SaveIconBtn />}
+              {submitting ? t("common.saving") : t("common.save")}
             </MotionButton>
           </div>
         </form>

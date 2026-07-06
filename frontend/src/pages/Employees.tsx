@@ -5,6 +5,7 @@ import {
   BlockIconBtn,
   CancelIcon,
   CreateUserIconBtn,
+  LoadingIconBtn,
   UnblockIconBtn,
 } from "../components/ButtonIcons";
 import { CompanyAvatar } from "../components/CompanyAvatar";
@@ -26,6 +27,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
 import { useListLoading } from "../hooks/useListLoading";
+import { useSubmitGuard } from "../hooks/useSubmitGuard";
 import { MotionButton, motionTap } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FloatingLabelInput } from "@/components/ui/floating-label-input";
@@ -49,6 +51,7 @@ export function EmployeesPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [error, setError] = useState("");
   const { loading, start, finish } = useListLoading();
+  const { submitting, guard } = useSubmitGuard();
   const [form, setForm] = useState({
     username: "",
     full_name: "",
@@ -79,7 +82,7 @@ export function EmployeesPage() {
     );
   }, [users, search]);
 
-  const handleCreate = async (e: FormEvent) => {
+  const handleCreate = guard(async (e: FormEvent) => {
     e.preventDefault();
     setError("");
     try {
@@ -90,7 +93,7 @@ export function EmployeesPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : t("common.error"));
     }
-  };
+  });
 
   const toggleActive = async (target: User) => {
     if (currentUser && target.id === currentUser.id && target.is_active) {
@@ -272,9 +275,9 @@ export function EmployeesPage() {
               <CancelIcon />
               {t("common.cancel")}
             </MotionButton>
-            <MotionButton type="submit" {...motionTap}>
-              <CreateUserIconBtn />
-              {t("common.create")}
+            <MotionButton type="submit" disabled={submitting} {...motionTap}>
+              {submitting ? <LoadingIconBtn /> : <CreateUserIconBtn />}
+              {submitting ? t("common.saving") : t("common.create")}
             </MotionButton>
           </div>
         </form>

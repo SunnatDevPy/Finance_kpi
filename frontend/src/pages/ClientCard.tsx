@@ -13,7 +13,7 @@ import {
   XCircleIcon,
 } from "lucide-react";
 import { api } from "../api/client";
-import { CancelIcon, SaveIconBtn } from "../components/ButtonIcons";
+import { CancelIcon, LoadingIconBtn, SaveIconBtn } from "../components/ButtonIcons";
 import { ClientLogoUploader } from "../components/ClientLogoUploader";
 import { Modal } from "../components/Modal";
 import { PageError } from "../components/PageError";
@@ -47,6 +47,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { useI18n } from "../context/I18nContext";
+import { useSubmitGuard } from "../hooks/useSubmitGuard";
 import { Button, MotionButton, motionTap } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FloatingLabelDatePicker } from "@/components/ui/date-picker";
@@ -61,7 +62,7 @@ import {
 } from "@/components/ui/select";
 import type { ClientCard, Payment } from "../types";
 import { cn } from "@/lib/utils";
-import { formatDate, formatMoney, toNumber } from "../utils/format";
+import { formatDateWithWeekday, formatMoney, toNumber } from "../utils/format";
 
 export function ClientCardPage() {
   const { id } = useParams<{ id: string }>();
@@ -78,6 +79,7 @@ export function ClientCardPage() {
   } | null>(null);
   const [cancelContractTarget, setCancelContractTarget] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
+  const { submitting: payingSubmitting, guard: guardPayment } = useSubmitGuard();
 
   const load = () => {
     if (!id) return;
@@ -102,7 +104,7 @@ export function ClientCardPage() {
 
   useEffect(load, [id]);
 
-  const handlePayment = async (e: React.FormEvent) => {
+  const handlePayment = guardPayment(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!payModal) return;
     setError("");
@@ -125,7 +127,7 @@ export function ClientCardPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : t("common.error"));
     }
-  };
+  });
 
   const handleDownloadDocument = async (
     contractId: number,
@@ -285,7 +287,7 @@ export function ClientCardPage() {
                           </span>
                         )}
                         <p className="font-semibold text-foreground">
-                          {formatDate(contract.start_date)} — {formatDate(contract.end_date)}
+                          {formatDateWithWeekday(contract.start_date, "short")} — {formatDateWithWeekday(contract.end_date, "short")}
                         </p>
                         {contract.is_cancelled ? (
                           <Badge variant="secondary" className="gap-1 text-muted-foreground">
@@ -471,7 +473,7 @@ export function ClientCardPage() {
               <TableBody>
                 {payments.map((p, index) => (
                   <MotionTableRow key={p.id} {...rowEnter(index)}>
-                    <TableCellDate>{formatDate(p.paid_at)}</TableCellDate>
+                    <TableCellDate>{formatDateWithWeekday(p.paid_at)}</TableCellDate>
                     <TableCellMuted>#{p.contract_id}</TableCellMuted>
                     <TableCellMoney tone="positive">{formatMoney(p.amount)}</TableCellMoney>
                     <TableCellMuted>{p.note}</TableCellMuted>
@@ -530,9 +532,9 @@ export function ClientCardPage() {
               <CancelIcon />
               {t("common.cancel")}
             </MotionButton>
-            <MotionButton type="submit" {...motionTap}>
-              <SaveIconBtn />
-              {t("common.save")}
+            <MotionButton type="submit" disabled={payingSubmitting} {...motionTap}>
+              {payingSubmitting ? <LoadingIconBtn /> : <SaveIconBtn />}
+              {payingSubmitting ? t("common.saving") : t("common.save")}
             </MotionButton>
           </div>
         </form>

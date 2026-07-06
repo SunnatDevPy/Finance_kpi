@@ -31,11 +31,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { MotionButton, motionTap } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import type { Client, Contract, Expense, Payment } from "../types";
-import { formatDate, formatMoney } from "../utils/format";
+import type { Client, Contract, Expense, Income, Payment } from "../types";
+import { formatDateWithWeekday, formatMoney } from "../utils/format";
 import { expenseCategoryLabel } from "../utils/expenseCategory";
+import { incomeCategoryLabel } from "../utils/incomeCategory";
 
-type TrashTab = "clients" | "contracts" | "payments" | "expenses";
+type TrashTab = "clients" | "contracts" | "payments" | "expenses" | "incomes";
 
 export function TrashPage() {
   const { t } = useI18n();
@@ -44,6 +45,7 @@ export function TrashPage() {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [incomes, setIncomes] = useState<Income[]>([]);
   const [clientNames, setClientNames] = useState<Record<number, string>>({});
   const [error, setError] = useState("");
   const [restoreTarget, setRestoreTarget] = useState<{ tab: TrashTab; id: number } | null>(null);
@@ -57,19 +59,30 @@ export function TrashPage() {
       api.contracts.trash(),
       api.payments.trash(),
       api.expenses.trash(),
+      api.incomes.trash(),
       api.clients.list({ limit: 200 }).catch(() => ({ items: [] as Client[] })),
     ])
-      .then(([trashedClients, trashedContracts, trashedPayments, trashedExpenses, activeClients]) => {
-        setClients(trashedClients);
-        setContracts(trashedContracts);
-        setPayments(trashedPayments);
-        setExpenses(trashedExpenses);
-        const map: Record<number, string> = {};
-        for (const client of [...trashedClients, ...activeClients.items]) {
-          map[client.id] = client.company_name;
-        }
-        setClientNames(map);
-      })
+      .then(
+        ([
+          trashedClients,
+          trashedContracts,
+          trashedPayments,
+          trashedExpenses,
+          trashedIncomes,
+          activeClients,
+        ]) => {
+          setClients(trashedClients);
+          setContracts(trashedContracts);
+          setPayments(trashedPayments);
+          setExpenses(trashedExpenses);
+          setIncomes(trashedIncomes);
+          const map: Record<number, string> = {};
+          for (const client of [...trashedClients, ...activeClients.items]) {
+            map[client.id] = client.company_name;
+          }
+          setClientNames(map);
+        },
+      )
       .catch((e) => setError(e.message))
       .finally(() => finish());
   };
@@ -85,8 +98,9 @@ export function TrashPage() {
       { id: "contracts", label: t("trash.tabContracts"), count: contracts.length },
       { id: "payments", label: t("trash.tabPayments"), count: payments.length },
       { id: "expenses", label: t("trash.tabExpenses"), count: expenses.length },
+      { id: "incomes", label: t("trash.tabIncomes"), count: incomes.length },
     ],
-    [t, clients.length, contracts.length, payments.length, expenses.length],
+    [t, clients.length, contracts.length, payments.length, expenses.length, incomes.length],
   );
 
   const handleRestore = async () => {
@@ -103,9 +117,12 @@ export function TrashPage() {
       } else if (targetTab === "payments") {
         await api.payments.restore(id);
         setPayments((prev) => prev.filter((item) => item.id !== id));
-      } else {
+      } else if (targetTab === "expenses") {
         await api.expenses.restore(id);
         setExpenses((prev) => prev.filter((item) => item.id !== id));
+      } else {
+        await api.incomes.restore(id);
+        setIncomes((prev) => prev.filter((item) => item.id !== id));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : t("common.error"));
@@ -177,7 +194,7 @@ export function TrashPage() {
                   <MotionTableRow key={item.id} {...rowEnter(index)}>
                     <TableCellPrimary>{item.company_name}</TableCellPrimary>
                     <TableCellMuted>{item.phone}</TableCellMuted>
-                    <TableCellDate>{formatDate(item.updated_at)}</TableCellDate>
+                    <TableCellDate>{formatDateWithWeekday(item.updated_at)}</TableCellDate>
                     <TableCellActions>
                       <MotionButton
                         variant="outline"
@@ -219,10 +236,10 @@ export function TrashPage() {
                       {clientNames[item.client_id] ?? `ID ${item.client_id}`}
                     </TableCellPrimary>
                     <TableCellMuted>
-                      {formatDate(item.start_date)} — {formatDate(item.end_date)}
+                      {formatDateWithWeekday(item.start_date, "short")} — {formatDateWithWeekday(item.end_date, "short")}
                     </TableCellMuted>
                     <TableCellMoney>{formatMoney(item.total_amount)}</TableCellMoney>
-                    <TableCellDate>{formatDate(item.updated_at)}</TableCellDate>
+                    <TableCellDate>{formatDateWithWeekday(item.updated_at)}</TableCellDate>
                     <TableCellActions>
                       <MotionButton
                         variant="outline"
@@ -260,7 +277,7 @@ export function TrashPage() {
                 {payments.map((item, index) => (
                   <MotionTableRow key={item.id} {...rowEnter(index)}>
                     <TableCellMuted>#{item.contract_id}</TableCellMuted>
-                    <TableCellDate>{formatDate(item.paid_at)}</TableCellDate>
+                    <TableCellDate>{formatDateWithWeekday(item.paid_at)}</TableCellDate>
                     <TableCellMoney>{formatMoney(item.amount)}</TableCellMoney>
                     <TableCellActions>
                       <MotionButton
@@ -299,7 +316,7 @@ export function TrashPage() {
               <TableBody>
                 {expenses.map((item, index) => (
                   <MotionTableRow key={item.id} {...rowEnter(index)}>
-                    <TableCellDate>{formatDate(item.expense_date)}</TableCellDate>
+                    <TableCellDate>{formatDateWithWeekday(item.expense_date)}</TableCellDate>
                     <TableCellMuted>{expenseCategoryLabel(t, item.category)}</TableCellMuted>
                     <TableCellPrimary>{item.title}</TableCellPrimary>
                     <TableCellMoney tone="negative">{formatMoney(item.amount)}</TableCellMoney>
@@ -309,6 +326,47 @@ export function TrashPage() {
                         size="sm"
                         className="rounded-lg"
                         onClick={() => setRestoreTarget({ tab: "expenses", id: item.id })}
+                        {...motionTap}
+                      >
+                        <RotateCcwIcon data-icon="inline-start" />
+                        {t("trash.restore")}
+                      </MotionButton>
+                    </TableCellActions>
+                  </MotionTableRow>
+                ))}
+              </TableBody>
+            </PremiumDataTable>
+          )}
+
+          {tab === "incomes" && (
+            <PremiumDataTable
+              loading={loading}
+              empty={!loading && incomes.length === 0}
+              emptyMessage={t("trash.empty")}
+              skeletonCols={5}
+            >
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t("common.date")}</TableHead>
+                  <TableHead>{t("finance.category")}</TableHead>
+                  <TableHead>{t("expenses.titleField")}</TableHead>
+                  <TableHead>{t("common.amount")}</TableHead>
+                  <TableHead className="text-right">{t("common.actions")}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {incomes.map((item, index) => (
+                  <MotionTableRow key={item.id} {...rowEnter(index)}>
+                    <TableCellDate>{formatDateWithWeekday(item.income_date)}</TableCellDate>
+                    <TableCellMuted>{incomeCategoryLabel(t, item.category)}</TableCellMuted>
+                    <TableCellPrimary>{item.title}</TableCellPrimary>
+                    <TableCellMoney tone="positive">{formatMoney(item.amount)}</TableCellMoney>
+                    <TableCellActions>
+                      <MotionButton
+                        variant="outline"
+                        size="sm"
+                        className="rounded-lg"
+                        onClick={() => setRestoreTarget({ tab: "incomes", id: item.id })}
                         {...motionTap}
                       >
                         <RotateCcwIcon data-icon="inline-start" />
