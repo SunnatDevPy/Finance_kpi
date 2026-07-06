@@ -91,6 +91,10 @@ export function ContractsPage() {
   const [importResult, setImportResult] = useState<ContractImportResult | null>(null);
   const [importError, setImportError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [contractNumberHint, setContractNumberHint] = useState<{
+    last: string | null;
+    next: string;
+  } | null>(null);
 
   const [form, setForm] = useState({
     client_id: "",
@@ -155,12 +159,14 @@ export function ContractsPage() {
 
   const openCreate = () => {
     setEditing(null);
+    setContractNumberHint(null);
     setForm(emptyForm());
     setModalOpen(true);
   };
 
   const openEdit = (contract: Contract) => {
     setEditing(contract);
+    setContractNumberHint(null);
     setForm({
       client_id: String(contract.client_id),
       start_date: contract.start_date,
@@ -179,7 +185,30 @@ export function ContractsPage() {
   const closeModal = () => {
     setModalOpen(false);
     setEditing(null);
+    setContractNumberHint(null);
     setForm(emptyForm());
+  };
+
+  const handleClientChange = async (clientId: string) => {
+    if (editing) {
+      setForm((f) => ({ ...f, client_id: clientId }));
+      return;
+    }
+
+    setForm((f) => ({ ...f, client_id: clientId, contract_number: "" }));
+    setContractNumberHint(null);
+
+    try {
+      const data = await api.contracts.nextNumber(parseInt(clientId, 10));
+      setForm((f) => ({
+        ...f,
+        client_id: clientId,
+        contract_number: data.next_number,
+      }));
+      setContractNumberHint({ last: data.last_number, next: data.next_number });
+    } catch {
+      setContractNumberHint(null);
+    }
   };
 
   const addLineItem = () => {
@@ -527,7 +556,7 @@ export function ContractsPage() {
             ) : (
               <Select
                 value={form.client_id}
-                onValueChange={(value) => value && setForm({ ...form, client_id: value })}
+                onValueChange={(value) => value && handleClientChange(value)}
               >
                 <SelectTrigger id="client" className="w-full">
                   <SelectValue placeholder={t("contracts.selectClient")} />
@@ -564,12 +593,26 @@ export function ContractsPage() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FloatingLabelInput
-              id="contract_number"
-              label={t("contracts.contractNumber")}
-              value={form.contract_number}
-              onChange={(e) => setForm({ ...form, contract_number: e.target.value })}
-            />
+            <div className="flex flex-col gap-1">
+              <FloatingLabelInput
+                id="contract_number"
+                label={t("contracts.contractNumber")}
+                value={form.contract_number}
+                onChange={(e) => setForm({ ...form, contract_number: e.target.value })}
+              />
+              {!editing && contractNumberHint && (
+                <p className="px-1 text-xs text-muted-foreground">
+                  {contractNumberHint.last
+                    ? t("contracts.contractNumberNext")
+                        .replace("{last}", contractNumberHint.last)
+                        .replace("{next}", contractNumberHint.next)
+                    : t("contracts.contractNumberFirst").replace(
+                        "{number}",
+                        contractNumberHint.next,
+                      )}
+                </p>
+              )}
+            </div>
             <FloatingLabelInput
               id="invoice_number"
               label={t("contracts.invoiceNumber")}
@@ -597,6 +640,7 @@ export function ContractsPage() {
                 transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
                 className="overflow-hidden"
               >
+              <div className="pt-2.5 pb-1">
               <div className="flex flex-col gap-2 rounded-lg border border-border/50 p-2.5 sm:flex-row sm:items-start sm:border-0 sm:p-0">
                 <Select
                   value={String(item.service_type_id)}
@@ -645,6 +689,7 @@ export function ContractsPage() {
                     </MotionButton>
                   )}
                 </div>
+              </div>
               </div>
               </motion.div>
             ))}

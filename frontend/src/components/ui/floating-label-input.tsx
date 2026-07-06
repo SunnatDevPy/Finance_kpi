@@ -9,12 +9,12 @@ export const inputStyles =
 
 /** Label chiziq ustida — scale yo‘q, o‘qilishi oson o‘lcham */
 export const floatedLabel =
-  "top-0 -translate-y-1/2 bg-background px-2 text-sm font-semibold leading-tight text-brand-700 dark:bg-card dark:text-brand-300";
+  "top-0 z-20 -translate-y-1/2 bg-background px-2 text-sm font-semibold leading-tight text-brand-700 dark:bg-card dark:text-brand-300";
 
 export const restingLabel = "top-1/2 -translate-y-1/2 text-sm text-muted-foreground";
 
 export const labelPeer =
-  "pointer-events-none absolute left-3 z-10 transition-all duration-200 ease-out peer-focus:top-0 peer-focus:-translate-y-1/2 peer-focus:bg-background peer-focus:px-2 peer-focus:text-sm peer-focus:font-semibold peer-focus:leading-tight peer-focus:text-brand-700 peer-[:not(:placeholder-shown)]:top-0 peer-[:not(:placeholder-shown)]:-translate-y-1/2 peer-[:not(:placeholder-shown)]:bg-background peer-[:not(:placeholder-shown)]:px-2 peer-[:not(:placeholder-shown)]:text-sm peer-[:not(:placeholder-shown)]:font-semibold peer-[:not(:placeholder-shown)]:leading-tight peer-[:not(:placeholder-shown)]:text-brand-700 dark:peer-focus:bg-card dark:peer-[:not(:placeholder-shown)]:bg-card dark:peer-focus:text-brand-300 dark:peer-[:not(:placeholder-shown)]:text-brand-300";
+  "pointer-events-none absolute left-3 z-20 transition-all duration-200 ease-out peer-focus:top-0 peer-focus:-translate-y-1/2 peer-focus:bg-background peer-focus:px-2 peer-focus:text-sm peer-focus:font-semibold peer-focus:leading-tight peer-focus:text-brand-700 peer-focus:z-20 peer-[:not(:placeholder-shown)]:top-0 peer-[:not(:placeholder-shown)]:-translate-y-1/2 peer-[:not(:placeholder-shown)]:bg-background peer-[:not(:placeholder-shown)]:px-2 peer-[:not(:placeholder-shown)]:text-sm peer-[:not(:placeholder-shown)]:font-semibold peer-[:not(:placeholder-shown)]:leading-tight peer-[:not(:placeholder-shown)]:text-brand-700 peer-[:not(:placeholder-shown)]:z-20 dark:peer-focus:bg-card dark:peer-[:not(:placeholder-shown)]:bg-card dark:peer-focus:text-brand-300 dark:peer-[:not(:placeholder-shown)]:text-brand-300";
 
 type FloatingLabelInputProps = React.ComponentProps<"input"> & {
   label: string;

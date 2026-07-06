@@ -354,6 +354,10 @@ export const api = {
       const qs = q.toString();
       return request<Paginated<Contract>>(`/contracts${qs ? `?${qs}` : ""}`);
     },
+    nextNumber: (clientId: number) =>
+      request<{ last_number: string | null; next_number: string }>(
+        `/contracts/next-number?client_id=${clientId}`,
+      ),
     create: (data: {
       client_id: number;
       start_date: string;

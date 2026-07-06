@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.api.deps import get_current_user, require_admin
 from app.database import get_db
 from app.models import AuditAction, Client, Contract, ContractLineItem, User
-from app.schemas.contract import ContractCreate, ContractRead, ContractUpdate
+from app.schemas.contract import ContractCreate, ContractNextNumber, ContractRead, ContractUpdate
 from app.schemas.contract_import import ContractImportResult
 from app.schemas.pagination import Page
 from app.services.app_settings import get_company_profile
@@ -151,6 +151,43 @@ async def import_contracts(
         ) from exc
 
 
+def _next_contract_number_for_client(db: Session, client_id: int) -> ContractNextNumber:
+    get_client_or_404(db, client_id)
+    numbers = db.scalars(
+        select(Contract.contract_number).where(
+            Contract.client_id == client_id,
+            Contract.deleted_at.is_(None),
+            Contract.contract_number.is_not(None),
+        )
+    ).all()
+
+    max_num = 0
+    last_number: str | None = None
+    for raw in numbers:
+        if not raw:
+            continue
+        stripped = raw.strip()
+        if not stripped.isdigit():
+            continue
+        value = int(stripped)
+        if value > max_num:
+            max_num = value
+            last_number = stripped
+
+    return ContractNextNumber(
+        last_number=last_number,
+        next_number=str(max_num + 1) if max_num > 0 else "1",
+    )
+
+
+@router.get("/next-number", response_model=ContractNextNumber)
+def next_contract_number(
+    client_id: int = Query(..., ge=1),
+    db: Session = Depends(get_db),
+) -> ContractNextNumber:
+    return _next_contract_number_for_client(db, client_id)
+
+
 @router.post("/{contract_id}/duplicate", response_model=ContractRead, status_code=status.HTTP_201_CREATED)
 def duplicate_contract(
     contract_id: int,
@@ -161,12 +198,14 @@ def duplicate_contract(
     duration = source.end_date - source.start_date
     new_start = date.today()
     new_end = new_start + duration
+    next_number = _next_contract_number_for_client(db, source.client_id).next_number
 
     contract = Contract(
         client_id=source.client_id,
         start_date=new_start,
         end_date=new_end,
         notes=source.notes,
+        contract_number=next_number,
         line_items=[
             ContractLineItem(
                 service_type_id=item.service_type_id,

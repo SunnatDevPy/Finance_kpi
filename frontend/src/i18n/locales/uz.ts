@@ -168,6 +168,8 @@ export const uz = {
     downloadAct: "Bajarilgan ishlar akti (PDF)",
     state: "Holat",
     contractNumber: "Shartnoma raqami",
+    contractNumberFirst: "Bu mijoz uchun birinchi shartnoma — raqam: {number}",
+    contractNumberNext: "Oxirgi shartnoma: {last} → keyingi: {next}",
     invoiceNumber: "ЭСФ raqami",
     importFromExcel: "Excel'dan import",
     importDesc: "Eski Excel faylingizni to'g'ridan-to'g'ri yuklashingiz mumkin — ustunlar tartibi shablon bilan bir xil bo'lishi shart emas, tizim sarlavhalar nomiga qarab (Kompaniya, Xizmat, Shartnoma, Summa, To'landi, ЭСФ) avtomatik aniqlaydi. Har bir qator alohida shartnoma sifatida qo'shiladi, mijoz mavjud bo'lmasa avtomatik yaratiladi, summasi to'lovga teng bo'lsa — avtomatik \"to'liq to'langan\" deb belgilanadi.",

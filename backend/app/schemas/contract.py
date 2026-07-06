@@ -56,6 +56,13 @@ class ContractUpdate(BaseModel):
         return self
 
 
+class ContractNextNumber(BaseModel):
+    """Mijoz bo'yicha keyingi shartnoma raqami (1, 2, 3 …)."""
+
+    last_number: str | None = None
+    next_number: str
+
+
 class ContractRead(ContractBase):
     model_config = ConfigDict(from_attributes=True)
 
