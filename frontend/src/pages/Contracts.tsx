@@ -393,28 +393,26 @@ export function ContractsPage() {
                     name={clientName(contract.client_id)}
                   />
                   <TableCellDate>
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-col gap-0.5">
                       {contract.contract_number && (
-                        <span className="text-xs font-semibold text-primary/80">
+                        <span className="whitespace-nowrap text-[11px] font-semibold text-primary/80">
                           №{contract.contract_number}
                         </span>
                       )}
-                      <div className="flex flex-col gap-0.5 text-xs leading-tight">
-                        <span className="font-medium text-foreground/90">
-                          {formatDate(contract.start_date)}
-                          <span className="ml-1 font-normal text-muted-foreground">
-                            {formatWeekday(contract.start_date, "short")}
-                          </span>
+                      <span className="whitespace-nowrap text-xs font-medium text-foreground/90">
+                        {formatDate(contract.start_date)}
+                        <span className="ml-1 font-normal text-muted-foreground">
+                          {formatWeekday(contract.start_date, "short")}
                         </span>
-                        <span className="font-medium text-foreground/90">
-                          <span className="text-muted-foreground/60">→</span> {formatDate(contract.end_date)}
-                          <span className="ml-1 font-normal text-muted-foreground">
-                            {formatWeekday(contract.end_date, "short")}
-                          </span>
+                      </span>
+                      <span className="whitespace-nowrap text-xs font-medium text-foreground/90">
+                        <span className="text-muted-foreground/50">→</span> {formatDate(contract.end_date)}
+                        <span className="ml-1 font-normal text-muted-foreground">
+                          {formatWeekday(contract.end_date, "short")}
                         </span>
-                      </div>
+                      </span>
                       {contract.invoice_number && (
-                        <span className="text-[10px] font-normal text-muted-foreground">
+                        <span className="whitespace-nowrap text-[10px] font-normal text-muted-foreground">
                           {t("contracts.invoiceNumber")}: {contract.invoice_number}
                         </span>
                       )}
@@ -431,13 +429,12 @@ export function ContractsPage() {
                     )}
                   </TableCell>
                   <TableCell>
-                    <div className="grid w-64 grid-cols-4 gap-1">
+                    <div className="grid w-56 grid-cols-2 gap-1">
                       {contract.line_items.map((item, i) => (
                         <Badge
                           key={i}
-                          variant="outline"
                           title={item.service_type_name}
-                          className="min-w-0 justify-center truncate px-1.5 text-[10.5px] font-normal text-muted-foreground"
+                          className="min-w-0 justify-center truncate px-2 text-[10.5px] font-medium"
                         >
                           {item.service_type_name}
                         </Badge>
