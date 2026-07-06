@@ -9,6 +9,7 @@ from app.limiter import limiter
 from app.models import User
 from app.schemas.user import ChangePasswordRequest, LoginRequest, TokenResponse, UserMe
 from app.services.auth import create_access_token, hash_password, verify_password
+from app.services.login_history import record_login
 
 router = APIRouter(prefix="/auth")
 
@@ -29,6 +30,7 @@ def login(request: Request, payload: LoginRequest, db: Session = Depends(get_db)
         )
 
     token = create_access_token(user.username, user.role.value)
+    record_login(db, user, request)
     return TokenResponse(access_token=token)
 
 

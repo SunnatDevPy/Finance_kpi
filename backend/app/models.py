@@ -28,6 +28,25 @@ class UserRole(str, enum.Enum):
     MENEJER = "menejer"
 
 
+class AuditAction(str, enum.Enum):
+    CREATE = "create"
+    UPDATE = "update"
+    DELETE = "delete"
+    RESTORE = "restore"
+
+
+class ExpenseCategory(str, enum.Enum):
+    SALARY = "salary"
+    RENT = "rent"
+    MARKETING = "marketing"
+    UTILITIES = "utilities"
+    TRANSPORT = "transport"
+    OFFICE = "office"
+    TAX = "tax"
+    BANK_FEE = "bank_fee"
+    OTHER = "other"
+
+
 class Client(Base):
     __tablename__ = "clients"
     __table_args__ = (
@@ -54,6 +73,7 @@ class Client(Base):
         nullable=False,
     )
     notes: Mapped[str | None] = mapped_column(Text)
+    logo_path: Mapped[str | None] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -63,10 +83,17 @@ class Client(Base):
         onupdate=func.now(),
         nullable=False,
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     contracts: Mapped[list["Contract"]] = relationship(
         back_populates="client", cascade="all, delete-orphan"
     )
+
+    @property
+    def logo_url(self) -> str | None:
+        if not self.logo_path:
+            return None
+        return f"/api/v1/uploads/client_logos/{self.logo_path}"
 
 
 class ServiceType(Base):
@@ -112,6 +139,7 @@ class Contract(Base):
         onupdate=func.now(),
         nullable=False,
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     client: Mapped["Client"] = relationship(back_populates="contracts")
     line_items: Mapped[list["ContractLineItem"]] = relationship(
@@ -132,7 +160,10 @@ class Contract(Base):
 
     @property
     def paid_amount(self) -> Decimal:
-        return sum((payment.amount for payment in self.payments), Decimal("0"))
+        return sum(
+            (payment.amount for payment in self.payments if payment.deleted_at is None),
+            Decimal("0"),
+        )
 
     @property
     def debt_amount(self) -> Decimal:
@@ -184,8 +215,43 @@ class Payment(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     contract: Mapped["Contract"] = relationship(back_populates="payments")
+
+
+class Expense(Base):
+    """Operational cost (salary, rent, marketing, ...) — the cost side of the P&L."""
+
+    __tablename__ = "expenses"
+    __table_args__ = (
+        Index("ix_expenses_category", "category"),
+        Index("ix_expenses_expense_date", "expense_date"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    category: Mapped[ExpenseCategory] = mapped_column(
+        Enum(
+            ExpenseCategory,
+            name="expense_category",
+            values_callable=lambda enum: [item.value for item in enum],
+        ),
+        nullable=False,
+    )
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
+    expense_date: Mapped[date] = mapped_column(Date, nullable=False)
+    note: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class User(Base):
@@ -220,6 +286,10 @@ class User(Base):
         nullable=False,
     )
 
+    login_history: Mapped[list["LoginHistory"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+
 
 class AppSetting(Base):
     __tablename__ = "app_settings"
@@ -231,4 +301,54 @@ class AppSetting(Base):
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,
+    )
+
+
+class LoginHistory(Base):
+    __tablename__ = "login_history"
+    __table_args__ = (
+        Index("ix_login_history_user_id", "user_id"),
+        Index("ix_login_history_logged_in_at", "logged_in_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    username: Mapped[str] = mapped_column(String(50), nullable=False)
+    full_name: Mapped[str] = mapped_column(String(150), nullable=False)
+    ip_address: Mapped[str | None] = mapped_column(String(45))
+    user_agent: Mapped[str | None] = mapped_column(String(512))
+    logged_in_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    user: Mapped["User"] = relationship(back_populates="login_history")
+
+
+class AuditLog(Base):
+    """Immutable record of who changed what on core financial entities."""
+
+    __tablename__ = "audit_logs"
+    __table_args__ = (
+        Index("ix_audit_logs_entity", "entity_type", "entity_id"),
+        Index("ix_audit_logs_created_at", "created_at"),
+        Index("ix_audit_logs_user_id", "user_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    entity_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    entity_id: Mapped[int] = mapped_column(nullable=False)
+    action: Mapped[AuditAction] = mapped_column(
+        Enum(
+            AuditAction,
+            name="audit_action",
+            values_callable=lambda enum: [item.value for item in enum],
+        ),
+        nullable=False,
+    )
+    summary: Mapped[str | None] = mapped_column(String(500))
+    changes: Mapped[str | None] = mapped_column(Text)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    username: Mapped[str] = mapped_column(String(150), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )

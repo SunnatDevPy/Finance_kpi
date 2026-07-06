@@ -1,10 +1,11 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { restoreScrollY } from "../hooks/usePreserveScroll";
 import { cn } from "@/lib/utils";
 
 interface ModalProps {
@@ -16,6 +17,16 @@ interface ModalProps {
 }
 
 export function Modal({ title, open, onClose, children, wide }: ModalProps) {
+  const scrollYRef = useRef(0);
+
+  useEffect(() => {
+    if (open) {
+      scrollYRef.current = window.scrollY;
+      return;
+    }
+    restoreScrollY(scrollYRef.current);
+  }, [open]);
+
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent

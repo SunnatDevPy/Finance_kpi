@@ -1,11 +1,23 @@
 from decimal import Decimal, InvalidOperation
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models import AppSetting
 
 MONTHLY_PLAN_KEY = "monthly_plan"
+
+COMPANY_PROFILE_DEFAULTS: dict[str, str] = {
+    "company_name": "World Textile Marketing Agency",
+    "company_address": "",
+    "company_phone": "",
+    "company_inn": "",
+    "company_bank_name": "",
+    "company_bank_account": "",
+    "company_mfo": "",
+    "company_director": "",
+}
 
 
 def get_monthly_plan(db: Session) -> Decimal:
@@ -27,3 +39,24 @@ def set_monthly_plan(db: Session, amount: Decimal) -> Decimal:
         row.value = value
     db.commit()
     return amount
+
+
+def get_company_profile(db: Session) -> dict[str, str]:
+    rows = db.scalars(
+        select(AppSetting).where(AppSetting.key.in_(COMPANY_PROFILE_DEFAULTS.keys()))
+    ).all()
+    saved = {row.key: row.value for row in rows}
+    return {key: saved.get(key, default) for key, default in COMPANY_PROFILE_DEFAULTS.items()}
+
+
+def set_company_profile(db: Session, data: dict[str, str]) -> dict[str, str]:
+    for key, value in data.items():
+        if key not in COMPANY_PROFILE_DEFAULTS:
+            continue
+        row = db.get(AppSetting, key)
+        if row is None:
+            db.add(AppSetting(key=key, value=value or ""))
+        else:
+            row.value = value or ""
+    db.commit()
+    return get_company_profile(db)

@@ -15,6 +15,10 @@ export function AnimatedNumber({ value, format, className }: AnimatedNumberProps
   const hasMountedRef = useRef(false);
 
   useEffect(() => {
+    if (Math.abs(value - motionValue.get()) < 0.01) {
+      if (ref.current) ref.current.textContent = format(value);
+      return;
+    }
     if (reduce) {
       if (ref.current) ref.current.textContent = format(value);
       return;

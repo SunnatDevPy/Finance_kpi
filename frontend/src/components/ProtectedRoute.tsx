@@ -1,4 +1,6 @@
 import { Navigate, Outlet } from "react-router-dom";
+import { PageError } from "./PageError";
+import { PageShell } from "./PageHeader";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
 
@@ -23,9 +25,16 @@ export function ProtectedRoute() {
 
 export function AdminRoute() {
   const { isAdmin, loading } = useAuth();
+  const { t } = useI18n();
 
   if (loading) return null;
-  if (!isAdmin) return <Navigate to="/" replace />;
+  if (!isAdmin) {
+    return (
+      <PageShell>
+        <PageError message={t("common.accessDenied")} />
+      </PageShell>
+    );
+  }
 
   return <Outlet />;
 }

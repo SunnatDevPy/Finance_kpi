@@ -21,16 +21,19 @@ function RouteReady({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+const AuditLogPage = lazy(() => import("./pages/AuditLog").then((m) => ({ default: m.AuditLogPage })));
 const ClientCardPage = lazy(() => import("./pages/ClientCard").then((m) => ({ default: m.ClientCardPage })));
 const ClientsPage = lazy(() => import("./pages/Clients").then((m) => ({ default: m.ClientsPage })));
 const ContractsPage = lazy(() => import("./pages/Contracts").then((m) => ({ default: m.ContractsPage })));
 const DashboardPage = lazy(() => import("./pages/Dashboard").then((m) => ({ default: m.DashboardPage })));
 const DebtsPage = lazy(() => import("./pages/Debts").then((m) => ({ default: m.DebtsPage })));
 const EmployeesPage = lazy(() => import("./pages/Employees").then((m) => ({ default: m.EmployeesPage })));
+const ExpensesPage = lazy(() => import("./pages/Expenses").then((m) => ({ default: m.ExpensesPage })));
 const LoginPage = lazy(() => import("./pages/Login").then((m) => ({ default: m.LoginPage })));
 const PaymentsPage = lazy(() => import("./pages/Payments").then((m) => ({ default: m.PaymentsPage })));
 const ProfilePage = lazy(() => import("./pages/Profile").then((m) => ({ default: m.ProfilePage })));
 const ServiceTypesPage = lazy(() => import("./pages/ServiceTypes").then((m) => ({ default: m.ServiceTypesPage })));
+const TrashPage = lazy(() => import("./pages/Trash").then((m) => ({ default: m.TrashPage })));
 
 export default function App() {
   return (
@@ -50,11 +53,14 @@ export default function App() {
                       <Route path="clients/:id" element={<ClientCardPage />} />
                       <Route path="contracts" element={<ContractsPage />} />
                       <Route path="payments" element={<PaymentsPage />} />
+                      <Route path="expenses" element={<ExpensesPage />} />
                       <Route path="debts" element={<DebtsPage />} />
                       <Route path="service-types" element={<ServiceTypesPage />} />
                       <Route path="profile" element={<ProfilePage />} />
                       <Route element={<AdminRoute />}>
                         <Route path="employees" element={<EmployeesPage />} />
+                        <Route path="audit-log" element={<AuditLogPage />} />
+                        <Route path="trash" element={<TrashPage />} />
                       </Route>
                     </Route>
                   </Route>

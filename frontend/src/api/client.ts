@@ -1,18 +1,27 @@
 import type {
+  AppSettings,
+  AuditEntityType,
+  AuditLogEntry,
   ChartPoint,
   Client,
   ClientCard,
   ClientFormData,
   ClientImportResult,
+  CompanyProfile,
   Contract,
   ContractImportResult,
   DashboardStats,
   DebtsSummary,
+  Expense,
+  ExpenseCategory,
+  ExpenseSummary,
   ExpiringContract,
+  LoginHistoryEntry,
   Payment,
   PaymentListItem,
   Paginated,
   ServiceType,
+  ServiceTypeStats,
   TopClientLtvItem,
   User,
   UserRole,
@@ -196,17 +205,43 @@ export const api = {
   },
 
   settings: {
-    get: () => request<{ monthly_plan: string }>("/settings"),
+    get: () => request<AppSettings>("/settings"),
     updateMonthlyPlan: (monthly_plan: number) =>
-      request<{ monthly_plan: string }>("/settings/monthly-plan", {
+      request<AppSettings>("/settings/monthly-plan", {
         method: "PATCH",
         body: JSON.stringify({ monthly_plan }),
       }),
+    updateCompanyProfile: (data: Partial<CompanyProfile>) =>
+      request<AppSettings>("/settings/company-profile", {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+  },
+
+  audit: {
+    loginHistory: (limit = 100) =>
+      request<LoginHistoryEntry[]>(`/audit/login-history?limit=${limit}`),
+    log: (params?: {
+      entityType?: AuditEntityType;
+      entityId?: number;
+      userId?: number;
+      skip?: number;
+      limit?: number;
+    }) => {
+      const q = new URLSearchParams();
+      if (params?.entityType) q.set("entity_type", params.entityType);
+      if (params?.entityId !== undefined) q.set("entity_id", String(params.entityId));
+      if (params?.userId !== undefined) q.set("user_id", String(params.userId));
+      if (params?.skip !== undefined) q.set("skip", String(params.skip));
+      if (params?.limit !== undefined) q.set("limit", String(params.limit));
+      const qs = q.toString();
+      return request<Paginated<AuditLogEntry>>(`/audit/log${qs ? `?${qs}` : ""}`);
+    },
   },
 
   export: {
     download: (
-      resource: "clients" | "contracts" | "payments" | "debts",
+      resource: "clients" | "contracts" | "payments" | "debts" | "expenses",
       format: "xlsx" | "pdf",
       params?: { date_from?: string; date_to?: string },
     ) => {
@@ -242,6 +277,10 @@ export const api = {
     delete: (id: number) => request<void>(`/clients/${id}`, { method: "DELETE" }),
     downloadImportTemplate: () => download("/clients/import-template", "mijozlar_shabloni.xlsx"),
     import: (file: File) => uploadFile<ClientImportResult>("/clients/import", file),
+    trash: () => request<Client[]>("/clients/trash"),
+    restore: (id: number) => request<Client>(`/clients/${id}/restore`, { method: "POST" }),
+    uploadLogo: (id: number, file: File) => uploadFile<Client>(`/clients/${id}/logo`, file),
+    deleteLogo: (id: number) => request<Client>(`/clients/${id}/logo`, { method: "DELETE" }),
   },
 
   serviceTypes: {
@@ -258,6 +297,7 @@ export const api = {
         body: JSON.stringify(data),
       }),
     delete: (id: number) => request<void>(`/service-types/${id}`, { method: "DELETE" }),
+    stats: (id: number) => request<ServiceTypeStats>(`/service-types/${id}/stats`),
   },
 
   contracts: {
@@ -314,6 +354,15 @@ export const api = {
       }),
     cancelAll: (contractId: number) =>
       request<Contract>(`/contracts/${contractId}/cancel-all`, { method: "POST" }),
+    trash: () => request<Contract[]>("/contracts/trash"),
+    restore: (id: number) => request<Contract>(`/contracts/${id}/restore`, { method: "POST" }),
+    downloadDocument: (id: number, type: "invoice" | "act", contractNumber?: string | null) => {
+      const prefix = type === "invoice" ? "schyot-faktura" : "akt";
+      return download(
+        `/contracts/${id}/documents/${type}`,
+        `${prefix}_${contractNumber || id}.pdf`,
+      );
+    },
   },
 
   payments: {
@@ -346,5 +395,63 @@ export const api = {
         body: JSON.stringify(data),
       }),
     delete: (id: number) => request<void>(`/payments/${id}`, { method: "DELETE" }),
+    trash: () => request<Payment[]>("/payments/trash"),
+    restore: (id: number) => request<Payment>(`/payments/${id}/restore`, { method: "POST" }),
+  },
+
+  expenses: {
+    list: (params?: {
+      category?: ExpenseCategory;
+      search?: string;
+      date_from?: string;
+      date_to?: string;
+      skip?: number;
+      limit?: number;
+    }) => {
+      const q = new URLSearchParams();
+      if (params?.category) q.set("category", params.category);
+      if (params?.search) q.set("search", params.search);
+      if (params?.date_from) q.set("date_from", params.date_from);
+      if (params?.date_to) q.set("date_to", params.date_to);
+      if (params?.skip !== undefined) q.set("skip", String(params.skip));
+      if (params?.limit !== undefined) q.set("limit", String(params.limit));
+      const qs = q.toString();
+      return request<Paginated<Expense>>(`/expenses${qs ? `?${qs}` : ""}`);
+    },
+    summary: (params?: { date_from?: string; date_to?: string }) => {
+      const q = new URLSearchParams();
+      if (params?.date_from) q.set("date_from", params.date_from);
+      if (params?.date_to) q.set("date_to", params.date_to);
+      const qs = q.toString();
+      return request<ExpenseSummary>(`/expenses/summary${qs ? `?${qs}` : ""}`);
+    },
+    create: (data: {
+      category: ExpenseCategory;
+      title: string;
+      amount: number;
+      expense_date: string;
+      note?: string;
+    }) =>
+      request<Expense>("/expenses", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    update: (
+      id: number,
+      data: Partial<{
+        category: ExpenseCategory;
+        title: string;
+        amount: number;
+        expense_date: string;
+        note: string;
+      }>,
+    ) =>
+      request<Expense>(`/expenses/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    delete: (id: number) => request<void>(`/expenses/${id}`, { method: "DELETE" }),
+    trash: () => request<Expense[]>("/expenses/trash"),
+    restore: (id: number) => request<Expense>(`/expenses/${id}/restore`, { method: "POST" }),
   },
 };

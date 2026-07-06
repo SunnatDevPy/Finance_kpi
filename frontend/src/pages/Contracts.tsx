@@ -3,11 +3,13 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangleIcon,
   CheckCircle2Icon,
+  ClipboardCheckIcon,
   CopyIcon,
   DownloadIcon,
   FileUpIcon,
   PencilIcon,
   PlusIcon,
+  ReceiptIcon,
   Trash2Icon,
   UploadCloudIcon,
   XCircleIcon,
@@ -48,7 +50,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { MotionButton, motionTap } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FloatingLabelInput, FloatingLabelTextarea } from "@/components/ui/floating-label-input";
+import { FloatingLabelDatePicker } from "@/components/ui/date-picker";
+import { FloatingLabelInput, FloatingLabelMoneyInput, FloatingLabelTextarea } from "@/components/ui/floating-label-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -61,7 +64,8 @@ import {
 } from "@/components/ui/select";
 import type { Client, Contract, ContractFormLineItem, ContractImportResult, ServiceType } from "../types";
 import { useI18n } from "../context/I18nContext";
-import { formatDate, formatMoney, toNumber } from "../utils/format";
+import { useListLoading } from "../hooks/useListLoading";
+import { formatDate, formatMoney, toNumber, toWholeAmountDigits } from "../utils/format";
 import { PageHeader, PageShell } from "../components/PageHeader";
 
 export function ContractsPage() {
@@ -73,7 +77,7 @@ export function ContractsPage() {
   const [editing, setEditing] = useState<Contract | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
+  const { loading, start, finish } = useListLoading();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [total, setTotal] = useState(0);
@@ -97,8 +101,8 @@ export function ContractsPage() {
     line_items: [{ service_type_id: 0, price: "" }] as ContractFormLineItem[],
   });
 
-  const load = () => {
-    setLoading(true);
+  const load = (silent = true) => {
+    start(silent);
     Promise.all([
       api.contracts.list({
         skip: (page - 1) * pageSize,
@@ -123,7 +127,7 @@ export function ContractsPage() {
         }
       })
       .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+      .finally(() => finish());
   };
 
   useEffect(() => {
@@ -165,7 +169,7 @@ export function ContractsPage() {
       invoice_number: contract.invoice_number || "",
       line_items: contract.line_items.map((item) => ({
         service_type_id: item.service_type_id,
-        price: item.price,
+        price: toWholeAmountDigits(item.price),
       })),
     });
     setModalOpen(true);
@@ -202,6 +206,10 @@ export function ContractsPage() {
       setError(t("contracts.selectClientError"));
       return;
     }
+    if (!form.start_date || !form.end_date) {
+      setError(t("clients.selectDateError"));
+      return;
+    }
     const payload = {
       start_date: form.start_date,
       end_date: form.end_date,
@@ -215,15 +223,25 @@ export function ContractsPage() {
     };
     try {
       if (editing) {
-        await api.contracts.update(editing.id, payload);
+        const updated = await api.contracts.update(editing.id, payload);
+        setContracts((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
       } else {
         await api.contracts.create({
           client_id: parseInt(form.client_id),
           ...payload,
         });
+        load(true);
       }
       closeModal();
-      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("common.error"));
+    }
+  };
+
+  const handleDownloadDocument = async (contract: Contract, type: "invoice" | "act") => {
+    setError("");
+    try {
+      await api.contracts.downloadDocument(contract.id, type, contract.contract_number);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("common.error"));
     }
@@ -233,7 +251,7 @@ export function ContractsPage() {
     setError("");
     try {
       await api.contracts.duplicate(contract.id);
-      load();
+      load(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("common.error"));
     }
@@ -241,11 +259,16 @@ export function ContractsPage() {
 
   const handleDelete = async () => {
     if (!deleteId) return;
+    const id = deleteId;
+    const snapshot = contracts;
+    setContracts((prev) => prev.filter((c) => c.id !== id));
+    setTotal((prev) => Math.max(0, prev - 1));
+    setDeleteId(null);
     try {
-      await api.contracts.delete(deleteId);
-      setDeleteId(null);
-      load();
+      await api.contracts.delete(id);
     } catch (err) {
+      setContracts(snapshot);
+      setTotal((prev) => prev + 1);
       setError(err instanceof Error ? err.message : t("common.error"));
     }
   };
@@ -278,7 +301,7 @@ export function ContractsPage() {
     try {
       const result = await api.contracts.import(importFile);
       setImportResult(result);
-      if (result.created_contracts > 0) load();
+      if (result.created_contracts > 0) load(true);
     } catch (err) {
       setImportError(err instanceof Error ? err.message : t("common.error"));
     } finally {
@@ -323,14 +346,14 @@ export function ContractsPage() {
         />
       </div>
 
-      <Card>
+      <Card className="content-card">
         <CardHeader>
           <CardTitle>{t("contracts.listTitle")}</CardTitle>
           <CardDescription>
             {t("common.itemsFound").replace("{count}", String(total))}
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-0 pt-4">
+        <CardContent className="p-0">
           <PremiumDataTable
             loading={loading}
             empty={!loading && contracts.length === 0}
@@ -411,6 +434,24 @@ export function ContractsPage() {
                   <TableCellActions>
                     <MotionButton
                       variant="ghost"
+                      size="icon-sm"
+                      onClick={() => handleDownloadDocument(contract, "invoice")}
+                      title={t("contracts.downloadInvoice")}
+                      {...motionTap}
+                    >
+                      <ReceiptIcon data-icon="inline-start" />
+                    </MotionButton>
+                    <MotionButton
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => handleDownloadDocument(contract, "act")}
+                      title={t("contracts.downloadAct")}
+                      {...motionTap}
+                    >
+                      <ClipboardCheckIcon data-icon="inline-start" />
+                    </MotionButton>
+                    <MotionButton
+                      variant="ghost"
                       size="sm"
                       onClick={() => handleDuplicate(contract)}
                       title={t("contracts.duplicate")}
@@ -480,21 +521,20 @@ export function ContractsPage() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FloatingLabelInput
+            <FloatingLabelDatePicker
               id="start_date"
-              type="date"
               label={t("contracts.start")}
               required
               value={form.start_date}
-              onChange={(e) => setForm({ ...form, start_date: e.target.value })}
+              onChange={(value) => setForm({ ...form, start_date: value })}
             />
-            <FloatingLabelInput
+            <FloatingLabelDatePicker
               id="end_date"
-              type="date"
               label={t("contracts.end")}
               required
               value={form.end_date}
-              onChange={(e) => setForm({ ...form, end_date: e.target.value })}
+              min={form.start_date || undefined}
+              onChange={(value) => setForm({ ...form, end_date: value })}
             />
           </div>
 
@@ -556,16 +596,14 @@ export function ContractsPage() {
                   </SelectContent>
                 </Select>
                 <div className="flex items-center gap-2">
-                  <FloatingLabelInput
-                    className="w-full sm:w-40"
-                    type="number"
+                  <FloatingLabelMoneyInput
+                    containerClassName="w-full sm:w-40"
                     label={t("common.price")}
                     required
-                    min={1}
                     value={item.price}
-                    onChange={(e) => {
+                    onValueChange={(digits) => {
                       const items = [...form.line_items];
-                      items[index].price = e.target.value;
+                      items[index].price = digits;
                       setForm({ ...form, line_items: items });
                     }}
                   />

@@ -211,6 +211,27 @@
 - [x] Backend testlar (`test_contract_import.py`) — haqiqiy fayl tuzilishi, "yopilgan" matn evristikasi, notanish sarlavhalarni rad etish (jami 43/43 pytest o'tdi)
 - [x] i18n matnlari yangilandi — ustun tartibi muhim emasligi tushuntirildi
 
+### 33. Soft-delete + Audit log (2026-yil iyul)
+- [x] `Client`/`Contract`/`Payment` ga `deleted_at` maydoni — hard delete o'rniga soft-delete, kaskad bilan (mijoz o'chirilsa shartnomalar ham)
+- [x] `AuditLog` jadvali — har bir create/update/delete/restore amali kim, qachon, nimani o'zgartirgani bilan yoziladi
+- [x] `GET /*/trash` + `POST /*/{id}/restore` (admin) — Arxiv sahifasi orqali tiklash
+- [x] `GET /audit/log` — O'zgarishlar tarixi sahifasi, entity turi/foydalanuvchi bo'yicha filtr
+- [x] Barcha hisobot/dashboard/eksport so'rovlari o'chirilgan yozuvlarni chetlab o'tadigan qilib yangilandi
+
+### 34. Xarajatlar (Expenses) moduli (2026-yil iyul)
+- [x] `Expense` modeli + `ExpenseCategory` enum (ish haqi, ijara, marketing va h.k.) — soft-delete bilan
+- [x] To'liq CRUD + kategoriya bo'yicha jamlanma (`/expenses/summary`) + Arxiv/Audit integratsiyasi
+- [x] Dashboard: `total_expenses`, `net_profit`, `profit_margin_pct` + xarajat/foyda grafiklari
+- [x] Frontend: `/expenses` sahifasi (CRUD, filtr, eksport), sidebar havolasi
+- [x] Backend testlar (`test_expenses.py`), jami 54/54 pytest o'tdi
+
+### 35. Rasmiy hujjat generatsiyasi — schyot-faktura va akt (2026-yil iyul)
+- [x] `GET /contracts/{id}/documents/{invoice|act}` — kontrakt bo'yicha PDF schyot-faktura yoki bajarilgan ishlar dalolatnomasi
+- [x] `AppSetting` orqali kompaniya rekvizitlari (nomi, manzili, STIR, bank, MFO, rahbar) — Profil sahifasida admin tomonidan tahrirlanadi (`PATCH /settings/company-profile`)
+- [x] PDF'larda kirill/o'zbek matnini to'g'ri chizish uchun `DejaVu Sans` shrifti ro'yxatga olindi (`fonts-dejavu-core`, backend Docker image'ga qo'shildi) — mavjud jadval eksportlari ham shu shriftdan foydalanadigan qilindi
+- [x] Frontend: Kontraktlar va mijoz kartasi sahifalarida har bir shartnoma qatorida "Schyot-faktura" va "Akt" yuklab olish tugmalari
+- [x] Backend testlar (`test_documents.py`) — PDF generatsiya, noto'g'ri hujjat turi, mavjud bo'lmagan kontrakt, kompaniya profili CRUD (jami 59/59 pytest o'tdi)
+
 ---
 
 ### 33. Login globusi qayta ko'rinmay qolishi — barqarorlashtirish (2026-yil iyul)
@@ -245,6 +266,29 @@
 - [x] Backend cookie/secure-flag'ga bog'liq emas (JWT Bearer token, `localStorage`) — Caddy→nginx orasidagi ichki HTTP ulanishi xavfsizlikka ta'sir qilmaydi
 - [x] `caddy validate`, `docker compose config` va to'liq lokal smoke-test (`DOMAIN=localhost`, alohida proyekt nomi bilan) orqali tekshirildi: HTTPS orqali frontend (`200`), `/api/*` proksi (`{"status":"ok"}`) va HTTP→HTTPS avtomatik yo'naltirish (`308 Location: https://...`) barchasi ishlayapti (haqiqiy domenda Let's Encrypt sertifikat olish esa foydalanuvchining haqiqiy DNS/domenini talab qiladi, bu qadam qo'lda tekshirilmadi)
 - [x] `README.md`dagi "Production'ga chiqarish" bo'limi yangilandi (HTTPS sozlash qadamlari)
+
+---
+
+### 36. Login sahifasi atmosferasi — chiroyli va "hayratlanarli" qilib boyitildi (2026-yil iyul)
+- [x] Sabab: foydalanuvchi login sahifasining umumiy atmosferasini yanada chiroyli qilishni so'radi, kerak bo'lsa globus uchun tayyor kod topib qo'yishni taklif qildi; `.cursorrules` va 34-bandda qayd etilgan tajriba (`cobe`/WebGL barqarorsizligi) sabab uchinchi tomon globus kutubxonasi ishlatilmadi — o'rniga butun atmosfera sof Tailwind/Framer Motion/CSS bilan boyitildi
+- [x] Yangi `LoginAtmosphere.tsx` komponenti — nebula mesh, aurora nur dog'lari, ko'tarilib boruvchi yorug' zarrachalar (particles), pastda gorizontga ketuvchi 3D panjara (`login-horizon-grid`) va nozik filmik grain qatlamini birlashtiradi
+- [x] `LoginGlobe.tsx`ga: sichqoncha holatiga qarab yengil 3D tilt (Framer Motion `useMotionValue`/`useSpring`, `perspective` + `rotateX/rotateY`), atmosfera rim-light (fresnel) qatlami va vaqti-vaqti bilan uchib o'tuvchi kometa effekti qo'shildi
+- [x] **Ishlash tezligi**: dastlabki `filter: blur()` bilan aylanuvchi aurora qatlami headless/GPU'siz muhitda FPS'ni ~21'dan ~3'gacha tushirib yubordi — `.cursorrules`dagi 60 FPS talabiga zid edi. Tuzatish: `filter: blur()` butunlay olib tashlandi (o'rniga yumshoq radial-gradient stoplari), `mix-blend-mode` yangi qatlamlardan olib tashlandi, aurora bitta qatlamga birlashtirildi, zarrachalar soni kamaytirildi — barcha animatsiyalar endi faqat `transform`/`opacity` bilan ishlaydi (`will-change` bilan), Playwright orqali FPS o'lchab tasdiqlandi
+- [x] `npm run build` xatosiz o'tdi, Playwright orqali light/dark/mobil va sichqoncha tilt holatlari vizual tekshirildi
+
+---
+
+---
+
+### 37. To'lov modali UX + custom sana/summa inputlari + mijoz logotipi (2026-yil iyul)
+- [x] "To'lov qo'shish" modalida "To'lov turi" va "Sana" maydonlari endi bitta qatorda (yonma-yon) joylashgan
+- [x] Native brauzer `<input type="date">` o'rniga to'liq custom `FloatingLabelDatePicker` (`components/ui/date-picker.tsx`) — oy/yil navigatsiyasi, "Bugun"/"Tozalash" tugmalari, `DateRangePicker`dagi mavjud kalendar mantig'idan (`lib/dateRange.ts`) qayta foydalaniladi; to'lov, shartnoma (boshlanish/tugash, `end_date` uchun `min` sifatida `start_date`) va xarajat sanalarida qo'llanildi
+- [x] Native `<button>`ga o'tish sabab yo'qolgan brauzer `required` validatsiyasi o'rniga har uch formda (`ClientCard`, `Contracts`, `Expenses`) aniq JS tekshiruvi qo'shildi
+- [x] Summa maydonlari uchun `useMoneyInput` hooki + `FloatingLabelMoneyInput`/`MoneyInput` komponentlari — endi raqam kiritilganda avtomatik probel bilan mingliklarga ajratiladi (`1 500 000`) va boshiga `0` yozish bloklanadi; kursor pozitsiyasi to'g'ri saqlanadi (o'rtadan tahrirlashda ham)
+- [x] To'lov summasi, shartnoma xizmat narxi, xarajat summasi va oylik reja (Profil) shu yangi komponentlarga o'tkazildi; tahrirlashda API'dan kelgan (`"1500000.00"` kabi) qiymatlar `toWholeAmountDigits()` orqali toza butun raqamga normallashtiriladi (aks holda ".00" raqamlarga qo'shilib ketardi)
+- [x] Backend: `Client` modeliga `logo_path` maydoni (migratsiya `009`) + hisoblanuvchi `logo_url` property; `POST/DELETE /clients/{id}/logo` endpointlari (rasm turi va 5MB hajm tekshiruvi bilan, eski fayl avtomatik o'chiriladi); yuklangan rasmlar `backend/uploads/client_logos/` papkasida saqlanadi va `/api/v1/uploads/...` orqali statik xizmat qilinadi (`docker-compose.prod.yml`ga alohida `uploads_data` volume qo'shildi)
+- [x] Frontend: umumiy `CompanyAvatar` komponenti endi `logoUrl` bo'lsa rasmni ko'rsatadi (aks holda eski initsial-belgi fallback); yangi `ClientLogoUploader` komponenti — mijozlar ro'yxati tahrirlash modali va mijoz kartasi sahifasida logotip yuklash/o'chirish imkonini beradi
+- [x] Backend testlar (`test_clients.py`ga logotip yuklash/o'chirish/xato holatlar qo'shildi, yuklamalar uchun `tmp_path` bilan izolyatsiya) — jami 62/62 pytest va frontend build (`tsc -b && vite build`) xatosiz o'tdi
 
 ---
 

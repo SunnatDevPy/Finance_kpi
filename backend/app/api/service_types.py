@@ -5,10 +5,34 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.database import get_db
 from app.models import ServiceType
-from app.schemas.service_type import ServiceTypeCreate, ServiceTypeRead, ServiceTypeUpdate
+from app.schemas.service_type import (
+    ServiceTypeCreate,
+    ServiceTypeRead,
+    ServiceTypeStatsRead,
+    ServiceTypeUpdate,
+)
 from app.services.helpers import get_service_type_or_404
+from app.services.service_type_stats import get_service_type_stats, usage_counts_by_service_type
 
 router = APIRouter(prefix="/service-types", dependencies=[Depends(get_current_user)])
+
+
+def _enrich_service_types(db: Session, items: list[ServiceType]) -> list[ServiceTypeRead]:
+    counts = usage_counts_by_service_type(db)
+    result: list[ServiceTypeRead] = []
+    for item in items:
+        usage_count, total_revenue = counts.get(item.id, (0, 0))
+        result.append(
+            ServiceTypeRead(
+                id=item.id,
+                name=item.name,
+                is_active=item.is_active,
+                created_at=item.created_at,
+                usage_count=usage_count,
+                total_revenue=total_revenue,
+            )
+        )
+    return result
 
 
 @router.get("", response_model=list[ServiceTypeRead])
@@ -17,11 +41,12 @@ def list_service_types(
     active_only: bool = Query(default=False),
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=200),
-) -> list[ServiceType]:
+) -> list[ServiceTypeRead]:
     stmt = select(ServiceType).order_by(ServiceType.name)
     if active_only:
         stmt = stmt.where(ServiceType.is_active.is_(True))
-    return list(db.scalars(stmt.offset(skip).limit(limit)).all())
+    items = list(db.scalars(stmt.offset(skip).limit(limit)).all())
+    return _enrich_service_types(db, items)
 
 
 @router.post("", response_model=ServiceTypeRead, status_code=status.HTTP_201_CREATED)
@@ -41,12 +66,18 @@ def create_service_type(
     db.add(service_type)
     db.commit()
     db.refresh(service_type)
-    return service_type
+    return _enrich_service_types(db, [service_type])[0]
+
+
+@router.get("/{service_type_id}/stats", response_model=ServiceTypeStatsRead)
+def service_type_stats(service_type_id: int, db: Session = Depends(get_db)) -> ServiceTypeStatsRead:
+    return get_service_type_stats(db, service_type_id)
 
 
 @router.get("/{service_type_id}", response_model=ServiceTypeRead)
-def get_service_type(service_type_id: int, db: Session = Depends(get_db)) -> ServiceType:
-    return get_service_type_or_404(db, service_type_id)
+def get_service_type(service_type_id: int, db: Session = Depends(get_db)) -> ServiceTypeRead:
+    service_type = get_service_type_or_404(db, service_type_id)
+    return _enrich_service_types(db, [service_type])[0]
 
 
 @router.patch("/{service_type_id}", response_model=ServiceTypeRead)
@@ -70,7 +101,7 @@ def update_service_type(
         setattr(service_type, field, value)
     db.commit()
     db.refresh(service_type)
-    return service_type
+    return _enrich_service_types(db, [service_type])[0]
 
 
 @router.delete("/{service_type_id}", status_code=status.HTTP_204_NO_CONTENT)

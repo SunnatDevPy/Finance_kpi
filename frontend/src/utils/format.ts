@@ -28,6 +28,17 @@ export function toNumber(value: string | number): number {
   return typeof value === "string" ? parseFloat(value) : value;
 }
 
+/**
+ * Normalizes a possibly-decimal amount (e.g. "1500000.00" from the API)
+ * into a clean whole-number digit string (e.g. "1500000") suitable for
+ * the space-formatted money inputs, which don't support fractional so'm.
+ */
+export function toWholeAmountDigits(value: string | number): string {
+  const num = typeof value === "string" ? parseFloat(value) : value;
+  if (!Number.isFinite(num)) return "";
+  return String(Math.round(num));
+}
+
 export function formatDate(value: string): string {
   return new Date(value).toLocaleDateString(formatLocale);
 }

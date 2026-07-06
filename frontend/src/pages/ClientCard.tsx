@@ -5,13 +5,16 @@ import {
   BanIcon,
   BanknoteIcon,
   Building2Icon,
+  ClipboardCheckIcon,
   FileTextIcon,
+  ReceiptIcon,
   RotateCcwIcon,
   UserIcon,
   XCircleIcon,
 } from "lucide-react";
 import { api } from "../api/client";
 import { CancelIcon, SaveIconBtn } from "../components/ButtonIcons";
+import { ClientLogoUploader } from "../components/ClientLogoUploader";
 import { Modal } from "../components/Modal";
 import { PageError } from "../components/PageError";
 import { PageHeader, PageShell } from "../components/PageHeader";
@@ -46,7 +49,8 @@ import { Badge } from "@/components/ui/badge";
 import { useI18n } from "../context/I18nContext";
 import { Button, MotionButton, motionTap } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FloatingLabelInput } from "@/components/ui/floating-label-input";
+import { FloatingLabelDatePicker } from "@/components/ui/date-picker";
+import { FloatingLabelInput, FloatingLabelMoneyInput } from "@/components/ui/floating-label-input";
 import {
   Select,
   SelectContent,
@@ -102,6 +106,10 @@ export function ClientCardPage() {
     e.preventDefault();
     if (!payModal) return;
     setError("");
+    if (!payForm.paid_at) {
+      setError(t("clients.selectDateError"));
+      return;
+    }
     try {
       const magnitude = Math.abs(parseFloat(payForm.amount));
       await api.payments.create({
@@ -114,6 +122,19 @@ export function ClientCardPage() {
       setPayForm({ amount: "", paid_at: "", note: "" });
       setPayType("income");
       load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("common.error"));
+    }
+  };
+
+  const handleDownloadDocument = async (
+    contractId: number,
+    type: "invoice" | "act",
+    contractNumber: string | null,
+  ) => {
+    setError("");
+    try {
+      await api.contracts.downloadDocument(contractId, type, contractNumber);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("common.error"));
     }
@@ -207,14 +228,19 @@ export function ClientCardPage() {
         />
       </div>
 
-      <Card>
+      <Card className="content-card">
         <CardHeader className="border-b">
           <CardTitle className="flex items-center gap-2 text-base">
             <Building2Icon className="size-4 text-primary" />
             {t("clients.basicInfo")}
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-5">
+        <CardContent className="flex flex-col gap-5 pt-5">
+          <ClientLogoUploader
+            client={card}
+            size="lg"
+            onUpdated={(updated) => setCard((prev) => (prev ? { ...prev, ...updated } : prev))}
+          />
           <dl className="info-grid grid grid-cols-1 gap-5 md:grid-cols-2">
             {(
               [
@@ -235,7 +261,7 @@ export function ClientCardPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="content-card">
         <CardHeader className="border-b">
           <CardTitle className="text-base">{t("common.contracts")}</CardTitle>
           <CardDescription>{t("clients.contractsDesc")}</CardDescription>
@@ -278,6 +304,24 @@ export function ClientCardPage() {
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
+                      <MotionButton
+                        size="icon-sm"
+                        variant="ghost"
+                        title={t("contracts.downloadInvoice")}
+                        onClick={() => handleDownloadDocument(contract.id, "invoice", contract.contract_number)}
+                        {...motionTap}
+                      >
+                        <ReceiptIcon data-icon="inline-start" />
+                      </MotionButton>
+                      <MotionButton
+                        size="icon-sm"
+                        variant="ghost"
+                        title={t("contracts.downloadAct")}
+                        onClick={() => handleDownloadDocument(contract.id, "act", contract.contract_number)}
+                        {...motionTap}
+                      >
+                        <ClipboardCheckIcon data-icon="inline-start" />
+                      </MotionButton>
                       {!contract.is_cancelled && (
                         <MotionButton
                           size="sm"
@@ -410,11 +454,11 @@ export function ClientCardPage() {
       </Card>
 
       {payments.length > 0 && (
-        <Card>
+        <Card className="content-card">
           <CardHeader className="border-b">
             <CardTitle className="text-base">{t("clients.paymentHistory")}</CardTitle>
           </CardHeader>
-          <CardContent className="p-0 pt-4">
+          <CardContent className="p-0">
             <PremiumDataTable skeletonCols={4}>
               <TableHeader>
                 <TableRow>
@@ -445,36 +489,35 @@ export function ClientCardPage() {
         onClose={() => setPayModal(null)}
       >
         <form onSubmit={handlePayment} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <label className="label">{t("clients.paymentType")}</label>
-            <Select value={payType} onValueChange={(value) => value && setPayType(value as "income" | "refund")}>
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value="income">{t("clients.paymentTypeIncome")}</SelectItem>
-                  <SelectItem value="refund">{t("clients.paymentTypeRefund")}</SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-2">
+              <label className="label">{t("clients.paymentType")}</label>
+              <Select value={payType} onValueChange={(value) => value && setPayType(value as "income" | "refund")}>
+                <SelectTrigger className="h-12 w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="income">{t("clients.paymentTypeIncome")}</SelectItem>
+                    <SelectItem value="refund">{t("clients.paymentTypeRefund")}</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+            <FloatingLabelDatePicker
+              id="paid_at"
+              label={t("common.date")}
+              required
+              value={payForm.paid_at}
+              onChange={(value) => setPayForm({ ...payForm, paid_at: value })}
+            />
           </div>
-          <FloatingLabelInput
+          <FloatingLabelMoneyInput
             id="amount"
-            type="number"
             label={t("common.amount")}
             required
-            min={1}
             value={payForm.amount}
-            onChange={(e) => setPayForm({ ...payForm, amount: e.target.value })}
-          />
-          <FloatingLabelInput
-            id="paid_at"
-            type="date"
-            label={t("common.date")}
-            required
-            value={payForm.paid_at}
-            onChange={(e) => setPayForm({ ...payForm, paid_at: e.target.value })}
+            onValueChange={(digits) => setPayForm({ ...payForm, amount: digits })}
           />
           <FloatingLabelInput
             id="note"

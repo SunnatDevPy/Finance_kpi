@@ -6,6 +6,7 @@ import { CancelIcon, DeleteIconBtn } from "../components/ButtonIcons";
 import { DateRangePicker } from "../components/DateRangePicker";
 import { PageError } from "../components/PageError";
 import { Pagination } from "../components/Pagination";
+import { useListLoading } from "../hooks/useListLoading";
 import {
   MotionTableRow,
   PremiumDataTable,
@@ -46,13 +47,13 @@ export function PaymentsPage() {
   const [search, setSearch] = useState("");
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
+  const { loading, start, finish } = useListLoading();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [total, setTotal] = useState(0);
 
-  const load = () => {
-    setLoading(true);
+  const load = (silent = true) => {
+    start(silent);
     api.payments
       .list({
         date_from: dateFrom || undefined,
@@ -66,7 +67,7 @@ export function PaymentsPage() {
         setTotal(data.total);
       })
       .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+      .finally(() => finish());
   };
 
   useEffect(() => {
@@ -80,11 +81,16 @@ export function PaymentsPage() {
 
   const handleDelete = async () => {
     if (!deleteId) return;
+    const id = deleteId;
+    const snapshot = payments;
+    setPayments((prev) => prev.filter((p) => p.id !== id));
+    setTotal((prev) => Math.max(0, prev - 1));
+    setDeleteId(null);
     try {
-      await api.payments.delete(deleteId);
-      setDeleteId(null);
-      load();
+      await api.payments.delete(id);
     } catch (err) {
+      setPayments(snapshot);
+      setTotal((prev) => prev + 1);
       setError(err instanceof Error ? err.message : t("common.error"));
     }
   };
@@ -116,7 +122,7 @@ export function PaymentsPage() {
         />
       </div>
 
-      <Card>
+      <Card className="content-card">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>{t("payments.listTitle")}</CardTitle>
@@ -126,7 +132,7 @@ export function PaymentsPage() {
             </CardDescription>
           </div>
         </CardHeader>
-        <CardContent className="p-0 pt-4">
+        <CardContent className="p-0">
           <PremiumDataTable
             loading={loading}
             empty={!loading && payments.length === 0}

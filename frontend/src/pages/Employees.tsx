@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { PlusIcon } from "lucide-react";
+import { BanIcon, PlusIcon, UsersIcon } from "lucide-react";
 import { api } from "../api/client";
 import {
   BlockIconBtn,
@@ -7,9 +7,11 @@ import {
   CreateUserIconBtn,
   UnblockIconBtn,
 } from "../components/ButtonIcons";
+import { CompanyAvatar } from "../components/CompanyAvatar";
 import { Modal } from "../components/Modal";
 import { PageError } from "../components/PageError";
 import { PageHeader, PageShell } from "../components/PageHeader";
+import { ActiveStatusBadge, RoleBadge } from "../components/UserBadges";
 import {
   MotionTableRow,
   PremiumDataTable,
@@ -17,19 +19,18 @@ import {
   TableBody,
   TableCell,
   TableCellActions,
-  TableCellPrimary,
   TableHead,
   TableHeader,
   TableRow,
 } from "../components/PremiumDataTable";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
+import { useListLoading } from "../hooks/useListLoading";
 import { MotionButton, motionTap } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FloatingLabelInput } from "@/components/ui/floating-label-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -38,15 +39,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { User, UserRole } from "../types";
+import { cn } from "@/lib/utils";
 
 export function EmployeesPage() {
-  const { isAdmin } = useAuth();
+  const { user: currentUser, isAdmin } = useAuth();
   const { t } = useI18n();
   const [users, setUsers] = useState<User[]>([]);
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
+  const { loading, start, finish } = useListLoading();
   const [form, setForm] = useState({
     username: "",
     full_name: "",
@@ -54,17 +56,17 @@ export function EmployeesPage() {
     role: "menejer" as UserRole,
   });
 
-  const load = () => {
-    setLoading(true);
+  const load = (silent = false) => {
+    start(silent);
     api.users
       .list()
       .then(setUsers)
       .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+      .finally(() => finish());
   };
 
   useEffect(() => {
-    if (isAdmin) load();
+    if (isAdmin) load(false);
   }, [isAdmin]);
 
   const filteredUsers = useMemo(() => {
@@ -81,20 +83,30 @@ export function EmployeesPage() {
     e.preventDefault();
     setError("");
     try {
-      await api.users.create(form);
+      const created = await api.users.create(form);
+      setUsers((prev) => [...prev, created]);
       setModalOpen(false);
       setForm({ username: "", full_name: "", password: "", role: "menejer" });
-      load();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("common.error"));
     }
   };
 
-  const toggleActive = async (user: User) => {
+  const toggleActive = async (target: User) => {
+    if (currentUser && target.id === currentUser.id && target.is_active) {
+      setError(t("employees.cannotBlockSelf"));
+      return;
+    }
+    const snapshot = users;
+    const nextActive = !target.is_active;
+    setError("");
+    setUsers((prev) =>
+      prev.map((row) => (row.id === target.id ? { ...row, is_active: nextActive } : row)),
+    );
     try {
-      await api.users.update(user.id, { is_active: !user.is_active });
-      load();
+      await api.users.update(target.id, { is_active: nextActive });
     } catch (err) {
+      setUsers(snapshot);
       setError(err instanceof Error ? err.message : t("common.error"));
     }
   };
@@ -119,8 +131,21 @@ export function EmployeesPage() {
         />
       </div>
 
-      <Card>
-        <CardContent className="p-0 pt-4">
+      <Card className="content-card">
+        <CardHeader className="border-b">
+          <div className="flex items-center gap-3">
+            <span className="flex size-10 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
+              <UsersIcon className="size-5" />
+            </span>
+            <div>
+              <CardTitle>{t("employees.listTitle")}</CardTitle>
+              <CardDescription>
+                {t("common.itemsFound").replace("{count}", String(filteredUsers.length))}
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
           <PremiumDataTable
             loading={loading}
             empty={!loading && filteredUsers.length === 0}
@@ -137,37 +162,66 @@ export function EmployeesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredUsers.map((user, index) => (
-                <MotionTableRow key={user.id} {...rowEnter(index)}>
-                  <TableCellPrimary>{user.full_name}</TableCellPrimary>
-                  <TableCell className="text-muted-foreground">{user.username}</TableCell>
-                  <TableCell>
-                    <Badge variant={user.role === "admin" ? "default" : "secondary"}>
-                      {t(`roles.${user.role}`)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={user.is_active ? "default" : "secondary"}>
-                      {user.is_active ? t("status.active") : t("status.inactive")}
-                    </Badge>
-                  </TableCell>
-                  <TableCellActions>
-                    <MotionButton variant="ghost" size="sm" onClick={() => toggleActive(user)} {...motionTap}>
-                      {user.is_active ? (
-                        <>
-                          <BlockIconBtn />
-                          {t("employees.block")}
-                        </>
+              {filteredUsers.map((user, index) => {
+                const isSelf = currentUser?.id === user.id;
+                return (
+                  <MotionTableRow key={user.id} {...rowEnter(index)}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <CompanyAvatar name={user.full_name} size="sm" />
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-foreground">{user.full_name}</p>
+                          {isSelf && (
+                            <p className="text-xs text-muted-foreground">{t("employees.you")}</p>
+                          )}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-medium text-muted-foreground">{user.username}</TableCell>
+                    <TableCell>
+                      <RoleBadge role={user.role} />
+                    </TableCell>
+                    <TableCell>
+                      <ActiveStatusBadge active={user.is_active} />
+                    </TableCell>
+                    <TableCellActions>
+                      {isSelf ? (
+                        <span
+                          className="inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground/50"
+                          title={t("employees.selfNoBlock")}
+                          aria-label={t("employees.selfNoBlock")}
+                        >
+                          <BanIcon className="size-4" aria-hidden />
+                        </span>
                       ) : (
-                        <>
-                          <UnblockIconBtn />
-                          {t("employees.unblock")}
-                        </>
+                        <MotionButton
+                          variant={user.is_active ? "outline" : "secondary"}
+                          size="sm"
+                          className={cn(
+                            "rounded-lg",
+                            user.is_active &&
+                              "border-amber-300/60 text-amber-800 hover:bg-amber-500/10 dark:border-amber-500/40 dark:text-amber-200",
+                          )}
+                          onClick={() => toggleActive(user)}
+                          {...motionTap}
+                        >
+                          {user.is_active ? (
+                            <>
+                              <BlockIconBtn />
+                              {t("employees.block")}
+                            </>
+                          ) : (
+                            <>
+                              <UnblockIconBtn />
+                              {t("employees.unblock")}
+                            </>
+                          )}
+                        </MotionButton>
                       )}
-                    </MotionButton>
-                  </TableCellActions>
-                </MotionTableRow>
-              ))}
+                    </TableCellActions>
+                  </MotionTableRow>
+                );
+              })}
             </TableBody>
           </PremiumDataTable>
         </CardContent>
@@ -213,7 +267,7 @@ export function EmployeesPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-2 pt-2">
             <MotionButton type="button" variant="outline" onClick={() => setModalOpen(false)} {...motionTap}>
               <CancelIcon />
               {t("common.cancel")}

@@ -4,12 +4,14 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import Client, Contract, ContractLineItem, Payment, ServiceType
+from app.models import Client, Contract, ContractLineItem, Expense, Payment, ServiceType
 from app.schemas.contract import ContractLineItemRead, ContractRead
 
 
 def get_client_or_404(db: Session, client_id: int) -> Client:
-    client = db.get(Client, client_id)
+    client = db.scalars(
+        select(Client).where(Client.id == client_id, Client.deleted_at.is_(None))
+    ).first()
     if client is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mijoz topilmadi")
     return client
@@ -30,8 +32,9 @@ def get_contract_or_404(db: Session, contract_id: int) -> Contract:
         .options(
             selectinload(Contract.line_items).selectinload(ContractLineItem.service_type),
             selectinload(Contract.payments),
+            selectinload(Contract.client),
         )
-        .where(Contract.id == contract_id)
+        .where(Contract.id == contract_id, Contract.deleted_at.is_(None))
     )
     contract = db.scalars(stmt).first()
     if contract is None:
@@ -40,10 +43,21 @@ def get_contract_or_404(db: Session, contract_id: int) -> Contract:
 
 
 def get_payment_or_404(db: Session, payment_id: int) -> Payment:
-    payment = db.get(Payment, payment_id)
+    payment = db.scalars(
+        select(Payment).where(Payment.id == payment_id, Payment.deleted_at.is_(None))
+    ).first()
     if payment is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="To'lov topilmadi")
     return payment
+
+
+def get_expense_or_404(db: Session, expense_id: int) -> Expense:
+    expense = db.scalars(
+        select(Expense).where(Expense.id == expense_id, Expense.deleted_at.is_(None))
+    ).first()
+    if expense is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Xarajat topilmadi")
+    return expense
 
 
 def get_line_item_or_404(db: Session, contract_id: int, line_item_id: int) -> ContractLineItem:

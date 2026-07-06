@@ -29,15 +29,32 @@ interface CompanyAvatarProps {
   name: string;
   size?: "sm" | "md";
   className?: string;
+  logoUrl?: string | null;
 }
 
-export function CompanyAvatar({ name, size = "md", className }: CompanyAvatarProps) {
+export function CompanyAvatar({ name, size = "md", className, logoUrl }: CompanyAvatarProps) {
+  const sizeClass = size === "sm" ? "size-7 text-[11px]" : "size-9 text-xs";
+
+  if (logoUrl) {
+    return (
+      <img
+        src={logoUrl}
+        alt={name}
+        className={cn(
+          "shrink-0 rounded-lg object-cover ring-1 ring-border/60",
+          sizeClass,
+          className,
+        )}
+      />
+    );
+  }
+
   const palette = PALETTE[hashString(name) % PALETTE.length];
   return (
     <span
       className={cn(
         "flex shrink-0 items-center justify-center rounded-lg font-bold tracking-tight",
-        size === "sm" ? "size-7 text-[11px]" : "size-9 text-xs",
+        sizeClass,
         palette,
         className,
       )}

@@ -3,14 +3,17 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangleIcon,
+  ArchiveIcon,
   CreditCardIcon,
   FileTextIcon,
+  HistoryIcon,
   LayoutDashboardIcon,
   LayersIcon,
   LogOutIcon,
   UserCircleIcon,
   UserCogIcon,
   UsersIcon,
+  WalletIcon,
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -106,6 +109,7 @@ export function Layout() {
     { to: "/clients", label: t("nav.clients"), icon: UsersIcon },
     { to: "/contracts", label: t("nav.contracts"), icon: FileTextIcon },
     { to: "/payments", label: t("nav.payments"), icon: CreditCardIcon },
+    { to: "/expenses", label: t("nav.expenses"), icon: WalletIcon },
     { to: "/debts", label: t("nav.debts"), icon: AlertTriangleIcon },
     { to: "/service-types", label: t("nav.serviceTypes"), icon: LayersIcon },
   ];
@@ -187,12 +191,26 @@ export function Layout() {
               />
             ))}
             {isAdmin && (
-              <SidebarLink
-                to="/employees"
-                label={t("nav.employees")}
-                icon={UserCogIcon}
-                collapsed={collapsed}
-              />
+              <>
+                <SidebarLink
+                  to="/employees"
+                  label={t("nav.employees")}
+                  icon={UserCogIcon}
+                  collapsed={collapsed}
+                />
+                <SidebarLink
+                  to="/audit-log"
+                  label={t("nav.auditLog")}
+                  icon={HistoryIcon}
+                  collapsed={collapsed}
+                />
+                <SidebarLink
+                  to="/trash"
+                  label={t("nav.trash")}
+                  icon={ArchiveIcon}
+                  collapsed={collapsed}
+                />
+              </>
             )}
           </nav>
 
@@ -272,7 +290,7 @@ export function Layout() {
           onToggleCollapse={() => setCollapsed((value) => !value)}
         />
         <main className="main-canvas flex-1">
-          <div className="mx-auto max-w-7xl px-5 py-6 sm:px-6 sm:py-7">
+          <div className="mx-auto max-w-7xl px-5 py-7 sm:px-8 sm:py-8 lg:px-10 lg:py-9">
             <AnimatePresence mode="wait">
               <motion.div
                 key={location.pathname}

@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "hooks": {
+    "stop": [
+      {
+        "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .cursor/hooks/verify-on-stop.ps1",
+        "timeout": 300,
+        "loop_limit": 5
+      }
+    ]
+  }
+}

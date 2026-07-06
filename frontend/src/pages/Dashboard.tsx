@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   Area,
@@ -21,6 +20,7 @@ import {
   CalendarDaysIcon,
   CheckCircle2Icon,
   CrownIcon,
+  PiggyBankIcon,
   ScaleIcon,
   TrendingUpIcon,
   UsersIcon,
@@ -30,8 +30,9 @@ import { api } from "../api/client";
 import { ExportButtons } from "../components/ExportButtons";
 import { DateRangePicker } from "../components/DateRangePicker";
 import { StatCard } from "../components/StatCard";
+import { TableViewLink } from "../components/TableViewLink";
 import { StaggerContainer, StaggerItem } from "../components/Stagger";
-import { PageShell } from "../components/PageHeader";
+import { PageShell, SectionHeader } from "../components/PageHeader";
 import {
   PremiumDataTable,
   TableBody,
@@ -61,7 +62,7 @@ import {
 import type { ChartPoint, DashboardStats, ExpiringContract, TopClientLtvItem } from "../types";
 import { usePreferences } from "../context/PreferencesContext";
 import { useI18n } from "../context/I18nContext";
-import { formatCompactMoney, formatDate, formatMoney, toNumber } from "../utils/format";
+import { formatCompactMoney, formatDate, formatMoney, formatPercent, toNumber } from "../utils/format";
 import { cn } from "@/lib/utils";
 
 const SERVICE_BAR_COLORS = [
@@ -121,6 +122,14 @@ export function DashboardPage() {
       ({
         revenue: { label: t("dashboard.charts.revenue"), color: "hsl(160 72% 38%)" },
         plan: { label: t("dashboard.charts.plan"), color: "hsl(38 92% 50%)" },
+      }) satisfies ChartConfig,
+    [t],
+  );
+
+  const profitConfig = useMemo(
+    () =>
+      ({
+        profit: { label: t("dashboard.charts.profit"), color: "hsl(160 72% 38%)" },
       }) satisfies ChartConfig,
     [t],
   );
@@ -195,6 +204,24 @@ export function DashboardPage() {
     const balanceTotal = Math.max(1, totalPaid + totalDebt);
     const paidPercent = Math.round((totalPaid / balanceTotal) * 100);
 
+    const byExpenseSorted = [...stats.charts.expenses_by_category]
+      .map((item) => ({ name: item.name, amount: toNumber(item.amount) }))
+      .sort((a, b) => b.amount - a.amount);
+    const topExpenseCategories = byExpenseSorted.slice(0, 5);
+    const othersExpenseAmount = byExpenseSorted
+      .slice(5)
+      .reduce((sum, item) => sum + item.amount, 0);
+    const expensesByCategory =
+      othersExpenseAmount > 0
+        ? [...topExpenseCategories, { name: t("dashboard.charts.others"), amount: othersExpenseAmount }]
+        : topExpenseCategories;
+    const expensesByCategoryMax = Math.max(1, ...expensesByCategory.map((item) => item.amount));
+
+    const profitTrend = stats.charts.profit_by_month.map((point) => ({
+      label: point.label,
+      profit: toNumber(point.value),
+    }));
+
     return {
       revenueTrend,
       planComparison,
@@ -204,6 +231,9 @@ export function DashboardPage() {
       totalPaid,
       totalDebt,
       paidPercent,
+      expensesByCategory,
+      expensesByCategoryMax,
+      profitTrend,
     };
   }, [stats, t, trendPoints]);
 
@@ -228,7 +258,7 @@ export function DashboardPage() {
       : 0;
 
   return (
-    <PageShell className={cn("gap-8", loading && "pointer-events-none opacity-60")}>
+    <PageShell className={cn(loading && "pointer-events-none opacity-60")}>
 
       {/* ── Hero banner ── */}
       <div className="premium-hero shine-border px-6 py-7">
@@ -237,16 +267,16 @@ export function DashboardPage() {
         <div className="pointer-events-none absolute -bottom-8 left-16 h-48 w-48 rounded-full bg-brand-500/25 blur-2xl animate-mesh" />
         <div className="pointer-events-none absolute right-24 bottom-2 h-32 w-32 rounded-full bg-blue-400/15 blur-2xl" />
 
-        <div className="relative flex flex-wrap items-start justify-between gap-4">
-          <div>
+        <div className="relative flex flex-wrap items-start justify-between gap-6">
+          <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-300/90">
               World Textile Marketing Agency
             </p>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight">{t("dashboard.title")}</h1>
-            <p className="mt-2 max-w-lg text-sm leading-relaxed text-brand-200/85">{t("dashboard.subtitle")}</p>
+            <h1 className="mt-3 text-3xl font-bold tracking-tight sm:text-[2rem]">{t("dashboard.title")}</h1>
+            <p className="mt-3 max-w-lg text-sm leading-relaxed text-brand-200/85">{t("dashboard.subtitle")}</p>
           </div>
-          <div className="flex w-full flex-col items-stretch gap-3 sm:w-auto sm:items-end">
-            <div className="flex flex-wrap justify-end gap-2">
+          <div className="flex w-full flex-col items-stretch gap-4 sm:w-auto sm:min-w-[280px] sm:items-end">
+            <div className="toolbar-cluster justify-end">
               <ExportButtons resource="debts" onDark dateFrom={dateFrom} dateTo={dateTo} />
               <ExportButtons resource="payments" onDark dateFrom={dateFrom} dateTo={dateTo} />
             </div>
@@ -264,7 +294,7 @@ export function DashboardPage() {
       </div>
 
       {/* ── Stat cards ── */}
-      <StaggerContainer className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <StaggerContainer className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
         <StaggerItem>
           <StatCard
             title={t("dashboard.totalDebt")}
@@ -311,7 +341,7 @@ export function DashboardPage() {
         </StaggerItem>
       </StaggerContainer>
 
-      <StaggerContainer className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <StaggerContainer className="grid grid-cols-1 gap-5 md:grid-cols-3">
         <StaggerItem>
           <StatCard
             title={t("dashboard.totalPaid")}
@@ -347,17 +377,48 @@ export function DashboardPage() {
         </StaggerItem>
       </StaggerContainer>
 
+      {/* ── P&L: expenses / net profit / margin ── */}
+      <StaggerContainer className="grid grid-cols-1 gap-5 md:grid-cols-3">
+        <StaggerItem>
+          <StatCard
+            title={t("dashboard.totalExpenses")}
+            value={formatMoney(stats.period_expenses)}
+            numericValue={toNumber(stats.period_expenses)}
+            formatValue={formatMoney}
+            accent="red"
+            icon={WalletIcon}
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            title={t("dashboard.netProfit")}
+            value={formatMoney(stats.net_profit)}
+            numericValue={toNumber(stats.net_profit)}
+            formatValue={formatMoney}
+            accent={toNumber(stats.net_profit) >= 0 ? "green" : "red"}
+            icon={PiggyBankIcon}
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            title={t("dashboard.profitMargin")}
+            value={formatPercent(stats.profit_margin_pct)}
+            numericValue={stats.profit_margin_pct ?? 0}
+            formatValue={(n) => formatPercent(n)}
+            accent="violet"
+            icon={ScaleIcon}
+          />
+        </StaggerItem>
+      </StaggerContainer>
+
       {/* ── Insights: services / client status / balance ── */}
-      <div>
-        <h2 className="mb-1 text-lg font-bold tracking-tight text-foreground">
-          {t("dashboard.insights")}
-        </h2>
-        <p className="mb-4 text-sm text-muted-foreground">{t("dashboard.insightsDesc")}</p>
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+      <section className="page-section">
+        <SectionHeader title={t("dashboard.insights")} description={t("dashboard.insightsDesc")} />
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
           {/* Revenue by service */}
           <RevealCard>
-          <Card className="glass-panel overflow-hidden shadow-md transition-shadow hover:shadow-xl">
-            <CardHeader className="border-b pb-4">
+          <Card className="content-card">
+            <CardHeader className="border-b">
               <CardTitle className="text-base">{t("dashboard.charts.byService")}</CardTitle>
               <CardDescription className="text-xs">{t("dashboard.charts.byServiceDesc")}</CardDescription>
             </CardHeader>
@@ -391,8 +452,8 @@ export function DashboardPage() {
 
           {/* Client status donut */}
           <RevealCard>
-          <Card className="glass-panel overflow-hidden shadow-md transition-shadow hover:shadow-xl">
-            <CardHeader className="border-b pb-4">
+          <Card className="content-card">
+            <CardHeader className="border-b">
               <CardTitle className="text-base">{t("dashboard.charts.clientStatus")}</CardTitle>
               <CardDescription className="text-xs">{t("dashboard.charts.clientStatusDesc")}</CardDescription>
             </CardHeader>
@@ -441,8 +502,8 @@ export function DashboardPage() {
 
           {/* Paid vs debt balance */}
           <RevealCard>
-          <Card className="glass-panel overflow-hidden shadow-md transition-shadow hover:shadow-xl">
-            <CardHeader className="border-b pb-4">
+          <Card className="content-card">
+            <CardHeader className="border-b">
               <CardTitle className="text-base">{t("dashboard.charts.balance")}</CardTitle>
               <CardDescription className="text-xs">{t("dashboard.charts.balanceDesc")}</CardDescription>
             </CardHeader>
@@ -484,12 +545,12 @@ export function DashboardPage() {
           </Card>
           </RevealCard>
         </div>
-      </div>
+      </section>
 
       {/* ── Expiring contracts ── */}
-      <Card className="glass-panel overflow-hidden shadow-md transition-shadow hover:shadow-xl">
-        <CardHeader className="border-b bg-gradient-to-r from-amber-50 to-white pb-4 dark:from-amber-950/20 dark:to-card">
-          <div className="flex items-center gap-2">
+      <Card className="content-card">
+        <CardHeader className="border-b bg-gradient-to-r from-amber-50 to-white dark:from-amber-950/20 dark:to-card">
+          <div className="flex items-center gap-3">
             <span className="flex size-8 items-center justify-center rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-900/50 dark:text-amber-400">
               <CalendarDaysIcon className="size-4" />
             </span>
@@ -501,7 +562,7 @@ export function DashboardPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-0 pt-2">
+        <CardContent className="p-0">
           <PremiumDataTable
             empty={expiring.length === 0}
             emptyMessage={t("dashboard.noExpiring")}
@@ -537,9 +598,7 @@ export function DashboardPage() {
                     {formatMoney(item.debt_amount)}
                   </TableCellMoney>
                   <TableCell className="text-right">
-                    <Button variant="outline" size="sm" render={<Link to={`/clients/${item.client_id}`} />}>
-                      {t("common.view")}
-                    </Button>
+                    <TableViewLink to={`/clients/${item.client_id}`} />
                   </TableCell>
                 </TableRow>
               ))}
@@ -549,23 +608,23 @@ export function DashboardPage() {
       </Card>
 
       {/* ── Charts ── */}
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+      <div className="grid grid-cols-1 gap-8 xl:grid-cols-2">
         <RevealCard>
-        <Card className="glass-panel overflow-hidden shadow-md transition-shadow hover:shadow-xl">
-          <CardHeader className="border-b pb-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+        <Card className="content-card">
+          <CardHeader className="border-b">
+            <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <CardTitle className="text-base">{t("dashboard.charts.revenueTrend")}</CardTitle>
                 <CardDescription className="text-xs">{t("dashboard.charts.revenueTrendDesc")}</CardDescription>
               </div>
-              <div className="flex items-center gap-1 rounded-lg border bg-muted/40 p-1">
+              <div className="segmented-control">
                 {TREND_MONTH_OPTIONS.map((option) => (
                   <Button
                     key={option}
                     type="button"
                     size="sm"
                     variant={trendMonths === option ? "default" : "ghost"}
-                    className="h-7 px-3 text-xs"
+                    className="h-8 px-3.5"
                     onClick={() => setTrendMonths(option)}
                   >
                     {option} {t("dashboard.charts.months")}
@@ -613,8 +672,8 @@ export function DashboardPage() {
         </RevealCard>
 
         <RevealCard>
-        <Card className="glass-panel overflow-hidden shadow-md transition-shadow hover:shadow-xl">
-          <CardHeader className="border-b pb-4">
+        <Card className="content-card">
+          <CardHeader className="border-b">
             <CardTitle className="text-base">{t("dashboard.charts.planVsFact")}</CardTitle>
             <CardDescription className="text-xs">{t("dashboard.charts.planVsFactDesc")}</CardDescription>
           </CardHeader>
@@ -652,10 +711,91 @@ export function DashboardPage() {
         </RevealCard>
       </div>
 
+      {/* ── P&L charts: expenses breakdown / profit trend ── */}
+      <div className="grid grid-cols-1 gap-8 xl:grid-cols-2">
+        <RevealCard>
+        <Card className="content-card">
+          <CardHeader className="border-b">
+            <CardTitle className="text-base">{t("dashboard.charts.expensesByCategory")}</CardTitle>
+            <CardDescription className="text-xs">
+              {t("dashboard.charts.expensesByCategoryDesc")}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3 pt-4">
+            {chartData.expensesByCategory.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">{t("common.noData")}</p>
+            ) : (
+              chartData.expensesByCategory.map((item, index) => (
+                <div key={item.name} className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between gap-2 text-sm">
+                    <span className="truncate font-medium text-foreground">{item.name}</span>
+                    <span className="shrink-0 font-semibold tabular-nums text-foreground/90">
+                      {formatCompactMoney(item.amount)}
+                    </span>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                    <div
+                      className={cn(
+                        "h-full rounded-full",
+                        SERVICE_BAR_COLORS[index % SERVICE_BAR_COLORS.length],
+                      )}
+                      style={{
+                        width: `${Math.max(4, (item.amount / chartData.expensesByCategoryMax) * 100)}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+        </RevealCard>
+
+        <RevealCard>
+        <Card className="content-card">
+          <CardHeader className="border-b">
+            <CardTitle className="text-base">{t("dashboard.charts.profitTrend")}</CardTitle>
+            <CardDescription className="text-xs">{t("dashboard.charts.profitTrendDesc")}</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <ChartContainer config={profitConfig} className="h-[260px] w-full">
+              <AreaChart data={chartData.profitTrend} margin={{ left: 8, right: 8, top: 4, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="profitGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(160 72% 38%)" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="hsl(160 72% 38%)" stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border/60" />
+                <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
+                <YAxis
+                  tickFormatter={formatCompactMoney}
+                  tickLine={false}
+                  axisLine={false}
+                  width={60}
+                  tick={{ fontSize: 11 }}
+                />
+                <ChartTooltip content={<ChartTooltipContent formatter={(value) => moneyTooltip(value)} />} />
+                <Area
+                  type="monotone"
+                  dataKey="profit"
+                  stroke="hsl(160 72% 38%)"
+                  fill="url(#profitGrad)"
+                  strokeWidth={2.5}
+                  dot={{ r: 3, fill: "hsl(160 72% 38%)", strokeWidth: 0 }}
+                  activeDot={{ r: 5 }}
+                />
+              </AreaChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+        </RevealCard>
+      </div>
+
       {/* ── Top clients ── */}
-      <Card className="glass-panel overflow-hidden shadow-md transition-shadow hover:shadow-xl">
-        <CardHeader className="border-b bg-gradient-to-r from-blue-50 to-white pb-4 dark:from-blue-950/20 dark:to-card">
-          <div className="flex items-center gap-2">
+      <Card className="content-card">
+        <CardHeader className="border-b bg-gradient-to-r from-blue-50 to-white dark:from-blue-950/20 dark:to-card">
+          <div className="flex items-center gap-3">
             <span className="flex size-8 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-400">
               <UsersIcon className="size-4" />
             </span>
@@ -665,7 +805,7 @@ export function DashboardPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-0 pt-2">
+        <CardContent className="p-0">
           <PremiumDataTable
             empty={stats.top_clients.length === 0}
             emptyMessage={t("common.noData")}
@@ -722,9 +862,7 @@ export function DashboardPage() {
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="outline" size="sm" render={<Link to={`/clients/${client.client_id}`} />}>
-                        {t("common.view")}
-                      </Button>
+                      <TableViewLink to={`/clients/${client.client_id}`} />
                     </TableCell>
                   </TableRow>
                 );
@@ -735,10 +873,10 @@ export function DashboardPage() {
       </Card>
 
       {/* ── Top clients by lifetime value (LTV) ── */}
-      <Card className="glass-panel overflow-hidden shadow-md transition-shadow hover:shadow-xl">
-        <CardHeader className="border-b bg-gradient-to-r from-violet-50 to-white pb-4 dark:from-violet-950/20 dark:to-card">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
+      <Card className="content-card">
+        <CardHeader className="border-b bg-gradient-to-r from-violet-50 to-white dark:from-violet-950/20 dark:to-card">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
               <span className="flex size-8 items-center justify-center rounded-lg bg-violet-100 text-violet-600 dark:bg-violet-900/50 dark:text-violet-400">
                 <CrownIcon className="size-4" />
               </span>
@@ -747,14 +885,14 @@ export function DashboardPage() {
                 <CardDescription className="text-xs">{t("dashboard.topClientsLtvDesc")}</CardDescription>
               </div>
             </div>
-            <div className="flex items-center gap-1 rounded-lg border bg-muted/40 p-1">
+            <div className="segmented-control">
               {LTV_LIMIT_OPTIONS.map((option) => (
                 <Button
                   key={option}
                   type="button"
                   size="sm"
                   variant={ltvLimit === option ? "default" : "ghost"}
-                  className="h-7 px-3 text-xs"
+                  className="h-8 px-3.5"
                   onClick={() => setLtvLimit(option)}
                 >
                   Top {option}
@@ -811,9 +949,7 @@ export function DashboardPage() {
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button variant="outline" size="sm" render={<Link to={`/clients/${client.client_id}`} />}>
-                      {t("common.view")}
-                    </Button>
+                    <TableViewLink to={`/clients/${client.client_id}`} />
                   </TableCell>
                 </TableRow>
               ))}

@@ -34,3 +34,13 @@ React 19 + Vite + TS + Tailwind + shadcn/ui (Base UI) + Framer Motion + Recharts
 ## API
 
 `frontend/src/api/client.ts` — base `/api/v1`, types in `types/index.ts`.
+
+## Verify (majburiy)
+
+Kod o'zgartirilgach **wtma-verify** skillini qo'llang:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .cursor/skills/wtma-verify/scripts/verify.ps1
+```
+
+Xato bo'lsa tuzating va qayta ishga tushiring. Vazifani verify o'tmaguncha tugatmaying.

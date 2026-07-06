@@ -115,7 +115,7 @@ export function PremiumDataTable({
         <Table variant="default">{children}</Table>
       </div>
       {footer ? (
-        <div className="-mt-px rounded-b-2xl border border-t-0 border-border/50 bg-muted/20 px-4 py-3 backdrop-blur-sm">
+        <div className="-mt-px rounded-b-2xl border border-t-0 border-border/50 bg-muted/20 px-5 py-4 backdrop-blur-sm">
           {footer}
         </div>
       ) : null}
@@ -210,13 +210,14 @@ interface TableCellCompanyProps {
   name: string
   subtitle?: string
   className?: string
+  logoUrl?: string | null
 }
 
-export function TableCellCompany({ to, name, subtitle, className }: TableCellCompanyProps) {
+export function TableCellCompany({ to, name, subtitle, className, logoUrl }: TableCellCompanyProps) {
   return (
     <TableCell className={className}>
       <div className="flex items-center gap-2.5">
-        <CompanyAvatar name={name} size="sm" />
+        <CompanyAvatar name={name} size="sm" logoUrl={logoUrl} />
         <div className="flex min-w-0 flex-col gap-0.5">
           <Link
             to={to}
@@ -236,7 +237,7 @@ export function TableCellCompany({ to, name, subtitle, className }: TableCellCom
 export function TableCellActions({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <TableCell className={cn("text-right", className)}>
-      <div className="flex justify-end gap-1">{children}</div>
+      <div className="flex justify-end gap-2">{children}</div>
     </TableCell>
   )
 }

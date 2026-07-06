@@ -10,6 +10,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.config import settings
 from app.database import Base, get_db
 from app.limiter import limiter
 from app.main import app
@@ -18,6 +19,12 @@ from app.services.app_settings import MONTHLY_PLAN_KEY
 from app.services.auth import hash_password
 
 limiter.enabled = False
+
+
+@pytest.fixture(autouse=True)
+def _isolate_uploads(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "upload_dir", str(tmp_path / "uploads"))
+    yield
 
 TEST_ENGINE = create_engine(
     "sqlite://",

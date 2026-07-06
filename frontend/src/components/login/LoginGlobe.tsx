@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useReducedMotion } from "framer-motion";
+import { motion, useMotionValue, useReducedMotion, useSpring } from "framer-motion";
 
 /**
  * Login sahifasidagi premium 3D globus — Canvas 2D asosida.
@@ -170,9 +170,12 @@ function buildStars(count: number, spread: number): Star[] {
   return stars;
 }
 
+const clampNum = (min: number, value: number, max: number) => Math.min(max, Math.max(min, value));
+
 export function LoginGlobe({ className, size }: LoginGlobeProps) {
   const reduceMotion = useReducedMotion();
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
 
   const phiRef = useRef(0.15);
@@ -181,6 +184,24 @@ export function LoginGlobe({ className, size }: LoginGlobeProps) {
   const pointerInteracting = useRef<number | null>(null);
   const pointerMovement = useRef(0);
   const bucketsRef = useRef(new Map<number, { path: Path2D; color: string; alpha: number }>());
+
+  /** Sichqoncha holatiga qarab yengil 3D tilt — globusni "jonli" his qildiradi. */
+  const rotX = useMotionValue(0);
+  const rotY = useMotionValue(0);
+  const springRotX = useSpring(rotX, { stiffness: 55, damping: 16, mass: 0.6 });
+  const springRotY = useSpring(rotY, { stiffness: 55, damping: 16, mass: 0.6 });
+
+  useEffect(() => {
+    if (reduceMotion) return;
+    const onPointerMove = (e: PointerEvent) => {
+      const dx = (e.clientX / window.innerWidth - 0.5) * 2;
+      const dy = (e.clientY / window.innerHeight - 0.5) * 2;
+      rotY.set(clampNum(-7, dx * 7, 7));
+      rotX.set(clampNum(-7, -dy * 7, 7));
+    };
+    window.addEventListener("pointermove", onPointerMove);
+    return () => window.removeEventListener("pointermove", onPointerMove);
+  }, [reduceMotion, rotX, rotY]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -521,7 +542,11 @@ export function LoginGlobe({ className, size }: LoginGlobeProps) {
   const canvasOffset = (size - canvasSize) / 2;
 
   return (
-    <div className={`relative mx-auto ${className ?? ""}`} style={{ width: size, height: size }}>
+    <div
+      ref={wrapperRef}
+      className={`relative mx-auto ${className ?? ""}`}
+      style={{ width: size, height: size, perspective: 1200 }}
+    >
       {/* Tashqi atmosfera halqasi — pulsatsiya */}
       <div
         className="pointer-events-none absolute -inset-[18%] rounded-full login-globe-halo"
@@ -536,56 +561,71 @@ export function LoginGlobe({ className, size }: LoginGlobeProps) {
         aria-hidden
       />
 
-      {/* Sfera tanasi */}
-      <div
-        className="absolute inset-0 overflow-hidden rounded-full"
+      {/* Kometa — atmosferada tasodifan uchib o'tadi */}
+      <div className="pointer-events-none absolute -inset-[8%] overflow-hidden rounded-full" aria-hidden>
+        <div className="login-comet" />
+      </div>
+
+      <motion.div
+        className="absolute inset-0"
         style={{
-          background:
-            "radial-gradient(circle at 32% 28%, rgba(56,189,248,0.2) 0%, rgba(30,41,59,0.94) 44%, rgba(6,6,12,0.99) 78%)",
-          boxShadow:
-            "inset 0 0 60px rgba(0,0,0,0.55), inset 0 0 120px rgba(34,211,238,0.1), 0 0 90px rgba(99,102,241,0.22), 0 0 160px rgba(56,189,248,0.12)",
+          rotateX: springRotX,
+          rotateY: springRotY,
+          transformStyle: "preserve-3d",
         }}
       >
+        {/* Sfera tanasi */}
         <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage:
-              "repeating-radial-gradient(circle at 50% 50%, transparent 0, transparent 11.5%, rgba(103,232,249,0.14) 12%, transparent 12.5%)",
-          }}
-        />
-      </div>
-
-      <canvas
-        ref={canvasRef}
-        className="absolute cursor-grab transition-opacity duration-700 ease-out"
-        style={{
-          width: canvasSize,
-          height: canvasSize,
-          left: canvasOffset,
-          top: canvasOffset,
-          opacity: ready ? 1 : 0,
-        }}
-        aria-hidden
-      />
-
-      {/* Yaltirash va rim light */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-full">
-        <div
-          className="absolute inset-0 login-globe-shimmer"
+          className="absolute inset-0 overflow-hidden rounded-full"
           style={{
             background:
-              "radial-gradient(circle at 26% 20%, rgba(255,255,255,0.32) 0%, rgba(255,255,255,0.09) 15%, transparent 38%)",
+              "radial-gradient(circle at 32% 28%, rgba(56,189,248,0.2) 0%, rgba(30,41,59,0.94) 44%, rgba(6,6,12,0.99) 78%)",
+            boxShadow:
+              "inset 0 0 60px rgba(0,0,0,0.55), inset 0 0 120px rgba(34,211,238,0.1), 0 0 90px rgba(99,102,241,0.22), 0 0 160px rgba(56,189,248,0.12)",
           }}
-        />
-        <div
-          className="absolute inset-0"
+        >
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage:
+                "repeating-radial-gradient(circle at 50% 50%, transparent 0, transparent 11.5%, rgba(103,232,249,0.14) 12%, transparent 12.5%)",
+            }}
+          />
+        </div>
+
+        <canvas
+          ref={canvasRef}
+          className="absolute cursor-grab transition-opacity duration-700 ease-out"
           style={{
-            background:
-              "radial-gradient(circle at 50% 50%, transparent 50%, rgba(0,0,0,0.42) 80%, rgba(0,0,0,0.7) 100%)",
+            width: canvasSize,
+            height: canvasSize,
+            left: canvasOffset,
+            top: canvasOffset,
+            opacity: ready ? 1 : 0,
           }}
+          aria-hidden
         />
-        <div className="absolute inset-0 rounded-full ring-1 ring-cyan-300/25" />
-      </div>
+
+        {/* Yaltirash, rim light (atmosfera chekkasi) va soya */}
+        <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-full">
+          <div
+            className="absolute inset-0 login-globe-shimmer"
+            style={{
+              background:
+                "radial-gradient(circle at 26% 20%, rgba(255,255,255,0.32) 0%, rgba(255,255,255,0.09) 15%, transparent 38%)",
+            }}
+          />
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(circle at 50% 50%, transparent 50%, rgba(0,0,0,0.42) 80%, rgba(0,0,0,0.7) 100%)",
+            }}
+          />
+          <div className="absolute inset-0 login-globe-rim" />
+          <div className="absolute inset-0 rounded-full ring-1 ring-cyan-300/25" />
+        </div>
+      </motion.div>
     </div>
   );
 }

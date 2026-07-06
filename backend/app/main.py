@@ -1,5 +1,8 @@
+from pathlib import Path
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -37,6 +40,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)
+app.mount("/api/v1/uploads", StaticFiles(directory=settings.upload_dir), name="uploads")
 
 app.include_router(api_router, prefix="/api/v1")
 

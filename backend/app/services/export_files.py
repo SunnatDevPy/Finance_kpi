@@ -8,6 +8,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from app.services.export_data import EXPORT_TITLES
+from app.services.pdf_fonts import ensure_unicode_fonts
 
 
 def build_xlsx(title: str, headers: list[str], rows: list[list[str]]) -> BytesIO:
@@ -37,11 +38,14 @@ def build_xlsx(title: str, headers: list[str], rows: list[list[str]]) -> BytesIO
 
 
 def build_pdf(title: str, headers: list[str], rows: list[list[str]]) -> BytesIO:
+    font_regular, font_bold = ensure_unicode_fonts()
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), title=title)
     styles = getSampleStyleSheet()
+    title_style = styles["Title"]
+    title_style.fontName = font_bold
     elements = [
-        Paragraph(title, styles["Title"]),
+        Paragraph(title, title_style),
         Spacer(1, 12),
     ]
 
@@ -52,7 +56,8 @@ def build_pdf(title: str, headers: list[str], rows: list[list[str]]) -> BytesIO:
             [
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e3a5f")),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTNAME", (0, 0), (-1, 0), font_bold),
+                ("FONTNAME", (0, 1), (-1, -1), font_regular),
                 ("FONTSIZE", (0, 0), (-1, -1), 8),
                 ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
                 ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),

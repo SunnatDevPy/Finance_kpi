@@ -10,6 +10,8 @@ from app.models import (
     ClientStatus,
     Contract,
     ContractLineItem,
+    Expense,
+    ExpenseCategory,
     Payment,
     ServiceType,
 )
@@ -41,6 +43,18 @@ MONTH_LABELS = [
     "Dek",
 ]
 CHART_MONTHS = 12
+
+EXPENSE_CATEGORY_LABELS: dict[ExpenseCategory, str] = {
+    ExpenseCategory.SALARY: "Ish haqi",
+    ExpenseCategory.RENT: "Ijara",
+    ExpenseCategory.MARKETING: "Marketing",
+    ExpenseCategory.UTILITIES: "Kommunal",
+    ExpenseCategory.TRANSPORT: "Transport",
+    ExpenseCategory.OFFICE: "Ofis xarajatlari",
+    ExpenseCategory.TAX: "Soliq",
+    ExpenseCategory.BANK_FEE: "Bank xizmati",
+    ExpenseCategory.OTHER: "Boshqa",
+}
 
 
 def _month_start(value: date) -> date:
@@ -122,7 +136,14 @@ def get_revenue_trend(db: Session, months: int = 12) -> list[ChartPoint]:
                 extract("month", Payment.paid_at),
                 func.coalesce(func.sum(Payment.amount), 0),
             )
-            .where(Payment.paid_at >= start, Payment.paid_at <= end)
+            .select_from(Payment)
+            .join(Contract, Contract.id == Payment.contract_id)
+            .where(
+                Payment.paid_at >= start,
+                Payment.paid_at <= end,
+                Payment.deleted_at.is_(None),
+                Contract.deleted_at.is_(None),
+            )
             .group_by(extract("year", Payment.paid_at), extract("month", Payment.paid_at))
         ).all()
     }
@@ -151,20 +172,32 @@ def get_dashboard_stats(
     chart_end = period_end if has_custom_range else range_end
 
     total_contract_amount = db.scalar(
-        select(func.coalesce(func.sum(ContractLineItem.price), 0)).where(
-            ContractLineItem.is_cancelled.is_(False)
+        select(func.coalesce(func.sum(ContractLineItem.price), 0))
+        .select_from(ContractLineItem)
+        .join(Contract, Contract.id == ContractLineItem.contract_id)
+        .where(
+            ContractLineItem.is_cancelled.is_(False),
+            Contract.deleted_at.is_(None),
         )
     ) or Decimal("0")
 
-    total_paid = db.scalar(select(func.coalesce(func.sum(Payment.amount), 0))) or Decimal(
-        "0"
-    )
+    total_paid = db.scalar(
+        select(func.coalesce(func.sum(Payment.amount), 0))
+        .select_from(Payment)
+        .join(Contract, Contract.id == Payment.contract_id)
+        .where(Payment.deleted_at.is_(None), Contract.deleted_at.is_(None))
+    ) or Decimal("0")
     total_debt = total_contract_amount - total_paid
 
     period_revenue = db.scalar(
-        select(func.coalesce(func.sum(Payment.amount), 0)).where(
+        select(func.coalesce(func.sum(Payment.amount), 0))
+        .select_from(Payment)
+        .join(Contract, Contract.id == Payment.contract_id)
+        .where(
             Payment.paid_at >= period_start,
             Payment.paid_at <= period_end,
+            Payment.deleted_at.is_(None),
+            Contract.deleted_at.is_(None),
         )
     ) or Decimal("0")
 
@@ -172,12 +205,59 @@ def get_dashboard_stats(
     prev_period_end = period_start - timedelta(days=1)
     prev_period_start = prev_period_end - timedelta(days=duration_days - 1)
     prev_period_revenue = db.scalar(
-        select(func.coalesce(func.sum(Payment.amount), 0)).where(
+        select(func.coalesce(func.sum(Payment.amount), 0))
+        .select_from(Payment)
+        .join(Contract, Contract.id == Payment.contract_id)
+        .where(
             Payment.paid_at >= prev_period_start,
             Payment.paid_at <= prev_period_end,
+            Payment.deleted_at.is_(None),
+            Contract.deleted_at.is_(None),
         )
     ) or Decimal("0")
     revenue_growth_pct = _growth_pct(period_revenue, prev_period_revenue)
+
+    total_expenses = db.scalar(
+        select(func.coalesce(func.sum(Expense.amount), 0)).where(Expense.deleted_at.is_(None))
+    ) or Decimal("0")
+
+    period_expenses = db.scalar(
+        select(func.coalesce(func.sum(Expense.amount), 0)).where(
+            Expense.deleted_at.is_(None),
+            Expense.expense_date >= period_start,
+            Expense.expense_date <= period_end,
+        )
+    ) or Decimal("0")
+
+    net_profit = (period_revenue if has_custom_range else total_paid) - (
+        period_expenses if has_custom_range else total_expenses
+    )
+    profit_base = period_revenue if has_custom_range else total_paid
+    profit_margin_pct = float((net_profit / profit_base) * 100) if profit_base > 0 else None
+
+    expenses_by_category_rows = db.execute(
+        select(Expense.category, func.coalesce(func.sum(Expense.amount), 0))
+        .where(Expense.deleted_at.is_(None))
+        .group_by(Expense.category)
+        .order_by(func.coalesce(func.sum(Expense.amount), 0).desc())
+    ).all()
+
+    expenses_by_month = {
+        f"{int(year):04d}-{int(month):02d}": amount
+        for year, month, amount in db.execute(
+            select(
+                extract("year", Expense.expense_date),
+                extract("month", Expense.expense_date),
+                func.coalesce(func.sum(Expense.amount), 0),
+            )
+            .where(
+                Expense.expense_date >= chart_start,
+                Expense.expense_date <= chart_end,
+                Expense.deleted_at.is_(None),
+            )
+            .group_by(extract("year", Expense.expense_date), extract("month", Expense.expense_date))
+        ).all()
+    }
 
     displayed_paid = (
         period_revenue
@@ -191,11 +271,14 @@ def get_dashboard_stats(
         else 0.0
     )
 
-    total_contracts = db.scalar(select(func.count(Contract.id))) or 0
+    total_contracts = db.scalar(
+        select(func.count(Contract.id)).where(Contract.deleted_at.is_(None))
+    ) or 0
     active_contracts = db.scalar(
         select(func.count(Contract.id)).where(
             Contract.start_date <= today,
             Contract.end_date >= today,
+            Contract.deleted_at.is_(None),
         )
     ) or 0
 
@@ -204,7 +287,7 @@ def get_dashboard_stats(
             func.count(Client.id),
             func.count(case((Client.status == ClientStatus.FAOL, 1))),
             func.count(case((Client.status == ClientStatus.NOFAOL, 1))),
-        )
+        ).where(Client.deleted_at.is_(None))
     ).one()
 
     payment_by_month = {
@@ -215,7 +298,14 @@ def get_dashboard_stats(
                 extract("month", Payment.paid_at),
                 func.coalesce(func.sum(Payment.amount), 0),
             )
-            .where(Payment.paid_at >= chart_start, Payment.paid_at <= chart_end)
+            .select_from(Payment)
+            .join(Contract, Contract.id == Payment.contract_id)
+            .where(
+                Payment.paid_at >= chart_start,
+                Payment.paid_at <= chart_end,
+                Payment.deleted_at.is_(None),
+                Contract.deleted_at.is_(None),
+            )
             .group_by(extract("year", Payment.paid_at), extract("month", Payment.paid_at))
         ).all()
     }
@@ -226,7 +316,10 @@ def get_dashboard_stats(
             extract("month", func.date(Client.created_at)),
             func.count(Client.id),
         )
-        .where(func.date(Client.created_at) >= chart_start)
+        .where(
+            func.date(Client.created_at) >= chart_start,
+            Client.deleted_at.is_(None),
+        )
     )
     if has_custom_range:
         clients_stmt = clients_stmt.where(func.date(Client.created_at) <= chart_end)
@@ -248,7 +341,11 @@ def get_dashboard_stats(
                 extract("month", Contract.start_date),
                 func.count(Contract.id),
             )
-            .where(Contract.start_date >= chart_start, Contract.start_date <= chart_end)
+            .where(
+                Contract.start_date >= chart_start,
+                Contract.start_date <= chart_end,
+                Contract.deleted_at.is_(None),
+            )
             .group_by(extract("year", Contract.start_date), extract("month", Contract.start_date))
         ).all()
     }
@@ -256,7 +353,11 @@ def get_dashboard_stats(
     revenue_by_service_rows = db.execute(
         select(ServiceType.name, func.coalesce(func.sum(ContractLineItem.price), 0))
         .join(ContractLineItem, ContractLineItem.service_type_id == ServiceType.id)
-        .where(ContractLineItem.is_cancelled.is_(False))
+        .join(Contract, Contract.id == ContractLineItem.contract_id)
+        .where(
+            ContractLineItem.is_cancelled.is_(False),
+            Contract.deleted_at.is_(None),
+        )
         .group_by(ServiceType.name)
         .order_by(func.coalesce(func.sum(ContractLineItem.price), 0).desc())
     ).all()
@@ -267,7 +368,10 @@ def get_dashboard_stats(
             func.coalesce(func.sum(ContractLineItem.price), 0).label("contract_total"),
         )
         .join(ContractLineItem, ContractLineItem.contract_id == Contract.id)
-        .where(ContractLineItem.is_cancelled.is_(False))
+        .where(
+            ContractLineItem.is_cancelled.is_(False),
+            Contract.deleted_at.is_(None),
+        )
         .group_by(Contract.client_id)
         .subquery()
     )
@@ -278,6 +382,7 @@ def get_dashboard_stats(
             func.coalesce(func.sum(Payment.amount), 0).label("paid_total"),
         )
         .join(Payment, Payment.contract_id == Contract.id)
+        .where(Contract.deleted_at.is_(None), Payment.deleted_at.is_(None))
     )
     if has_custom_range:
         payment_totals_stmt = payment_totals_stmt.where(
@@ -294,6 +399,7 @@ def get_dashboard_stats(
             func.coalesce(contract_totals.c.contract_total, 0)
             - func.coalesce(payment_totals.c.paid_total, 0),
         )
+        .where(Client.deleted_at.is_(None))
         .outerjoin(contract_totals, contract_totals.c.client_id == Client.id)
         .outerjoin(payment_totals, payment_totals.c.client_id == Client.id)
         .order_by(func.coalesce(payment_totals.c.paid_total, 0).desc())
@@ -313,7 +419,10 @@ def get_dashboard_stats(
 
     cumulative_by_month = {}
     for month_date in months:
-        cumulative_filters = [func.date(Client.created_at) <= _month_end(month_date)]
+        cumulative_filters = [
+            func.date(Client.created_at) <= _month_end(month_date),
+            Client.deleted_at.is_(None),
+        ]
         if has_custom_range:
             cumulative_filters.append(func.date(Client.created_at) >= period_start)
         cumulative_by_month[_month_key(month_date)] = (
@@ -325,6 +434,7 @@ def get_dashboard_stats(
     client_growth_points: list[ChartPoint] = []
     cumulative_client_points: list[ChartPoint] = []
     contract_points: list[ChartPoint] = []
+    profit_points: list[ChartPoint] = []
 
     previous_revenue = Decimal("0")
 
@@ -334,6 +444,10 @@ def get_dashboard_stats(
         new_clients = clients_by_month.get(key, 0)
         cumulative_clients = cumulative_by_month[key]
         contracts_count = contracts_by_month.get(key, 0)
+        month_expenses = expenses_by_month.get(key, Decimal("0"))
+        profit_points.append(
+            ChartPoint(month=key, label=_month_label(month_date), value=revenue - month_expenses)
+        )
 
         monthly_revenue_points.append(
             ChartPoint(month=key, label=_month_label(month_date), value=revenue)
@@ -379,6 +493,12 @@ def get_dashboard_stats(
             NamedAmount(name="To'langan", amount=total_paid),
             NamedAmount(name="Qarzdorlik", amount=total_debt if total_debt > 0 else Decimal("0")),
         ],
+        expenses_by_category=[
+            NamedAmount(name=EXPENSE_CATEGORY_LABELS.get(row[0], str(row[0])), amount=row[1])
+            for row in expenses_by_category_rows
+            if row[1] > 0
+        ],
+        profit_by_month=profit_points,
     )
 
     return DashboardStats(
@@ -399,6 +519,10 @@ def get_dashboard_stats(
         charts=charts,
         period_start=period_start,
         period_end=period_end,
+        period_expenses=period_expenses if has_custom_range else total_expenses,
+        total_expenses=total_expenses,
+        net_profit=net_profit,
+        profit_margin_pct=profit_margin_pct,
     )
 
 
@@ -411,6 +535,7 @@ def get_top_clients_by_ltv(db: Session, limit: int = 10) -> list[TopClientLtvIte
             func.count(func.distinct(Contract.id)).label("contracts_count"),
         )
         .join(Payment, Payment.contract_id == Contract.id)
+        .where(Contract.deleted_at.is_(None), Payment.deleted_at.is_(None))
         .group_by(Contract.client_id)
         .subquery()
     )
@@ -423,11 +548,17 @@ def get_top_clients_by_ltv(db: Session, limit: int = 10) -> list[TopClientLtvIte
             ltv_totals.c.contracts_count,
         )
         .join(ltv_totals, ltv_totals.c.client_id == Client.id)
+        .where(Client.deleted_at.is_(None))
         .order_by(ltv_totals.c.paid_total.desc())
         .limit(limit)
     ).all()
 
-    total_ltv = db.scalar(select(func.coalesce(func.sum(Payment.amount), 0))) or Decimal("0")
+    total_ltv = db.scalar(
+        select(func.coalesce(func.sum(Payment.amount), 0))
+        .select_from(Payment)
+        .join(Contract, Contract.id == Payment.contract_id)
+        .where(Payment.deleted_at.is_(None), Contract.deleted_at.is_(None))
+    ) or Decimal("0")
 
     return [
         TopClientLtvItem(

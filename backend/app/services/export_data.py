@@ -4,7 +4,19 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import Client, Contract, ContractLineItem, Payment
+from app.models import Client, Contract, ContractLineItem, Expense, Payment
+
+EXPENSE_CATEGORY_NAMES: dict[str, str] = {
+    "salary": "Ish haqi",
+    "rent": "Ijara",
+    "marketing": "Marketing",
+    "utilities": "Kommunal",
+    "transport": "Transport",
+    "office": "Ofis xarajatlari",
+    "tax": "Soliq",
+    "bank_fee": "Bank xizmati",
+    "other": "Boshqa",
+}
 
 
 def _money(value: Decimal | float | int) -> str:
@@ -12,7 +24,13 @@ def _money(value: Decimal | float | int) -> str:
 
 
 def fetch_clients_rows(db: Session) -> list[list[str]]:
-    clients = list(db.scalars(select(Client).order_by(Client.company_name)).all())
+    clients = list(
+        db.scalars(
+            select(Client)
+            .where(Client.deleted_at.is_(None))
+            .order_by(Client.company_name)
+        ).all()
+    )
     return [
         [
             client.company_name,
@@ -37,6 +55,7 @@ def fetch_contracts_rows(
             selectinload(Contract.line_items).selectinload(ContractLineItem.service_type),
             selectinload(Contract.payments),
         )
+        .where(Contract.deleted_at.is_(None))
         .order_by(Contract.end_date.desc())
     )
     if date_from is not None:
@@ -75,6 +94,8 @@ def fetch_payments_rows(
     stmt = (
         select(Payment)
         .options(selectinload(Payment.contract).selectinload(Contract.client))
+        .join(Payment.contract)
+        .where(Payment.deleted_at.is_(None), Contract.deleted_at.is_(None))
         .order_by(Payment.paid_at.desc())
     )
     if date_from is not None:
@@ -102,12 +123,14 @@ def fetch_debts_rows(db: Session) -> list[list[str]]:
             selectinload(Client.contracts).selectinload(Contract.line_items),
             selectinload(Client.contracts).selectinload(Contract.payments),
         )
+        .where(Client.deleted_at.is_(None))
         .order_by(Client.company_name)
     )
     clients = list(db.scalars(stmt).all())
     rows: list[list[str]] = []
     for client in clients:
-        total_debt = sum((c.debt_amount for c in client.contracts), Decimal("0"))
+        active_contracts = [c for c in client.contracts if c.deleted_at is None]
+        total_debt = sum((c.debt_amount for c in active_contracts), Decimal("0"))
         if total_debt <= 0:
             continue
         rows.append(
@@ -119,6 +142,30 @@ def fetch_debts_rows(db: Session) -> list[list[str]]:
             ]
         )
     return rows
+
+
+def fetch_expenses_rows(
+    db: Session,
+    date_from: date | None = None,
+    date_to: date | None = None,
+) -> list[list[str]]:
+    stmt = select(Expense).where(Expense.deleted_at.is_(None)).order_by(Expense.expense_date.desc())
+    if date_from is not None:
+        stmt = stmt.where(Expense.expense_date >= date_from)
+    if date_to is not None:
+        stmt = stmt.where(Expense.expense_date <= date_to)
+
+    expenses = list(db.scalars(stmt).all())
+    return [
+        [
+            expense.expense_date.isoformat(),
+            EXPENSE_CATEGORY_NAMES.get(expense.category.value, expense.category.value),
+            expense.title,
+            _money(expense.amount),
+            expense.note or "",
+        ]
+        for expense in expenses
+    ]
 
 
 CLIENT_HEADERS = ["Korxona", "Mas'ul", "Telefon", "Shahar", "Holat"]
@@ -135,10 +182,12 @@ CONTRACT_HEADERS = [
 ]
 PAYMENT_HEADERS = ["Sana", "Kontrakt ID", "Mijoz", "Summa", "Izoh"]
 DEBT_HEADERS = ["Korxona", "Mas'ul", "Telefon", "Qarz"]
+EXPENSE_HEADERS = ["Sana", "Kategoriya", "Nomi", "Summa", "Izoh"]
 
 EXPORT_TITLES = {
     "clients": "Mijozlar",
     "contracts": "Kontraktlar",
     "payments": "To'lovlar",
     "debts": "Qarzdorlik",
+    "expenses": "Xarajatlar",
 }

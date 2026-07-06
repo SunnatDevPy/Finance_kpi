@@ -1,17 +1,22 @@
 from datetime import date, datetime, timezone
+from decimal import Decimal
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_admin
 from app.database import get_db
-from app.models import Client, Contract, ContractLineItem
+from app.models import AuditAction, Client, Contract, ContractLineItem, User
 from app.schemas.contract import ContractCreate, ContractRead, ContractUpdate
 from app.schemas.contract_import import ContractImportResult
 from app.schemas.pagination import Page
+from app.services.app_settings import get_company_profile
+from app.services.audit import diff_fields, record_audit
 from app.services.contract_import import build_contract_import_template, import_contracts_from_xlsx
+from app.services.documents import build_act_pdf, build_invoice_pdf
 from app.services.helpers import (
     contract_to_read,
     get_client_or_404,
@@ -38,7 +43,7 @@ def list_contracts(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=20, ge=1, le=200),
 ) -> Page[ContractRead]:
-    filters = []
+    filters = [Contract.deleted_at.is_(None)]
     join_client = False
     if client_id is not None:
         filters.append(Contract.client_id == client_id)
@@ -47,18 +52,14 @@ def list_contracts(
         pattern = f"%{search}%"
         filters.append(Client.company_name.ilike(pattern))
 
-    count_stmt = select(func.count(Contract.id))
+    count_stmt = select(func.count(Contract.id)).where(*filters)
     if join_client:
         count_stmt = count_stmt.join(Contract.client)
-    if filters:
-        count_stmt = count_stmt.where(*filters)
     total = db.scalar(count_stmt) or 0
 
-    stmt = _contracts_query().order_by(Contract.start_date.desc())
+    stmt = _contracts_query().where(*filters).order_by(Contract.start_date.desc())
     if join_client:
         stmt = stmt.join(Contract.client)
-    if filters:
-        stmt = stmt.where(*filters)
     contracts = list(db.scalars(stmt.offset(skip).limit(limit)).all())
 
     return Page(
@@ -69,8 +70,26 @@ def list_contracts(
     )
 
 
+@router.get(
+    "/trash", response_model=list[ContractRead], dependencies=[Depends(require_admin)]
+)
+def list_deleted_contracts(db: Session = Depends(get_db)) -> list[ContractRead]:
+    stmt = (
+        _contracts_query()
+        .where(Contract.deleted_at.is_not(None))
+        .order_by(Contract.deleted_at.desc())
+        .limit(200)
+    )
+    contracts = list(db.scalars(stmt).all())
+    return [contract_to_read(contract) for contract in contracts]
+
+
 @router.post("", response_model=ContractRead, status_code=status.HTTP_201_CREATED)
-def create_contract(payload: ContractCreate, db: Session = Depends(get_db)) -> ContractRead:
+def create_contract(
+    payload: ContractCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ContractRead:
     get_client_or_404(db, payload.client_id)
     validate_line_items(db, payload.line_items)
 
@@ -91,6 +110,15 @@ def create_contract(payload: ContractCreate, db: Session = Depends(get_db)) -> C
     )
     db.add(contract)
     db.commit()
+    total = sum((item.price for item in contract.line_items), Decimal("0"))
+    record_audit(
+        db,
+        user=current_user,
+        entity_type="contract",
+        entity_id=contract.id,
+        action=AuditAction.CREATE,
+        summary=f"Shartnoma yaratildi (#{contract.id}), summa: {total}",
+    )
     return contract_to_read(get_contract_or_404(db, contract.id))
 
 
@@ -124,7 +152,11 @@ async def import_contracts(
 
 
 @router.post("/{contract_id}/duplicate", response_model=ContractRead, status_code=status.HTTP_201_CREATED)
-def duplicate_contract(contract_id: int, db: Session = Depends(get_db)) -> ContractRead:
+def duplicate_contract(
+    contract_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ContractRead:
     source = get_contract_or_404(db, contract_id)
     duration = source.end_date - source.start_date
     new_start = date.today()
@@ -145,6 +177,14 @@ def duplicate_contract(contract_id: int, db: Session = Depends(get_db)) -> Contr
     )
     db.add(contract)
     db.commit()
+    record_audit(
+        db,
+        user=current_user,
+        entity_type="contract",
+        entity_id=contract.id,
+        action=AuditAction.CREATE,
+        summary=f"Shartnoma #{source.id} dan nusxalandi (yangi #{contract.id})",
+    )
     return contract_to_read(get_contract_or_404(db, contract.id))
 
 
@@ -153,9 +193,35 @@ def get_contract(contract_id: int, db: Session = Depends(get_db)) -> ContractRea
     return contract_to_read(get_contract_or_404(db, contract_id))
 
 
+@router.get("/{contract_id}/documents/{document_type}")
+def download_contract_document(
+    contract_id: int,
+    document_type: Literal["invoice", "act"],
+    db: Session = Depends(get_db),
+) -> StreamingResponse:
+    contract = get_contract_or_404(db, contract_id)
+    company = get_company_profile(db)
+
+    if document_type == "invoice":
+        buffer = build_invoice_pdf(contract, company)
+        filename = f"schyot-faktura_{contract.contract_number or contract.id}.pdf"
+    else:
+        buffer = build_act_pdf(contract, company)
+        filename = f"akt_{contract.contract_number or contract.id}.pdf"
+
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.patch("/{contract_id}", response_model=ContractRead)
 def update_contract(
-    contract_id: int, payload: ContractUpdate, db: Session = Depends(get_db)
+    contract_id: int,
+    payload: ContractUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> ContractRead:
     contract = get_contract_or_404(db, contract_id)
 
@@ -166,6 +232,15 @@ def update_contract(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Tugash sanasi boshlanish sanasidan oldin bo'lishi mumkin emas",
         )
+
+    before = {
+        "start_date": contract.start_date,
+        "end_date": contract.end_date,
+        "notes": contract.notes,
+        "contract_number": contract.contract_number,
+        "invoice_number": contract.invoice_number,
+        "total_amount": contract.total_amount,
+    }
 
     if payload.line_items is not None:
         validate_line_items(db, payload.line_items)
@@ -190,27 +265,97 @@ def update_contract(
         contract.invoice_number = payload.invoice_number or None
 
     db.commit()
+    db.refresh(contract)
+
+    after = {
+        "start_date": contract.start_date,
+        "end_date": contract.end_date,
+        "notes": contract.notes,
+        "contract_number": contract.contract_number,
+        "invoice_number": contract.invoice_number,
+        "total_amount": contract.total_amount,
+    }
+    changes = diff_fields(before, after)
+    if changes:
+        record_audit(
+            db,
+            user=current_user,
+            entity_type="contract",
+            entity_id=contract.id,
+            action=AuditAction.UPDATE,
+            changes=changes,
+            summary=f"Shartnoma tahrirlandi (#{contract.id})",
+        )
     return contract_to_read(get_contract_or_404(db, contract.id))
 
 
 @router.delete("/{contract_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_contract(contract_id: int, db: Session = Depends(get_db)) -> None:
+def delete_contract(
+    contract_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
     contract = get_contract_or_404(db, contract_id)
-    db.delete(contract)
+    contract.deleted_at = datetime.now(timezone.utc)
     db.commit()
+    record_audit(
+        db,
+        user=current_user,
+        entity_type="contract",
+        entity_id=contract.id,
+        action=AuditAction.DELETE,
+        summary=f"Shartnoma arxivga o'tkazildi (#{contract.id})",
+    )
+
+
+@router.post(
+    "/{contract_id}/restore",
+    response_model=ContractRead,
+    dependencies=[Depends(require_admin)],
+)
+def restore_contract(
+    contract_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ContractRead:
+    contract = db.get(Contract, contract_id)
+    if contract is None or contract.deleted_at is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Kontrakt topilmadi")
+    contract.deleted_at = None
+    db.commit()
+    record_audit(
+        db,
+        user=current_user,
+        entity_type="contract",
+        entity_id=contract.id,
+        action=AuditAction.RESTORE,
+        summary=f"Shartnoma arxivdan tiklandi (#{contract.id})",
+    )
+    return contract_to_read(get_contract_or_404(db, contract.id))
 
 
 @router.patch(
     "/{contract_id}/line-items/{line_item_id}/cancel", response_model=ContractRead
 )
 def cancel_line_item(
-    contract_id: int, line_item_id: int, db: Session = Depends(get_db)
+    contract_id: int,
+    line_item_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> ContractRead:
     line_item = get_line_item_or_404(db, contract_id, line_item_id)
     if not line_item.is_cancelled:
         line_item.is_cancelled = True
         line_item.cancelled_at = datetime.now(timezone.utc)
         db.commit()
+        record_audit(
+            db,
+            user=current_user,
+            entity_type="contract",
+            entity_id=contract_id,
+            action=AuditAction.UPDATE,
+            summary=f"Xizmat bekor qilindi ({line_item.service_type.name}, {line_item.price})",
+        )
     return contract_to_read(get_contract_or_404(db, contract_id))
 
 
@@ -218,24 +363,50 @@ def cancel_line_item(
     "/{contract_id}/line-items/{line_item_id}/reactivate", response_model=ContractRead
 )
 def reactivate_line_item(
-    contract_id: int, line_item_id: int, db: Session = Depends(get_db)
+    contract_id: int,
+    line_item_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> ContractRead:
     line_item = get_line_item_or_404(db, contract_id, line_item_id)
     if line_item.is_cancelled:
         line_item.is_cancelled = False
         line_item.cancelled_at = None
         db.commit()
+        record_audit(
+            db,
+            user=current_user,
+            entity_type="contract",
+            entity_id=contract_id,
+            action=AuditAction.UPDATE,
+            summary=f"Xizmat qayta faollashtirildi ({line_item.service_type.name}, {line_item.price})",
+        )
     return contract_to_read(get_contract_or_404(db, contract_id))
 
 
 @router.post("/{contract_id}/cancel-all", response_model=ContractRead)
-def cancel_all_line_items(contract_id: int, db: Session = Depends(get_db)) -> ContractRead:
+def cancel_all_line_items(
+    contract_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ContractRead:
     """Cancel every remaining active line item — treats the whole contract as void."""
     contract = get_contract_or_404(db, contract_id)
     now = datetime.now(timezone.utc)
+    cancelled_any = False
     for item in contract.line_items:
         if not item.is_cancelled:
             item.is_cancelled = True
             item.cancelled_at = now
+            cancelled_any = True
     db.commit()
+    if cancelled_any:
+        record_audit(
+            db,
+            user=current_user,
+            entity_type="contract",
+            entity_id=contract_id,
+            action=AuditAction.UPDATE,
+            summary=f"Shartnoma to'liq bekor qilindi (#{contract_id})",
+        )
     return contract_to_read(get_contract_or_404(db, contract_id))

@@ -40,13 +40,22 @@ def create_user(payload: UserCreate, db: Session = Depends(get_db)) -> User:
 
 @router.patch("/{user_id}", response_model=UserRead)
 def update_user(
-    user_id: int, payload: UserUpdate, db: Session = Depends(get_db)
+    user_id: int,
+    payload: UserUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
 ) -> User:
     user = db.get(User, user_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hodim topilmadi")
 
     data = payload.model_dump(exclude_unset=True)
+    if user_id == current_user.id and data.get("is_active") is False:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="O'zingizni bloklab bo'lmaydi",
+        )
+
     if "password" in data:
         user.password_hash = hash_password(data.pop("password"))
 

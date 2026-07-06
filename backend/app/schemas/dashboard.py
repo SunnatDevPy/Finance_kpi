@@ -52,6 +52,8 @@ class DashboardCharts(BaseModel):
     contracts_by_month: list[ChartPoint]
     revenue_by_service: list[NamedAmount]
     debt_vs_paid: list[NamedAmount]
+    expenses_by_category: list[NamedAmount]
+    profit_by_month: list[ChartPoint]
 
 
 class DashboardStats(BaseModel):
@@ -68,3 +70,7 @@ class DashboardStats(BaseModel):
     charts: DashboardCharts
     period_start: date
     period_end: date
+    period_expenses: Decimal
+    total_expenses: Decimal
+    net_profit: Decimal
+    profit_margin_pct: float | None

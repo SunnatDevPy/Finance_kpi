@@ -1,16 +1,20 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_admin
 from app.database import get_db
-from app.models import Client, ClientStatus, Contract, ContractLineItem
+from app.models import AuditAction, Client, ClientStatus, Contract, ContractLineItem, User
 from app.schemas.client import ClientCardRead, ClientCreate, ClientRead, ClientUpdate
 from app.schemas.client_import import ClientImportResult
 from app.schemas.pagination import Page
+from app.services.audit import diff_fields, record_audit
 from app.services.client_import import build_client_import_template, import_clients_from_xlsx
 from app.services.helpers import client_total_debt, contract_to_read, get_client_or_404
+from app.services.uploads import ALLOWED_LOGO_CONTENT_TYPES, MAX_LOGO_BYTES, delete_client_logo, save_client_logo
 
 router = APIRouter(prefix="/clients", dependencies=[Depends(get_current_user)])
 
@@ -24,7 +28,7 @@ def _load_client_card(db: Session, client_id: int) -> Client:
             .selectinload(ContractLineItem.service_type),
             selectinload(Client.contracts).selectinload(Contract.payments),
         )
-        .where(Client.id == client_id)
+        .where(Client.id == client_id, Client.deleted_at.is_(None))
     )
     client = db.scalars(stmt).first()
     if client is None:
@@ -40,7 +44,7 @@ def list_clients(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=20, ge=1, le=200),
 ) -> Page[ClientRead]:
-    filters = []
+    filters = [Client.deleted_at.is_(None)]
     if status_filter is not None:
         filters.append(Client.status == status_filter)
     if search:
@@ -54,25 +58,44 @@ def list_clients(
             )
         )
 
-    count_stmt = select(func.count(Client.id))
-    if filters:
-        count_stmt = count_stmt.where(*filters)
+    count_stmt = select(func.count(Client.id)).where(*filters)
     total = db.scalar(count_stmt) or 0
 
-    stmt = select(Client).order_by(Client.company_name)
-    if filters:
-        stmt = stmt.where(*filters)
+    stmt = select(Client).where(*filters).order_by(Client.company_name)
     items = list(db.scalars(stmt.offset(skip).limit(limit)).all())
 
     return Page(items=items, total=total, skip=skip, limit=limit)
 
 
+@router.get("/trash", response_model=list[ClientRead], dependencies=[Depends(require_admin)])
+def list_deleted_clients(db: Session = Depends(get_db)) -> list[Client]:
+    stmt = (
+        select(Client)
+        .where(Client.deleted_at.is_not(None))
+        .order_by(Client.deleted_at.desc())
+        .limit(200)
+    )
+    return list(db.scalars(stmt).all())
+
+
 @router.post("", response_model=ClientRead, status_code=status.HTTP_201_CREATED)
-def create_client(payload: ClientCreate, db: Session = Depends(get_db)) -> Client:
+def create_client(
+    payload: ClientCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Client:
     client = Client(**payload.model_dump())
     db.add(client)
     db.commit()
     db.refresh(client)
+    record_audit(
+        db,
+        user=current_user,
+        entity_type="client",
+        entity_id=client.id,
+        action=AuditAction.CREATE,
+        summary=f"Mijoz yaratildi: {client.company_name}",
+    )
     return client
 
 
@@ -113,28 +136,153 @@ def get_client(client_id: int, db: Session = Depends(get_db)) -> Client:
 @router.get("/{client_id}/card", response_model=ClientCardRead)
 def get_client_card(client_id: int, db: Session = Depends(get_db)) -> ClientCardRead:
     client = _load_client_card(db, client_id)
-    contracts = [contract_to_read(contract) for contract in client.contracts]
+    active_contracts = [c for c in client.contracts if c.deleted_at is None]
+    contracts = [contract_to_read(contract) for contract in active_contracts]
     return ClientCardRead(
         **ClientRead.model_validate(client).model_dump(),
         contracts=contracts,
-        total_debt=client_total_debt(client.contracts),
+        total_debt=client_total_debt(active_contracts),
     )
 
 
 @router.patch("/{client_id}", response_model=ClientRead)
 def update_client(
-    client_id: int, payload: ClientUpdate, db: Session = Depends(get_db)
+    client_id: int,
+    payload: ClientUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Client:
     client = get_client_or_404(db, client_id)
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    before = {
+        field: getattr(client, field) for field in payload.model_dump(exclude_unset=True)
+    }
+    data = payload.model_dump(exclude_unset=True)
+    for field, value in data.items():
         setattr(client, field, value)
     db.commit()
     db.refresh(client)
+    changes = diff_fields(before, data)
+    if changes:
+        record_audit(
+            db,
+            user=current_user,
+            entity_type="client",
+            entity_id=client.id,
+            action=AuditAction.UPDATE,
+            changes=changes,
+            summary=f"Mijoz tahrirlandi: {client.company_name}",
+        )
+    return client
+
+
+@router.post("/{client_id}/logo", response_model=ClientRead)
+async def upload_client_logo(
+    client_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Client:
+    client = get_client_or_404(db, client_id)
+    if file.content_type not in ALLOWED_LOGO_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Faqat rasm fayllari qabul qilinadi (PNG, JPEG, WEBP, SVG)",
+        )
+    content = await file.read()
+    if len(content) > MAX_LOGO_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Fayl hajmi 5 MB dan oshmasligi kerak",
+        )
+    old_logo_path = client.logo_path
+    filename = save_client_logo(client_id, file.content_type, content)
+    client.logo_path = filename
+    db.commit()
+    db.refresh(client)
+    delete_client_logo(old_logo_path)
+    record_audit(
+        db,
+        user=current_user,
+        entity_type="client",
+        entity_id=client.id,
+        action=AuditAction.UPDATE,
+        summary=f"Mijoz logotipi yangilandi: {client.company_name}",
+    )
+    return client
+
+
+@router.delete("/{client_id}/logo", response_model=ClientRead)
+def remove_client_logo(
+    client_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Client:
+    client = get_client_or_404(db, client_id)
+    old_logo_path = client.logo_path
+    client.logo_path = None
+    db.commit()
+    db.refresh(client)
+    delete_client_logo(old_logo_path)
+    record_audit(
+        db,
+        user=current_user,
+        entity_type="client",
+        entity_id=client.id,
+        action=AuditAction.UPDATE,
+        summary=f"Mijoz logotipi olib tashlandi: {client.company_name}",
+    )
     return client
 
 
 @router.delete("/{client_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_client(client_id: int, db: Session = Depends(get_db)) -> None:
+def delete_client(
+    client_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
     client = get_client_or_404(db, client_id)
-    db.delete(client)
+    now = datetime.now(timezone.utc)
+    client.deleted_at = now
+    for contract in client.contracts:
+        if contract.deleted_at is None:
+            contract.deleted_at = now
     db.commit()
+    record_audit(
+        db,
+        user=current_user,
+        entity_type="client",
+        entity_id=client.id,
+        action=AuditAction.DELETE,
+        summary=f"Mijoz arxivga o'tkazildi: {client.company_name}",
+    )
+
+
+@router.post(
+    "/{client_id}/restore",
+    response_model=ClientRead,
+    dependencies=[Depends(require_admin)],
+)
+def restore_client(
+    client_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Client:
+    client = db.get(Client, client_id)
+    if client is None or client.deleted_at is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mijoz topilmadi")
+    restored_at = client.deleted_at
+    client.deleted_at = None
+    for contract in client.contracts:
+        if contract.deleted_at == restored_at:
+            contract.deleted_at = None
+    db.commit()
+    db.refresh(client)
+    record_audit(
+        db,
+        user=current_user,
+        entity_type="client",
+        entity_id=client.id,
+        action=AuditAction.RESTORE,
+        summary=f"Mijoz arxivdan tiklandi: {client.company_name}",
+    )
+    return client

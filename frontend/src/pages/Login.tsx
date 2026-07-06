@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
 import { SettingsToolbar } from "../components/SettingsToolbar";
 import { LoginGlobe } from "../components/login/LoginGlobe";
+import { LoginAtmosphere } from "../components/login/LoginAtmosphere";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -120,18 +121,8 @@ export function LoginPage() {
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-background text-foreground">
-      {/* Ambient glow */}
-      <div
-        className="pointer-events-none absolute inset-0"
-        aria-hidden
-      >
-        <div className="login-bg-mesh" />
-        <div className="login-bg-mesh login-bg-mesh--alt" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_55%_at_38%_48%,rgba(56,189,248,0.14),transparent_62%)] dark:bg-[radial-gradient(ellipse_70%_55%_at_38%_48%,rgba(56,189,248,0.22),transparent_62%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_45%_40%_at_75%_75%,rgba(99,102,241,0.08),transparent_60%)] dark:bg-[radial-gradient(ellipse_45%_40%_at_75%_75%,rgba(99,102,241,0.14),transparent_60%)]" />
-        <div className="login-intro-stars absolute inset-0" />
-        <div className="dot-grid absolute inset-0 text-foreground/[0.06] dark:text-foreground/[0.12]" />
-      </div>
+      {/* Ambient atmosfera — nebula mesh, aurora, zarrachalar, gorizont to'ri, grain */}
+      <LoginAtmosphere revealed={revealed} />
 
       {/* Settings */}
       <motion.div

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AlertTriangleIcon,
   CheckCircle2Icon,
@@ -11,6 +11,7 @@ import {
   XCircleIcon,
 } from "lucide-react";
 import { api } from "../api/client";
+import { ClientLogoUploader } from "../components/ClientLogoUploader";
 import { ExportButtons } from "../components/ExportButtons";
 import { CancelIcon, DeleteIconBtn, SaveIconBtn } from "../components/ButtonIcons";
 import { Modal } from "../components/Modal";
@@ -58,6 +59,7 @@ import { useI18n } from "../context/I18nContext";
 import { emptyClientForm } from "../utils/format";
 import { PageHeader, PageShell } from "../components/PageHeader";
 import { StatusBadge } from "../components/StatusBadge";
+import { useListLoading } from "../hooks/useListLoading";
 
 export function ClientsPage() {
   const { t } = useI18n();
@@ -69,7 +71,7 @@ export function ClientsPage() {
   const [form, setForm] = useState<ClientFormData>(emptyClientForm());
   const [error, setError] = useState("");
   const [deleteId, setDeleteId] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { loading, start, finish } = useListLoading();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [total, setTotal] = useState(0);
@@ -80,31 +82,34 @@ export function ClientsPage() {
   const [importError, setImportError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const load = () => {
-    setLoading(true);
-    api.clients
-      .list({
-        search: search || undefined,
-        status: statusFilter === "all" ? undefined : statusFilter,
-        skip: (page - 1) * pageSize,
-        limit: pageSize,
-      })
-      .then((data) => {
-        setClients(data.items);
-        setTotal(data.total);
-      })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  };
+  const load = useCallback(
+    (silent = true) => {
+      start(silent);
+      api.clients
+        .list({
+          search: search || undefined,
+          status: statusFilter === "all" ? undefined : statusFilter,
+          skip: (page - 1) * pageSize,
+          limit: pageSize,
+        })
+        .then((data) => {
+          setClients(data.items);
+          setTotal(data.total);
+        })
+        .catch((e) => setError(e.message))
+        .finally(() => finish());
+    },
+    [search, statusFilter, page, pageSize, start, finish],
+  );
 
   useEffect(() => {
     setPage(1);
   }, [search, statusFilter]);
 
   useEffect(() => {
-    const timer = setTimeout(load, 300);
+    const timer = setTimeout(() => load(), 300);
     return () => clearTimeout(timer);
-  }, [search, statusFilter, page, pageSize]);
+  }, [load]);
 
   const openCreate = () => {
     setEditing(null);
@@ -143,12 +148,13 @@ export function ClientsPage() {
         notes: form.notes || undefined,
       };
       if (editing) {
-        await api.clients.update(editing.id, payload);
+        const updated = await api.clients.update(editing.id, payload);
+        setClients((prev) => prev.map((c) => (c.id === editing.id ? updated : c)));
       } else {
         await api.clients.create(payload);
+        load(true);
       }
       setModalOpen(false);
-      load();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("common.error"));
     }
@@ -156,11 +162,16 @@ export function ClientsPage() {
 
   const handleDelete = async () => {
     if (!deleteId) return;
+    const id = deleteId;
+    const snapshot = clients;
+    setClients((prev) => prev.filter((c) => c.id !== id));
+    setTotal((prev) => Math.max(0, prev - 1));
+    setDeleteId(null);
     try {
-      await api.clients.delete(deleteId);
-      setDeleteId(null);
-      load();
+      await api.clients.delete(id);
     } catch (err) {
+      setClients(snapshot);
+      setTotal((prev) => prev + 1);
       setError(err instanceof Error ? err.message : t("common.error"));
     }
   };
@@ -238,14 +249,14 @@ export function ClientsPage() {
 
       <PageError message={error} />
 
-      <Card>
+      <Card className="content-card">
         <CardHeader>
           <CardTitle>{t("clients.listTitle")}</CardTitle>
           <CardDescription>
             {t("common.itemsFound").replace("{count}", String(total))}
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-0 pt-4">
+        <CardContent className="p-0">
           <PremiumDataTable
             loading={loading}
             empty={!loading && clients.length === 0}
@@ -278,7 +289,11 @@ export function ClientsPage() {
             <TableBody>
               {clients.map((client, index) => (
                 <MotionTableRow key={client.id} {...rowEnter(index)}>
-                  <TableCellCompany to={`/clients/${client.id}`} name={client.company_name} />
+                  <TableCellCompany
+                    to={`/clients/${client.id}`}
+                    name={client.company_name}
+                    logoUrl={client.logo_url}
+                  />
                   <TableCellMuted>{client.contact_person}</TableCellMuted>
                   <TableCellMuted>{client.phone}</TableCellMuted>
                   <TableCellMuted>{client.city}</TableCellMuted>
@@ -318,6 +333,17 @@ export function ClientsPage() {
           onSubmit={handleSubmit}
           className="grid grid-cols-1 gap-4 md:grid-cols-2"
         >
+          {editing && (
+            <div className="md:col-span-2">
+              <ClientLogoUploader
+                client={editing}
+                onUpdated={(updated) => {
+                  setEditing(updated);
+                  setClients((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+                }}
+              />
+            </div>
+          )}
           <FloatingLabelInput
             id="company_name"
             label={t("clients.company")}

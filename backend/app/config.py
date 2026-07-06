@@ -23,5 +23,7 @@ class Settings(BaseSettings):
     login_rate_limit: str = "10/minute"
     change_password_rate_limit: str = "5/minute"
 
+    upload_dir: str = "uploads"
+
 
 settings = Settings()

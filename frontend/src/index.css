@@ -27,12 +27,35 @@
     @apply mb-1.5 block text-sm font-medium text-foreground;
   }
   .page-shell {
-    @apply flex flex-col gap-6 animate-fade-in;
+    @apply flex flex-col gap-8 animate-fade-in;
+  }
+  .page-section {
+    @apply flex flex-col gap-5;
+  }
+  .section-heading {
+    @apply text-lg font-semibold tracking-tight text-foreground sm:text-xl;
+  }
+  .section-description {
+    @apply mt-1.5 max-w-2xl text-sm leading-relaxed text-muted-foreground;
   }
   .filter-bar {
-    @apply flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm backdrop-blur-md;
-    background-color: color-mix(in oklch, var(--card) 70%, transparent);
-    border-color: color-mix(in oklch, var(--border) 60%, transparent);
+    @apply flex flex-wrap items-center gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm backdrop-blur-md;
+    background-color: color-mix(in oklch, var(--card) 82%, transparent);
+    border-color: color-mix(in oklch, var(--border) 65%, transparent);
+  }
+  .toolbar-cluster {
+    @apply flex flex-wrap items-center gap-2.5 sm:gap-3;
+  }
+  .segmented-control {
+    @apply inline-flex items-center gap-1.5 rounded-xl border p-1.5 shadow-sm;
+    border-color: color-mix(in oklch, var(--border) 70%, transparent);
+    background-color: color-mix(in oklch, var(--muted) 35%, transparent);
+  }
+  .segmented-control [data-slot="button"] {
+    @apply rounded-lg;
+  }
+  .content-card {
+    @apply glass-panel overflow-hidden shadow-md transition-shadow duration-300 hover:shadow-lg;
   }
   .glass-panel {
     @apply rounded-2xl border border-border shadow-lg backdrop-blur-xl;
@@ -40,13 +63,13 @@
     border-color: color-mix(in oklch, var(--border) 50%, transparent);
   }
   .premium-hero {
-    @apply relative overflow-hidden rounded-2xl text-white shadow-2xl;
+    @apply relative overflow-hidden rounded-2xl px-6 py-8 text-white shadow-2xl sm:px-8 sm:py-9;
     border: 1px solid color-mix(in oklch, white 10%, transparent);
     background: linear-gradient(to bottom right, var(--color-brand-950, oklch(0.18 0.04 256)), var(--color-brand-900, oklch(0.22 0.04 256)), var(--color-brand-800, oklch(0.28 0.045 256)));
     box-shadow: 0 25px 50px -12px color-mix(in oklch, var(--color-brand-950, oklch(0.18 0.04 256)) 30%, transparent);
   }
   .page-header-premium {
-    @apply relative overflow-hidden rounded-2xl px-6 py-5 shadow-md backdrop-blur-sm;
+    @apply relative overflow-hidden rounded-2xl px-6 py-6 shadow-md backdrop-blur-sm sm:px-7 sm:py-7;
     border: 1px solid color-mix(in oklch, var(--border) 50%, transparent);
     background: linear-gradient(to bottom right, var(--card), var(--card), color-mix(in oklch, var(--muted) 30%, transparent));
   }
@@ -227,10 +250,137 @@
     0% { opacity: 0.85; transform: translate(0, 0); }
     100% { opacity: 1; transform: translate(2%, 1%); }
   }
+  .login-globe-rim {
+    background: radial-gradient(
+      circle,
+      transparent 60%,
+      rgba(103, 232, 249, 0.16) 76%,
+      rgba(56, 189, 248, 0.32) 87%,
+      rgba(165, 243, 252, 0.5) 95%,
+      rgba(255, 255, 255, 0.14) 100%
+    );
+  }
+  .login-comet {
+    position: absolute;
+    top: 10%;
+    left: -8%;
+    width: 3px;
+    height: 3px;
+    border-radius: 9999px;
+    background: #fff;
+    box-shadow:
+      0 0 8px 2px rgba(255, 255, 255, 0.9),
+      0 0 22px 6px rgba(165, 243, 252, 0.5);
+    opacity: 0;
+    animation: login-comet-fly 11s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    animation-delay: 4s;
+  }
+  .login-comet::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    right: 100%;
+    width: 64px;
+    height: 1.5px;
+    background: linear-gradient(90deg, transparent, rgba(224, 247, 255, 0.75));
+    transform: translateY(-50%);
+  }
+  @keyframes login-comet-fly {
+    0%, 68% { left: -8%; top: 10%; opacity: 0; }
+    70% { opacity: 1; }
+    85% { left: 96%; top: 58%; opacity: 1; }
+    88%, 100% { left: 104%; top: 63%; opacity: 0; }
+  }
+  /* Aurora — bir nechta yumshoq radial nur dog'i, faqat transform/opacity
+     bilan animatsiya qilinadi (filter: blur() ISHLATILMAYDI — bu GPU'siz
+     muhitlarda va past quvvatli qurilmalarda kadr tezligini keskin
+     pasaytiradi, chunki brauzer har freymda butun qatlamni qayta xiralashtirishga
+     majbur bo'ladi). Yumshoq chekka radial-gradient stoplari orqali erishiladi. */
+  .login-aurora-glow {
+    position: absolute;
+    inset: -20%;
+    background:
+      radial-gradient(ellipse 38% 30% at 22% 30%, oklch(0.62 0.15 253 / 0.22), transparent 70%),
+      radial-gradient(ellipse 34% 28% at 78% 22%, oklch(0.6 0.17 300 / 0.16), transparent 70%),
+      radial-gradient(ellipse 36% 30% at 65% 78%, oklch(0.68 0.15 200 / 0.18), transparent 70%),
+      radial-gradient(ellipse 30% 26% at 40% 85%, oklch(0.58 0.16 320 / 0.12), transparent 70%);
+    will-change: transform;
+    transform: translateZ(0);
+    animation: login-aurora-drift 24s ease-in-out infinite;
+  }
+  .dark .login-aurora-glow {
+    background:
+      radial-gradient(ellipse 38% 30% at 22% 30%, oklch(0.55 0.18 253 / 0.4), transparent 70%),
+      radial-gradient(ellipse 34% 28% at 78% 22%, oklch(0.52 0.2 300 / 0.3), transparent 70%),
+      radial-gradient(ellipse 36% 30% at 65% 78%, oklch(0.58 0.18 200 / 0.34), transparent 70%),
+      radial-gradient(ellipse 30% 26% at 40% 85%, oklch(0.5 0.18 320 / 0.22), transparent 70%);
+  }
+  @keyframes login-aurora-drift {
+    0%, 100% { transform: translateZ(0) translate(0, 0) scale(1); }
+    33% { transform: translateZ(0) translate(3%, -4%) scale(1.08); }
+    66% { transform: translateZ(0) translate(-4%, 3%) scale(0.95); }
+  }
+  .login-particle {
+    position: absolute;
+    bottom: -5%;
+    border-radius: 9999px;
+    background: radial-gradient(circle, oklch(0.6 0.13 253 / 0.9) 0%, oklch(0.7 0.1 253 / 0.35) 55%, transparent 75%);
+    opacity: 0;
+    will-change: transform, opacity;
+    animation-name: login-particle-rise;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+  }
+  .dark .login-particle {
+    background: radial-gradient(circle, rgba(224, 247, 255, 0.95) 0%, rgba(165, 243, 252, 0.45) 55%, transparent 75%);
+  }
+  @keyframes login-particle-rise {
+    0% { transform: translate(0, 0); opacity: 0; }
+    12% { opacity: 0.85; }
+    50% { transform: translate(var(--drift, 20px), -48vh); opacity: 0.55; }
+    88% { opacity: 0.15; }
+    100% { transform: translate(calc(var(--drift, 20px) * 1.6), -96vh); opacity: 0; }
+  }
+  .login-horizon-grid {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 45vh;
+    background-image:
+      linear-gradient(oklch(0.55 0.08 253 / 0.14) 1px, transparent 1px),
+      linear-gradient(90deg, oklch(0.55 0.08 253 / 0.14) 1px, transparent 1px);
+    background-size: 56px 56px;
+    transform: perspective(400px) rotateX(62deg);
+    transform-origin: bottom;
+    -webkit-mask-image: linear-gradient(to top, black 0%, transparent 75%);
+    mask-image: linear-gradient(to top, black 0%, transparent 75%);
+    opacity: 0.45;
+  }
+  .dark .login-horizon-grid {
+    background-image:
+      linear-gradient(oklch(1 0 0 / 0.09) 1px, transparent 1px),
+      linear-gradient(90deg, oklch(1 0 0 / 0.09) 1px, transparent 1px);
+    opacity: 0.65;
+  }
+  .login-grain {
+    position: absolute;
+    inset: 0;
+    opacity: 0.025;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 160px 160px;
+  }
+  .dark .login-grain {
+    opacity: 0.04;
+  }
   @media (prefers-reduced-motion: reduce) {
     .login-globe-halo,
-    .login-globe-shimmer {
+    .login-globe-shimmer,
+    .login-aurora-glow,
+    .login-particle,
+    .login-comet {
       animation: none;
+      opacity: 0;
     }
   }
   .stat-card-glow-green::after,

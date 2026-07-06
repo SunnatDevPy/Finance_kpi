@@ -22,6 +22,7 @@ import {
 } from "../components/PremiumDataTable";
 import { StatCard } from "../components/StatCard";
 import { useI18n } from "../context/I18nContext";
+import { useListLoading } from "../hooks/useListLoading";
 import type { DebtsSummary } from "../types";
 import { formatDate, formatMoney, toNumber } from "../utils/format";
 
@@ -29,17 +30,17 @@ export function DebtsPage() {
   const { t } = useI18n();
   const [data, setData] = useState<DebtsSummary | null>(null);
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
+  const { loading, start, finish } = useListLoading();
   const [error, setError] = useState("");
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setLoading(true);
+      start(true);
       api.debts
         .list(search || undefined)
         .then(setData)
         .catch((e) => setError(e.message))
-        .finally(() => setLoading(false));
+        .finally(() => finish());
     }, 300);
     return () => window.clearTimeout(timer);
   }, [search]);
@@ -60,7 +61,7 @@ export function DebtsPage() {
 
       <PageError message={error} />
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
         <StatCard
           title={t("debts.totalDebt")}
           value={formatMoney(data?.total_debt ?? 0)}
@@ -90,12 +91,12 @@ export function DebtsPage() {
         />
       </div>
 
-      <Card>
+      <Card className="content-card">
         <CardHeader>
           <CardTitle>{t("debts.listTitle")}</CardTitle>
           <CardDescription>{t("debts.listDesc")}</CardDescription>
         </CardHeader>
-        <CardContent className="p-0 pt-4">
+        <CardContent className="p-0">
           <PremiumDataTable
             loading={loading}
             empty={!loading && rows.length === 0}

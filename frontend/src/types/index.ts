@@ -1,6 +1,22 @@
 export type ClientStatus = "faol" | "nofaol";
 export type UserRole = "admin" | "menejer";
 
+export interface CompanyProfile {
+  company_name: string;
+  company_address: string;
+  company_phone: string;
+  company_inn: string;
+  company_bank_name: string;
+  company_bank_account: string;
+  company_mfo: string;
+  company_director: string;
+}
+
+export interface AppSettings {
+  monthly_plan: string;
+  company: CompanyProfile;
+}
+
 export interface Paginated<T> {
   items: T[];
   total: number;
@@ -18,6 +34,15 @@ export interface User {
   updated_at: string;
 }
 
+export interface LoginHistoryEntry {
+  id: number;
+  user_id: number;
+  username: string;
+  full_name: string;
+  ip_address: string | null;
+  logged_in_at: string;
+}
+
 export interface Client {
   id: number;
   company_name: string;
@@ -29,6 +54,7 @@ export interface Client {
   activity_type: string | null;
   status: ClientStatus;
   notes: string | null;
+  logo_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -38,6 +64,30 @@ export interface ServiceType {
   name: string;
   is_active: boolean;
   created_at: string;
+  usage_count: number;
+  total_revenue: string;
+}
+
+export interface ServiceTypeClientUsage {
+  client_id: number;
+  company_name: string;
+  usage_count: number;
+  total_amount: string;
+}
+
+export interface ServiceTypeStats {
+  service_type_id: number;
+  name: string;
+  is_active: boolean;
+  created_at: string;
+  usage_count: number;
+  active_usage_count: number;
+  cancelled_count: number;
+  total_revenue: string;
+  contracts_count: number;
+  clients_count: number;
+  last_used_at: string | null;
+  top_clients: ServiceTypeClientUsage[];
 }
 
 export interface ContractLineItem {
@@ -112,6 +162,8 @@ export interface DashboardCharts {
   contracts_by_month: ChartPoint[];
   revenue_by_service: NamedAmount[];
   debt_vs_paid: NamedAmount[];
+  expenses_by_category: NamedAmount[];
+  profit_by_month: ChartPoint[];
 }
 
 export interface DashboardStats {
@@ -133,6 +185,10 @@ export interface DashboardStats {
   charts: DashboardCharts;
   period_start: string;
   period_end: string;
+  period_expenses: string;
+  total_expenses: string;
+  net_profit: string;
+  profit_margin_pct: number | null;
 }
 
 export interface ClientFormData {
@@ -228,4 +284,53 @@ export interface ExpiringContract {
   days_left: number;
   total_amount: string;
   debt_amount: string;
+}
+
+export type AuditAction = "create" | "update" | "delete" | "restore";
+export type AuditEntityType = "client" | "contract" | "payment" | "expense";
+
+export type ExpenseCategory =
+  | "salary"
+  | "rent"
+  | "marketing"
+  | "utilities"
+  | "transport"
+  | "office"
+  | "tax"
+  | "bank_fee"
+  | "other";
+
+export interface Expense {
+  id: number;
+  category: ExpenseCategory;
+  title: string;
+  amount: string;
+  expense_date: string;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ExpenseCategoryTotal {
+  category: ExpenseCategory;
+  total: string;
+}
+
+export interface ExpenseSummary {
+  total_expenses: string;
+  by_category: ExpenseCategoryTotal[];
+  period_start: string | null;
+  period_end: string | null;
+}
+
+export interface AuditLogEntry {
+  id: number;
+  entity_type: string;
+  entity_id: number;
+  action: AuditAction;
+  summary: string | null;
+  changes: Record<string, [unknown, unknown]> | null;
+  user_id: number | null;
+  username: string;
+  created_at: string;
 }

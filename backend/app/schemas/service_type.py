@@ -1,4 +1,5 @@
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -22,3 +23,27 @@ class ServiceTypeRead(ServiceTypeBase):
 
     id: int
     created_at: datetime
+    usage_count: int = 0
+    total_revenue: Decimal = Decimal("0")
+
+
+class ServiceTypeClientUsage(BaseModel):
+    client_id: int
+    company_name: str
+    usage_count: int
+    total_amount: Decimal
+
+
+class ServiceTypeStatsRead(BaseModel):
+    service_type_id: int
+    name: str
+    is_active: bool
+    created_at: datetime
+    usage_count: int
+    active_usage_count: int
+    cancelled_count: int
+    total_revenue: Decimal
+    contracts_count: int
+    clients_count: int
+    last_used_at: date | None
+    top_clients: list[ServiceTypeClientUsage]

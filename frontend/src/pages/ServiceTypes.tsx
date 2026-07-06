@@ -1,18 +1,24 @@
-import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2Icon, LayersIcon, PlusIcon, Trash2Icon, XCircleIcon } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  BarChart3Icon,
+  CheckCircle2Icon,
+  LayersIcon,
+  PlusIcon,
+  Trash2Icon,
+  XCircleIcon,
+} from "lucide-react";
 import { api } from "../api/client";
 import {
-  ActivateIconBtn,
   CancelIcon,
-  DeactivateIconBtn,
-  DeleteIconBtn,
   SaveIconBtn,
 } from "../components/ButtonIcons";
 import { Modal } from "../components/Modal";
 import { PageError } from "../components/PageError";
 import { PageHeader, PageShell } from "../components/PageHeader";
+import { ServiceTypeCard } from "../components/ServiceTypeCard";
+import { ServiceTypeDetailModal } from "../components/ServiceTypeDetailModal";
 import { StatCard } from "../components/StatCard";
-import { StaggerContainer, StaggerItem } from "../components/Stagger";
+import { useListLoading } from "../hooks/useListLoading";
 import { useI18n } from "../context/I18nContext";
 import {
   AlertDialog,
@@ -24,37 +30,66 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { MotionButton, motionTap } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FloatingLabelInput } from "@/components/ui/floating-label-input";
 import { Input } from "@/components/ui/input";
 import type { ServiceType } from "../types";
+import { formatCompactMoney } from "../utils/format";
 
 export function ServiceTypesPage() {
   const { t } = useI18n();
   const [items, setItems] = useState<ServiceType[]>([]);
   const [search, setSearch] = useState("");
-  const [modalOpen, setModalOpen] = useState(false);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [detailItem, setDetailItem] = useState<ServiceType | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [name, setName] = useState("");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
+  const { loading, start, finish } = useListLoading();
+  const menuRef = useRef<HTMLDivElement>(null);
 
-  const load = () => {
-    setLoading(true);
+  const load = (silent = false) => {
+    start(silent);
     api.serviceTypes
       .list()
       .then(setItems)
       .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+      .finally(() => finish());
   };
 
-  useEffect(load, []);
+  useEffect(() => {
+    load(false);
+  }, []);
+
+  useEffect(() => {
+    if (menuOpenId === null) return;
+    const closeMenu = (event: PointerEvent) => {
+      if (menuRef.current?.contains(event.target as Node)) return;
+      setMenuOpenId(null);
+    };
+    document.addEventListener("pointerdown", closeMenu);
+    return () => document.removeEventListener("pointerdown", closeMenu);
+  }, [menuOpenId]);
+
+  const cardLabels = useMemo(
+    () => ({
+      usageCount: t("services.usageCount"),
+      revenueShort: t("services.revenueShort"),
+      viewStats: t("services.viewStats"),
+      timesUsed: (count: number) => t("services.timesUsed").replace("{count}", String(count)),
+      deactivate: t("services.deactivate"),
+      activate: t("services.activate"),
+      delete: t("common.delete"),
+    }),
+    [t],
+  );
 
   const summary = useMemo(() => {
     const active = items.filter((item) => item.is_active).length;
-    return { total: items.length, active, inactive: items.length - active };
+    const totalRevenue = items.reduce((sum, item) => sum + parseFloat(item.total_revenue || "0"), 0);
+    return { total: items.length, active, inactive: items.length - active, totalRevenue };
   }, [items]);
 
   const filteredItems = useMemo(() => {
@@ -67,39 +102,69 @@ export function ServiceTypesPage() {
     e.preventDefault();
     setError("");
     try {
-      await api.serviceTypes.create({ name });
+      const created = await api.serviceTypes.create({ name });
+      setItems((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
       setName("");
-      setModalOpen(false);
-      load();
+      setCreateModalOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("common.error"));
     }
   };
 
-  const toggleActive = async (item: ServiceType) => {
+  const toggleActive = useCallback(async (item: ServiceType) => {
+    const nextActive = !item.is_active;
+    const snapshot = items;
+    setError("");
+    setMenuOpenId(null);
+    setItems((prev) =>
+      prev.map((row) => (row.id === item.id ? { ...row, is_active: nextActive } : row)),
+    );
+    setDetailItem((prev) => (prev?.id === item.id ? { ...prev, is_active: nextActive } : prev));
     try {
-      await api.serviceTypes.update(item.id, { is_active: !item.is_active });
-      load();
+      await api.serviceTypes.update(item.id, { is_active: nextActive });
     } catch (err) {
+      setItems(snapshot);
+      setDetailItem((prev) =>
+        prev?.id === item.id ? { ...prev, is_active: item.is_active } : prev,
+      );
       setError(err instanceof Error ? err.message : t("common.error"));
     }
-  };
+  }, [items, t]);
 
   const handleDelete = async () => {
     if (!deleteId) return;
+    const id = deleteId;
+    const snapshot = items;
+    setError("");
+    setItems((prev) => prev.filter((row) => row.id !== id));
+    setDeleteId(null);
+    setDetailItem((prev) => (prev?.id === id ? null : prev));
     try {
-      await api.serviceTypes.delete(deleteId);
-      setDeleteId(null);
-      load();
+      await api.serviceTypes.delete(id);
     } catch (err) {
+      setItems(snapshot);
       setError(err instanceof Error ? err.message : t("common.error"));
     }
   };
+
+  const openDetail = useCallback((item: ServiceType) => {
+    setMenuOpenId(null);
+    setDetailItem(item);
+  }, []);
+
+  const handleToggleMenu = useCallback((id: number) => {
+    setMenuOpenId((prev) => (prev === id ? null : id));
+  }, []);
+
+  const handleRequestDelete = useCallback((id: number) => {
+    setMenuOpenId(null);
+    setDeleteId(id);
+  }, []);
 
   return (
     <PageShell>
       <PageHeader title={t("services.title")} subtitle={t("services.subtitle")}>
-        <MotionButton onClick={() => setModalOpen(true)} {...motionTap}>
+        <MotionButton type="button" onClick={() => setCreateModalOpen(true)} {...motionTap}>
           <PlusIcon data-icon="inline-start" />
           {t("services.new")}
         </MotionButton>
@@ -116,7 +181,7 @@ export function ServiceTypesPage() {
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           title={t("services.summaryTotal")}
           value={String(summary.total)}
@@ -135,73 +200,54 @@ export function ServiceTypesPage() {
           accent="amber"
           icon={XCircleIcon}
         />
+        <StatCard
+          title={t("services.totalRevenue")}
+          value={formatCompactMoney(summary.totalRevenue)}
+          accent="violet"
+          icon={BarChart3Icon}
+        />
       </div>
 
-      <Card>
-        <CardHeader>
+      <Card className="content-card">
+        <CardHeader className="border-b">
           <CardTitle>{t("services.listTitle")}</CardTitle>
-          <CardDescription>{t("services.listDesc")}</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6">
           {loading ? (
             <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
           ) : filteredItems.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t("services.notFound")}</p>
           ) : (
-            <StaggerContainer className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {filteredItems.map((item) => (
-                <StaggerItem
+                <ServiceTypeCard
                   key={item.id}
-                  whileHover={{ y: -2 }}
-                  transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
-                  className={`group flex items-center justify-between rounded-xl border border-border bg-card p-4 shadow-sm transition-shadow duration-200 hover:border-primary/30 hover:shadow-md ${!item.is_active ? "opacity-55" : ""}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`flex size-10 items-center justify-center rounded-xl text-sm font-bold tracking-tight ${item.is_active ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
-                      {item.name.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-sm text-foreground">{item.name}</p>
-                      <Badge
-                        variant={item.is_active ? "default" : "secondary"}
-                        className="mt-0.5 text-[10px] px-1.5 py-0"
-                      >
-                        {item.is_active ? t("status.faol") : t("status.nofaol")}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                    <MotionButton
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 px-2 text-xs"
-                      onClick={() => toggleActive(item)}
-                      {...motionTap}
-                    >
-                      {item.is_active ? (
-                        <><DeactivateIconBtn />{t("services.deactivate")}</>
-                      ) : (
-                        <><ActivateIconBtn />{t("services.activate")}</>
-                      )}
-                    </MotionButton>
-                    <MotionButton
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 px-2 text-destructive hover:text-destructive"
-                      onClick={() => setDeleteId(item.id)}
-                      {...motionTap}
-                    >
-                      <Trash2Icon className="size-3.5" />
-                    </MotionButton>
-                  </div>
-                </StaggerItem>
+                  item={item}
+                  menuOpen={menuOpenId === item.id}
+                  menuRef={menuOpenId === item.id ? menuRef : undefined}
+                  labels={cardLabels}
+                  onOpen={openDetail}
+                  onToggleMenu={handleToggleMenu}
+                  onToggleActive={toggleActive}
+                  onDelete={handleRequestDelete}
+                />
               ))}
-            </StaggerContainer>
+            </div>
           )}
         </CardContent>
       </Card>
 
-      <Modal title={t("services.newTitle")} open={modalOpen} onClose={() => setModalOpen(false)}>
+      <ServiceTypeDetailModal
+        item={detailItem}
+        open={detailItem !== null}
+        onClose={() => setDetailItem(null)}
+        onToggleActive={toggleActive}
+        onDelete={(id) => {
+          setDeleteId(id);
+        }}
+      />
+
+      <Modal title={t("services.newTitle")} open={createModalOpen} onClose={() => setCreateModalOpen(false)}>
         <form onSubmit={handleCreate} className="flex flex-col gap-4">
           <FloatingLabelInput
             id="name"
@@ -211,7 +257,7 @@ export function ServiceTypesPage() {
             onChange={(e) => setName(e.target.value)}
           />
           <div className="flex justify-end gap-2">
-            <MotionButton type="button" variant="outline" onClick={() => setModalOpen(false)} {...motionTap}>
+            <MotionButton type="button" variant="outline" onClick={() => setCreateModalOpen(false)} {...motionTap}>
               <CancelIcon />
               {t("common.cancel")}
             </MotionButton>
@@ -230,12 +276,19 @@ export function ServiceTypesPage() {
             <AlertDialogDescription>{t("services.deleteDesc")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>
+            <AlertDialogCancel type="button">
               <CancelIcon />
               {t("common.cancel")}
             </AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={handleDelete}>
-              <DeleteIconBtn />
+            <AlertDialogAction
+              type="button"
+              variant="destructive"
+              onClick={(e) => {
+                e.preventDefault();
+                void handleDelete();
+              }}
+            >
+              <Trash2Icon data-icon="inline-start" className="size-4" />
               {t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>

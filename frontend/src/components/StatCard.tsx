@@ -85,14 +85,14 @@ export function StatCard({
     <motion.div
       whileHover={{ y: -4, transition: { duration: 0.2, ease: [0.16, 1, 0.3, 1] } }}
       className={cn(
-        "group relative flex h-full flex-col overflow-hidden rounded-2xl border bg-gradient-to-br p-5 backdrop-blur-sm transition-shadow duration-300 hover:shadow-xl",
+        "group relative flex h-full flex-col overflow-hidden rounded-2xl border bg-gradient-to-br p-6 backdrop-blur-sm transition-shadow duration-300 hover:shadow-xl",
         th.card,
         th.glow,
       )}
     >
       {/* Yuqori qator: sarlavha chapda, ikonka o'ng burchakda */}
-      <div className="flex items-start justify-between gap-3">
-        <p className="min-w-0 flex-1 text-sm font-medium leading-snug text-muted-foreground">
+      <div className="flex items-start justify-between gap-4">
+        <p className="min-w-0 flex-1 text-sm font-medium leading-relaxed tracking-tight text-muted-foreground">
           {title}
         </p>
         {Icon && (
@@ -108,7 +108,7 @@ export function StatCard({
       </div>
 
       {/* Asosiy qiymat — katta, ikonka ostidagi joyda */}
-      <p className="mt-4 text-[1.75rem] font-bold leading-none tracking-tight text-foreground sm:text-3xl">
+      <p className="mt-5 text-[1.85rem] font-bold leading-none tracking-tight text-foreground sm:text-[2rem]">
         {numericValue != null && formatValue ? (
           <AnimatedNumber value={numericValue} format={formatValue} />
         ) : (
@@ -118,7 +118,7 @@ export function StatCard({
 
       {/* Qo'shimcha matn / o'sish foizi */}
       {(change != null || subtitle) && (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
+        <div className="mt-4 flex flex-wrap items-center gap-2.5">
           {change != null && (
             <span
               className={cn(

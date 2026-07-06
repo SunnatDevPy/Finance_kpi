@@ -17,7 +17,7 @@ export function AppHeader({ onMenuClick, collapsed = false, onToggleCollapse }: 
   const { t } = useI18n();
 
   return (
-    <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border/50 bg-background/75 px-3 shadow-sm backdrop-blur-xl supports-[backdrop-filter]:bg-background/70 sm:gap-3 sm:px-5">
+    <header className="sticky top-0 z-20 flex h-[3.75rem] shrink-0 items-center justify-between gap-3 border-b border-border/50 bg-background/75 px-4 shadow-sm backdrop-blur-xl supports-[backdrop-filter]:bg-background/70 sm:gap-4 sm:px-6">
       <div className="flex items-center gap-2">
         {/* Mobile: ochish uchun burger tugma (drawer sifatida) */}
         <Button

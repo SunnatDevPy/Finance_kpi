@@ -39,6 +39,7 @@ class ClientRead(ClientBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    logo_url: str | None = None
     created_at: datetime
     updated_at: datetime
 

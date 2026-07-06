@@ -18,7 +18,11 @@ def get_expiring_contracts(db: Session, days: int = 30) -> list[ExpiringContract
             selectinload(Contract.line_items).selectinload(ContractLineItem.service_type),
             selectinload(Contract.payments),
         )
-        .where(Contract.end_date >= today, Contract.end_date <= cutoff)
+        .where(
+            Contract.end_date >= today,
+            Contract.end_date <= cutoff,
+            Contract.deleted_at.is_(None),
+        )
         .order_by(Contract.end_date.asc())
     )
 

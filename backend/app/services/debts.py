@@ -15,6 +15,7 @@ def get_debts_overview(db: Session, search: str | None = None) -> DebtsSummary:
             selectinload(Client.contracts).selectinload(Contract.line_items),
             selectinload(Client.contracts).selectinload(Contract.payments),
         )
+        .where(Client.deleted_at.is_(None))
         .order_by(Client.company_name)
     )
     if search:
@@ -30,6 +31,8 @@ def get_debts_overview(db: Session, search: str | None = None) -> DebtsSummary:
         client_total = Decimal("0")
 
         for contract in client.contracts:
+            if contract.deleted_at is not None:
+                continue
             debt = contract.debt_amount
             if debt == 0:
                 continue

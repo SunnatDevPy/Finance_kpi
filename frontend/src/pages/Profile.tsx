@@ -1,16 +1,29 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { SettingsIcon, ShieldIcon, UserIcon } from "lucide-react";
+import { Building2Icon, HistoryIcon, SettingsIcon, ShieldIcon, UserIcon } from "lucide-react";
 import { api } from "../api/client";
 import { KeyIconBtn, LoadingIconBtn, SaveIconBtn } from "../components/ButtonIcons";
 import { PageError } from "../components/PageError";
 import { PageHeader, PageShell } from "../components/PageHeader";
+import { RoleBadge } from "../components/UserBadges";
+import {
+  PremiumDataTable,
+  TableBody,
+  TableCellDate,
+  TableCellMuted,
+  TableCellPrimary,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../components/PremiumDataTable";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
 import { usePreferences } from "../context/PreferencesContext";
+import { formatDate, toWholeAmountDigits } from "../utils/format";
+import type { CompanyProfile, LoginHistoryEntry } from "../types";
 import { FloatingLabelInput } from "@/components/ui/floating-label-input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Input, MoneyInput } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export function ProfilePage() {
@@ -27,6 +40,21 @@ export function ProfilePage() {
   const [planError, setPlanError] = useState("");
   const [planSuccess, setPlanSuccess] = useState("");
   const [planLoading, setPlanLoading] = useState(false);
+  const [companyForm, setCompanyForm] = useState<CompanyProfile>({
+    company_name: "",
+    company_address: "",
+    company_phone: "",
+    company_inn: "",
+    company_bank_name: "",
+    company_bank_account: "",
+    company_mfo: "",
+    company_director: "",
+  });
+  const [companyError, setCompanyError] = useState("");
+  const [companySuccess, setCompanySuccess] = useState("");
+  const [companyLoading, setCompanyLoading] = useState(false);
+  const [loginHistory, setLoginHistory] = useState<LoginHistoryEntry[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   useEffect(() => {
     setNotifyDaysInput(String(notifyDays));
@@ -36,8 +64,17 @@ export function ProfilePage() {
     if (!isAdmin) return;
     api.settings
       .get()
-      .then((data) => setMonthlyPlanInput(data.monthly_plan))
+      .then((data) => {
+        setMonthlyPlanInput(toWholeAmountDigits(data.monthly_plan));
+        setCompanyForm(data.company);
+      })
       .catch(() => {});
+    setHistoryLoading(true);
+    api.audit
+      .loginHistory(50)
+      .then(setLoginHistory)
+      .catch(() => {})
+      .finally(() => setHistoryLoading(false));
   }, [isAdmin]);
 
   const [form, setForm] = useState({
@@ -94,12 +131,28 @@ export function ProfilePage() {
     setPlanLoading(true);
     try {
       const data = await api.settings.updateMonthlyPlan(value);
-      setMonthlyPlanInput(data.monthly_plan);
+      setMonthlyPlanInput(toWholeAmountDigits(data.monthly_plan));
       setPlanSuccess(t("profile.monthlyPlanSaved"));
     } catch (err) {
       setPlanError(err instanceof Error ? err.message : t("common.error"));
     } finally {
       setPlanLoading(false);
+    }
+  };
+
+  const handleCompanySubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setCompanyError("");
+    setCompanySuccess("");
+    setCompanyLoading(true);
+    try {
+      const data = await api.settings.updateCompanyProfile(companyForm);
+      setCompanyForm(data.company);
+      setCompanySuccess(t("profile.companyProfileSaved"));
+    } catch (err) {
+      setCompanyError(err instanceof Error ? err.message : t("common.error"));
+    } finally {
+      setCompanyLoading(false);
     }
   };
 
@@ -109,7 +162,7 @@ export function ProfilePage() {
     <PageShell className="max-w-2xl">
       <PageHeader title={t("profile.title")} subtitle={t("profile.subtitle")} />
 
-      <Card>
+      <Card className="content-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <UserIcon className="size-5" />
@@ -128,13 +181,15 @@ export function ProfilePage() {
             </div>
             <div>
               <dt>{t("employees.role")}</dt>
-              <dd>{t(`roles.${user.role}`)}</dd>
+              <dd className="mt-1">
+                <RoleBadge role={user.role} />
+              </dd>
             </div>
           </dl>
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="content-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <SettingsIcon className="size-5" />
@@ -170,7 +225,7 @@ export function ProfilePage() {
       </Card>
 
       {isAdmin && (
-        <Card>
+        <Card className="content-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <ShieldIcon className="size-5" />
@@ -186,13 +241,11 @@ export function ProfilePage() {
             <form onSubmit={handlePlanSubmit} className="flex flex-col gap-4 sm:flex-row sm:items-end">
               <div className="flex flex-1 flex-col gap-2">
                 <Label htmlFor="monthly_plan">{t("profile.monthlyPlan")}</Label>
-                <Input
+                <MoneyInput
                   id="monthly_plan"
-                  type="number"
-                  min={1}
                   required
                   value={monthlyPlanInput}
-                  onChange={(e) => setMonthlyPlanInput(e.target.value)}
+                  onValueChange={setMonthlyPlanInput}
                 />
                 <p className="text-xs text-muted-foreground">{t("profile.monthlyPlanHint")}</p>
               </div>
@@ -214,7 +267,155 @@ export function ProfilePage() {
         </Card>
       )}
 
-      <Card>
+      {isAdmin && (
+        <Card className="content-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building2Icon className="size-5" />
+              {t("profile.companyProfile")}
+            </CardTitle>
+            <CardDescription>{t("profile.companyProfileDesc")}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {companyError && (
+              <p className="mb-4 text-sm text-red-600 dark:text-red-400">{companyError}</p>
+            )}
+            {companySuccess && (
+              <p className="mb-4 text-sm text-emerald-600 dark:text-emerald-400">{companySuccess}</p>
+            )}
+            <form onSubmit={handleCompanySubmit} className="flex flex-col gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="company_name">{t("profile.companyName")}</Label>
+                  <Input
+                    id="company_name"
+                    value={companyForm.company_name}
+                    onChange={(e) => setCompanyForm({ ...companyForm, company_name: e.target.value })}
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="company_phone">{t("profile.companyPhone")}</Label>
+                  <Input
+                    id="company_phone"
+                    value={companyForm.company_phone}
+                    onChange={(e) => setCompanyForm({ ...companyForm, company_phone: e.target.value })}
+                  />
+                </div>
+                <div className="flex flex-col gap-2 sm:col-span-2">
+                  <Label htmlFor="company_address">{t("profile.companyAddress")}</Label>
+                  <Input
+                    id="company_address"
+                    value={companyForm.company_address}
+                    onChange={(e) => setCompanyForm({ ...companyForm, company_address: e.target.value })}
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="company_inn">{t("profile.companyInn")}</Label>
+                  <Input
+                    id="company_inn"
+                    value={companyForm.company_inn}
+                    onChange={(e) => setCompanyForm({ ...companyForm, company_inn: e.target.value })}
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="company_director">{t("profile.companyDirector")}</Label>
+                  <Input
+                    id="company_director"
+                    value={companyForm.company_director}
+                    onChange={(e) => setCompanyForm({ ...companyForm, company_director: e.target.value })}
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="company_bank_name">{t("profile.companyBankName")}</Label>
+                  <Input
+                    id="company_bank_name"
+                    value={companyForm.company_bank_name}
+                    onChange={(e) => setCompanyForm({ ...companyForm, company_bank_name: e.target.value })}
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="company_bank_account">{t("profile.companyBankAccount")}</Label>
+                  <Input
+                    id="company_bank_account"
+                    value={companyForm.company_bank_account}
+                    onChange={(e) =>
+                      setCompanyForm({ ...companyForm, company_bank_account: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="company_mfo">{t("profile.companyMfo")}</Label>
+                  <Input
+                    id="company_mfo"
+                    value={companyForm.company_mfo}
+                    onChange={(e) => setCompanyForm({ ...companyForm, company_mfo: e.target.value })}
+                  />
+                </div>
+              </div>
+              <Button type="submit" disabled={companyLoading} className="w-fit">
+                {companyLoading ? (
+                  <>
+                    <LoadingIconBtn />
+                    {t("common.loading")}
+                  </>
+                ) : (
+                  <>
+                    <SaveIconBtn />
+                    {t("common.save")}
+                  </>
+                )}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
+      {isAdmin && (
+        <Card className="content-card">
+          <CardHeader className="border-b">
+            <CardTitle className="flex items-center gap-2">
+              <HistoryIcon className="size-5" />
+              {t("profile.loginHistory")}
+            </CardTitle>
+            <CardDescription>{t("profile.loginHistoryDesc")}</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <PremiumDataTable
+              loading={historyLoading}
+              empty={!historyLoading && loginHistory.length === 0}
+              emptyMessage={t("profile.loginHistoryEmpty")}
+              skeletonCols={4}
+            >
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t("profile.loginHistoryUser")}</TableHead>
+                  <TableHead>{t("auth.login")}</TableHead>
+                  <TableHead>{t("profile.loginHistoryIp")}</TableHead>
+                  <TableHead>{t("profile.loginHistoryTime")}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loginHistory.map((entry) => (
+                  <TableRow key={entry.id}>
+                    <TableCellPrimary>{entry.full_name}</TableCellPrimary>
+                    <TableCellMuted>{entry.username}</TableCellMuted>
+                    <TableCellMuted>{entry.ip_address ?? "—"}</TableCellMuted>
+                    <TableCellDate>
+                      {formatDate(entry.logged_in_at)}{" "}
+                      {new Date(entry.logged_in_at).toLocaleTimeString(undefined, {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </TableCellDate>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </PremiumDataTable>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card className="content-card">
         <CardHeader>
           <CardTitle>{t("profile.changePassword")}</CardTitle>
           <CardDescription>{t("profile.changePasswordDesc")}</CardDescription>

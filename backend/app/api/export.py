@@ -11,18 +11,20 @@ from app.services.export_data import (
     CLIENT_HEADERS,
     CONTRACT_HEADERS,
     DEBT_HEADERS,
+    EXPENSE_HEADERS,
     PAYMENT_HEADERS,
     EXPORT_TITLES,
     fetch_clients_rows,
     fetch_contracts_rows,
     fetch_debts_rows,
+    fetch_expenses_rows,
     fetch_payments_rows,
 )
 from app.services.export_files import export_resource_file
 
 router = APIRouter(prefix="/export", dependencies=[Depends(get_current_user)])
 
-ResourceType = Literal["clients", "contracts", "payments", "debts"]
+ResourceType = Literal["clients", "contracts", "payments", "debts", "expenses"]
 FileFormat = Literal["xlsx", "pdf"]
 
 
@@ -49,6 +51,9 @@ def export_data(
     elif resource == "payments":
         rows = fetch_payments_rows(db, date_from=date_from, date_to=date_to)
         headers = PAYMENT_HEADERS
+    elif resource == "expenses":
+        rows = fetch_expenses_rows(db, date_from=date_from, date_to=date_to)
+        headers = EXPENSE_HEADERS
     else:
         rows = fetch_debts_rows(db)
         headers = DEBT_HEADERS
