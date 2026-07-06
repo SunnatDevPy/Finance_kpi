@@ -57,6 +57,19 @@
   .content-card {
     @apply glass-panel overflow-hidden shadow-md transition-shadow duration-300 hover:shadow-lg;
   }
+  .form-section {
+    @apply rounded-xl border p-4 sm:p-5;
+    border-color: color-mix(in oklch, var(--border) 60%, transparent);
+    background-color: color-mix(in oklch, var(--muted) 14%, transparent);
+  }
+  .service-tag {
+    @apply inline-flex h-6 max-w-full items-center justify-center truncate rounded-md bg-brand-600 px-2.5 text-[10.5px] font-semibold tracking-tight text-white shadow-sm;
+  }
+  .action-toolbar {
+    @apply inline-flex items-center gap-0.5 rounded-lg border p-0.5 shadow-sm;
+    border-color: color-mix(in oklch, var(--border) 50%, transparent);
+    background-color: color-mix(in oklch, var(--muted) 30%, transparent);
+  }
   .glass-panel {
     @apply rounded-2xl border border-border shadow-lg backdrop-blur-xl;
     background-color: color-mix(in oklch, var(--card) 75%, transparent);
@@ -381,6 +394,23 @@
     .login-comet {
       animation: none;
       opacity: 0;
+    }
+  }
+  @media (max-width: 639px) {
+    .login-bg-mesh,
+    .login-bg-mesh--alt,
+    .login-intro-stars,
+    .login-globe-halo,
+    .login-globe-shimmer,
+    .login-comet {
+      animation: none !important;
+    }
+    .login-aurora-glow,
+    .login-particle {
+      display: none;
+    }
+    .login-intro-stars {
+      opacity: 0.35;
     }
   }
   .stat-card-glow-green::after,

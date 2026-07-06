@@ -38,7 +38,7 @@ export function Modal({ title, open, onClose, children, wide }: ModalProps) {
         <DialogHeader className="border-b border-border/60 pb-4">
           <DialogTitle className="text-lg font-semibold tracking-tight">{title}</DialogTitle>
         </DialogHeader>
-        <div className="pt-2">{children}</div>
+        <div className="pt-4">{children}</div>
       </DialogContent>
     </Dialog>
   );

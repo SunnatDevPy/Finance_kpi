@@ -9,6 +9,8 @@ import { motion, useMotionValue, useReducedMotion, useSpring } from "framer-moti
 interface LoginGlobeProps {
   className?: string;
   size: number;
+  /** Mobil uchun yengil rejim — kam nuqta, kam effekt */
+  lite?: boolean;
 }
 
 interface Vec3 {
@@ -172,7 +174,7 @@ function buildStars(count: number, spread: number): Star[] {
 
 const clampNum = (min: number, value: number, max: number) => Math.min(max, Math.max(min, value));
 
-export function LoginGlobe({ className, size }: LoginGlobeProps) {
+export function LoginGlobe({ className, size, lite = false }: LoginGlobeProps) {
   const reduceMotion = useReducedMotion();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -192,7 +194,7 @@ export function LoginGlobe({ className, size }: LoginGlobeProps) {
   const springRotY = useSpring(rotY, { stiffness: 55, damping: 16, mass: 0.6 });
 
   useEffect(() => {
-    if (reduceMotion) return;
+    if (reduceMotion || lite) return;
     const onPointerMove = (e: PointerEvent) => {
       const dx = (e.clientX / window.innerWidth - 0.5) * 2;
       const dy = (e.clientY / window.innerHeight - 0.5) * 2;
@@ -201,7 +203,7 @@ export function LoginGlobe({ className, size }: LoginGlobeProps) {
     };
     window.addEventListener("pointermove", onPointerMove);
     return () => window.removeEventListener("pointermove", onPointerMove);
-  }, [reduceMotion, rotX, rotY]);
+  }, [lite, reduceMotion, rotX, rotY]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -211,9 +213,14 @@ export function LoginGlobe({ className, size }: LoginGlobeProps) {
 
     let destroyed = false;
     let frame = 0;
+    let visible = document.visibilityState === "visible";
     let points: SpherePoints | null = null;
-    const pointCount = Math.round(Math.min(9000, Math.max(2800, size * 6.5)));
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const pointCount = lite
+      ? Math.round(Math.min(700, Math.max(400, size * 3)))
+      : Math.round(Math.min(9000, Math.max(2800, size * 6.5)));
+    const dpr = lite
+      ? Math.min(window.devicePixelRatio || 1, 1.25)
+      : Math.min(window.devicePixelRatio || 1, 2);
 
     const canvasSize = Math.round(size * CANVAS_MARGIN_SCALE);
     canvas.width = Math.round(canvasSize * dpr);
@@ -231,7 +238,7 @@ export function LoginGlobe({ className, size }: LoginGlobeProps) {
     const CX = canvasSize / 2;
     const CY = canvasSize / 2;
     const baseDotR = Math.max(1.15, size / 280);
-    const stars = buildStars(Math.round(size / 8), canvasSize * 0.48);
+    const stars = lite ? [] : buildStars(Math.round(size / 8), canvasSize * 0.48);
 
     const project = (v: Vec3, phi: number) => {
       const cosPhi = Math.cos(phi);
@@ -413,14 +420,15 @@ export function LoginGlobe({ className, size }: LoginGlobeProps) {
     const render = (timestamp: number) => {
       if (destroyed) return;
       frame = requestAnimationFrame(render);
-      if (!points) return;
+      if (!visible || !points) return;
 
       if (!reduceMotion) {
         const delta = lastFrameRef.current ? (timestamp - lastFrameRef.current) / 1000 : 0;
         lastFrameRef.current = timestamp;
         timeRef.current = timestamp * 0.001;
         if (pointerInteracting.current === null) {
-          phiRef.current += ROTATION_SPEED * delta;
+          const speed = lite ? ROTATION_SPEED * 0.4 : ROTATION_SPEED;
+          phiRef.current += speed * delta;
         }
       }
       const phi = phiRef.current + pointerMovement.current / 200;
@@ -477,31 +485,40 @@ export function LoginGlobe({ className, size }: LoginGlobeProps) {
         ctx.fill(bucket.path);
       }
 
-      if (!reduceMotion) {
+      if (!reduceMotion && !lite) {
         drawOrbitRing(phi, 0.55, 1.12, 0.35, 0.8);
         drawOrbitRing(phi + 0.4, 1.1, 1.18, 0.22, 0.6);
         drawOrbitRing(phi + 0.9, 1.65, 1.08, 0.18, 0.5);
       }
 
       const arcGlow = Math.max(4, size / 90);
-      CITIES.forEach((city, idx) => {
-        drawArc(HUB, city.pos, phi, "rgba(56,189,248,0.7)", arcGlow);
-        if (!reduceMotion) {
-          const pulseT = (t * 0.35 + idx * 0.125) % 1;
-          drawArcPulse(HUB, city.pos, phi, pulseT, "rgba(165,243,252,0.9)");
-        }
-      });
+      if (!lite) {
+        CITIES.forEach((city, idx) => {
+          drawArc(HUB, city.pos, phi, "rgba(56,189,248,0.7)", arcGlow);
+          if (!reduceMotion) {
+            const pulseT = (t * 0.35 + idx * 0.125) % 1;
+            drawArcPulse(HUB, city.pos, phi, pulseT, "rgba(165,243,252,0.9)");
+          }
+        });
+      }
 
-      if (!reduceMotion) drawHubPulse(phi, t);
+      if (!reduceMotion && !lite) drawHubPulse(phi, t);
 
-      CITIES.forEach((city) => {
-        drawMarker(city.pos, phi, Math.max(2.2, size / 170), "#a5f3fc", 12);
-      });
-      drawMarker(HUB, phi, Math.max(3.5, size / 110), HUB.color, 22);
+      if (!lite) {
+        CITIES.forEach((city) => {
+          drawMarker(city.pos, phi, Math.max(2.2, size / 170), "#a5f3fc", 12);
+        });
+      }
+      drawMarker(HUB, phi, Math.max(3.5, size / 110), HUB.color, lite ? 10 : 22);
 
       pointerMovement.current *= 0.94;
       if (Math.abs(pointerMovement.current) < 0.05) pointerMovement.current = 0;
     };
+
+    const onVisibility = () => {
+      visible = document.visibilityState === "visible";
+    };
+    document.addEventListener("visibilitychange", onVisibility);
 
     loadLandMask()
       .then((mask) => {
@@ -532,11 +549,12 @@ export function LoginGlobe({ className, size }: LoginGlobeProps) {
     return () => {
       destroyed = true;
       cancelAnimationFrame(frame);
+      document.removeEventListener("visibilitychange", onVisibility);
       canvas.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("pointerup", onPointerUp);
       window.removeEventListener("pointermove", onPointerMove);
     };
-  }, [size, reduceMotion]);
+  }, [size, reduceMotion, lite]);
 
   const canvasSize = size * CANVAS_MARGIN_SCALE;
   const canvasOffset = (size - canvasSize) / 2;
@@ -548,31 +566,41 @@ export function LoginGlobe({ className, size }: LoginGlobeProps) {
       style={{ width: size, height: size, perspective: 1200 }}
     >
       {/* Tashqi atmosfera halqasi — pulsatsiya */}
-      <div
-        className="pointer-events-none absolute -inset-[18%] rounded-full login-globe-halo"
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute -inset-[8%] rounded-full"
-        style={{
-          background:
-            "radial-gradient(circle, rgba(34,211,238,0.14) 0%, rgba(99,102,241,0.1) 38%, transparent 68%)",
-        }}
-        aria-hidden
-      />
+      {!lite && (
+        <div
+          className="pointer-events-none absolute -inset-[18%] rounded-full login-globe-halo"
+          aria-hidden
+        />
+      )}
+      {!lite && (
+        <div
+          className="pointer-events-none absolute -inset-[8%] rounded-full"
+          style={{
+            background:
+              "radial-gradient(circle, rgba(34,211,238,0.14) 0%, rgba(99,102,241,0.1) 38%, transparent 68%)",
+          }}
+          aria-hidden
+        />
+      )}
 
       {/* Kometa — atmosferada tasodifan uchib o'tadi */}
-      <div className="pointer-events-none absolute -inset-[8%] overflow-hidden rounded-full" aria-hidden>
-        <div className="login-comet" />
-      </div>
+      {!lite && (
+        <div className="pointer-events-none absolute -inset-[8%] overflow-hidden rounded-full" aria-hidden>
+          <div className="login-comet" />
+        </div>
+      )}
 
       <motion.div
         className="absolute inset-0"
-        style={{
-          rotateX: springRotX,
-          rotateY: springRotY,
-          transformStyle: "preserve-3d",
-        }}
+        style={
+          lite
+            ? undefined
+            : {
+                rotateX: springRotX,
+                rotateY: springRotY,
+                transformStyle: "preserve-3d",
+              }
+        }
       >
         {/* Sfera tanasi */}
         <div
@@ -608,13 +636,15 @@ export function LoginGlobe({ className, size }: LoginGlobeProps) {
 
         {/* Yaltirash, rim light (atmosfera chekkasi) va soya */}
         <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-full">
-          <div
-            className="absolute inset-0 login-globe-shimmer"
-            style={{
-              background:
-                "radial-gradient(circle at 26% 20%, rgba(255,255,255,0.32) 0%, rgba(255,255,255,0.09) 15%, transparent 38%)",
-            }}
-          />
+          {!lite && (
+            <div
+              className="absolute inset-0 login-globe-shimmer"
+              style={{
+                background:
+                  "radial-gradient(circle at 26% 20%, rgba(255,255,255,0.32) 0%, rgba(255,255,255,0.09) 15%, transparent 38%)",
+              }}
+            />
+          )}
           <div
             className="absolute inset-0"
             style={{

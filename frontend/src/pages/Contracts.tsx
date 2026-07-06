@@ -68,6 +68,23 @@ import { useSubmitGuard } from "../hooks/useSubmitGuard";
 import { formatDate, formatMoney, formatWeekday, toNumber, toWholeAmountDigits } from "../utils/format";
 import { PageHeader, PageShell } from "../components/PageHeader";
 
+const formReveal = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.05, delayChildren: 0.03 },
+  },
+};
+
+const formSectionReveal = {
+  hidden: { opacity: 0, y: 6 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.28, ease: [0.16, 1, 0.3, 1] as const },
+  },
+};
+
 export function ContractsPage() {
   const { t } = useI18n();
   const [contracts, setContracts] = useState<Contract[]>([]);
@@ -422,26 +439,31 @@ export function ContractsPage() {
                     name={clientName(contract.client_id)}
                   />
                   <TableCellDate>
-                    <div className="flex flex-col gap-0.5">
+                    <div className="flex min-w-[8.5rem] flex-col gap-1">
                       {contract.contract_number && (
-                        <span className="whitespace-nowrap text-[11px] font-semibold text-primary/80">
+                        <span className="whitespace-nowrap text-[11px] font-semibold tracking-tight text-primary">
                           №{contract.contract_number}
                         </span>
                       )}
-                      <span className="whitespace-nowrap text-xs font-medium text-foreground/90">
-                        {formatDate(contract.start_date)}
-                        <span className="ml-1 font-normal text-muted-foreground">
-                          {formatWeekday(contract.start_date, "short")}
+                      <div className="flex flex-col gap-0.5 text-xs md:flex-row md:items-center md:gap-1.5">
+                        <span className="whitespace-nowrap font-medium tabular-nums text-foreground/90">
+                          {formatDate(contract.start_date)}
+                          <span className="ml-1 font-normal text-muted-foreground">
+                            {formatWeekday(contract.start_date, "short")}
+                          </span>
                         </span>
-                      </span>
-                      <span className="whitespace-nowrap text-xs font-medium text-foreground/90">
-                        <span className="text-muted-foreground/50">→</span> {formatDate(contract.end_date)}
-                        <span className="ml-1 font-normal text-muted-foreground">
-                          {formatWeekday(contract.end_date, "short")}
+                        <span className="hidden text-muted-foreground/40 md:inline" aria-hidden>
+                          →
                         </span>
-                      </span>
+                        <span className="whitespace-nowrap font-medium tabular-nums text-foreground/90">
+                          {formatDate(contract.end_date)}
+                          <span className="ml-1 font-normal text-muted-foreground">
+                            {formatWeekday(contract.end_date, "short")}
+                          </span>
+                        </span>
+                      </div>
                       {contract.invoice_number && (
-                        <span className="whitespace-nowrap text-[10px] font-normal text-muted-foreground">
+                        <span className="whitespace-nowrap text-[10px] text-muted-foreground">
                           {t("contracts.invoiceNumber")}: {contract.invoice_number}
                         </span>
                       )}
@@ -458,15 +480,15 @@ export function ContractsPage() {
                     )}
                   </TableCell>
                   <TableCell>
-                    <div className="grid w-56 grid-cols-2 gap-1">
+                    <div className="flex max-w-[13rem] flex-wrap gap-1">
                       {contract.line_items.map((item, i) => (
-                        <Badge
+                        <span
                           key={i}
                           title={item.service_type_name}
-                          className="min-w-0 justify-center truncate px-2 text-[10.5px] font-medium"
+                          className="service-tag"
                         >
                           {item.service_type_name}
-                        </Badge>
+                        </span>
                       ))}
                     </div>
                   </TableCell>
@@ -481,52 +503,58 @@ export function ContractsPage() {
                     )}
                   </TableCellMoney>
                   <TableCellActions>
+                    <div className="action-toolbar">
                     <MotionButton
                       variant="ghost"
                       size="icon-sm"
+                      className="size-8"
                       onClick={() => handleDownloadDocument(contract, "invoice")}
                       title={t("contracts.downloadInvoice")}
                       {...motionTap}
                     >
-                      <ReceiptIcon data-icon="inline-start" />
+                      <ReceiptIcon className="size-3.5" />
                     </MotionButton>
                     <MotionButton
                       variant="ghost"
                       size="icon-sm"
+                      className="size-8"
                       onClick={() => handleDownloadDocument(contract, "act")}
                       title={t("contracts.downloadAct")}
                       {...motionTap}
                     >
-                      <ClipboardCheckIcon data-icon="inline-start" />
+                      <ClipboardCheckIcon className="size-3.5" />
                     </MotionButton>
                     <MotionButton
                       variant="ghost"
                       size="icon-sm"
+                      className="size-8"
                       onClick={() => handleDuplicate(contract)}
                       title={t("contracts.duplicate")}
                       {...motionTap}
                     >
-                      <CopyIcon data-icon="inline-start" />
+                      <CopyIcon className="size-3.5" />
                     </MotionButton>
                     <MotionButton
                       variant="ghost"
                       size="icon-sm"
+                      className="size-8"
                       onClick={() => openEdit(contract)}
                       title={t("common.edit")}
                       {...motionTap}
                     >
-                      <PencilIcon data-icon="inline-start" />
+                      <PencilIcon className="size-3.5" />
                     </MotionButton>
                     <MotionButton
                       variant="ghost"
                       size="icon-sm"
-                      className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      className="size-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
                       onClick={() => setDeleteId(contract.id)}
                       title={t("common.delete")}
                       {...motionTap}
                     >
-                      <Trash2Icon data-icon="inline-start" />
+                      <Trash2Icon className="size-3.5" />
                     </MotionButton>
+                    </div>
                   </TableCellActions>
                 </MotionTableRow>
               ))}
@@ -541,90 +569,101 @@ export function ContractsPage() {
         onClose={closeModal}
         wide
       >
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="client">{t("contracts.selectClientLabel")} *</Label>
-            {editing ? (
-              <FloatingLabelInput
-                id="client"
-                label={t("contracts.selectClientLabel")}
-                required
-                readOnly
-                value={clientName(editing.client_id)}
-                className="bg-muted"
-              />
-            ) : (
-              <Select
-                value={form.client_id}
-                onValueChange={(value) => value && handleClientChange(value)}
-              >
-                <SelectTrigger id="client" className="w-full">
-                  <SelectValue placeholder={t("contracts.selectClient")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {clients.map((c) => (
-                      <SelectItem key={c.id} value={String(c.id)}>
-                        {c.company_name}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FloatingLabelDatePicker
-              id="start_date"
-              label={t("contracts.start")}
-              required
-              value={form.start_date}
-              onChange={(value) => setForm({ ...form, start_date: value })}
-            />
-            <FloatingLabelDatePicker
-              id="end_date"
-              label={t("contracts.end")}
-              required
-              value={form.end_date}
-              min={form.start_date || undefined}
-              onChange={(value) => setForm({ ...form, end_date: value })}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-1">
-              <FloatingLabelInput
-                id="contract_number"
-                label={t("contracts.contractNumber")}
-                value={form.contract_number}
-                onChange={(e) => setForm({ ...form, contract_number: e.target.value })}
-              />
-              {!editing && contractNumberHint && (
-                <p className="px-1 text-xs text-muted-foreground">
-                  {contractNumberHint.last
-                    ? t("contracts.contractNumberNext")
-                        .replace("{last}", contractNumberHint.last)
-                        .replace("{next}", contractNumberHint.next)
-                    : t("contracts.contractNumberFirst").replace(
-                        "{number}",
-                        contractNumberHint.next,
-                      )}
-                </p>
+        <motion.form
+          onSubmit={handleSubmit}
+          className="flex flex-col gap-4"
+          variants={formReveal}
+          initial="hidden"
+          animate="visible"
+          key={editing?.id ?? "create"}
+        >
+          <motion.div variants={formSectionReveal} className="form-section space-y-4">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="client">{t("contracts.selectClientLabel")} *</Label>
+              {editing ? (
+                <FloatingLabelInput
+                  id="client"
+                  label={t("contracts.selectClientLabel")}
+                  required
+                  readOnly
+                  value={clientName(editing.client_id)}
+                  className="bg-muted"
+                />
+              ) : (
+                <Select
+                  value={form.client_id}
+                  onValueChange={(value) => value && handleClientChange(value)}
+                >
+                  <SelectTrigger id="client" className="h-12 w-full">
+                    <SelectValue placeholder={t("contracts.selectClient")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {clients.map((c) => (
+                        <SelectItem key={c.id} value={String(c.id)}>
+                          {c.company_name}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
               )}
             </div>
-            <FloatingLabelInput
-              id="invoice_number"
-              label={t("contracts.invoiceNumber")}
-              value={form.invoice_number}
-              onChange={(e) => setForm({ ...form, invoice_number: e.target.value })}
-            />
-          </div>
 
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FloatingLabelDatePicker
+                id="start_date"
+                label={t("contracts.start")}
+                required
+                value={form.start_date}
+                onChange={(value) => setForm({ ...form, start_date: value })}
+              />
+              <FloatingLabelDatePicker
+                id="end_date"
+                label={t("contracts.end")}
+                required
+                value={form.end_date}
+                min={form.start_date || undefined}
+                onChange={(value) => setForm({ ...form, end_date: value })}
+              />
+            </div>
+          </motion.div>
+
+          <motion.div variants={formSectionReveal} className="form-section">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-1">
+                <FloatingLabelInput
+                  id="contract_number"
+                  label={t("contracts.contractNumber")}
+                  value={form.contract_number}
+                  onChange={(e) => setForm({ ...form, contract_number: e.target.value })}
+                />
+                {!editing && contractNumberHint && (
+                  <p className="px-1 text-xs text-muted-foreground">
+                    {contractNumberHint.last
+                      ? t("contracts.contractNumberNext")
+                          .replace("{last}", contractNumberHint.last)
+                          .replace("{next}", contractNumberHint.next)
+                      : t("contracts.contractNumberFirst").replace(
+                          "{number}",
+                          contractNumberHint.next,
+                        )}
+                  </p>
+                )}
+              </div>
+              <FloatingLabelInput
+                id="invoice_number"
+                label={t("contracts.invoiceNumber")}
+                value={form.invoice_number}
+                onChange={(e) => setForm({ ...form, invoice_number: e.target.value })}
+              />
+            </div>
+          </motion.div>
+
+          <motion.div variants={formSectionReveal} className="form-section space-y-3">
+            <div className="flex items-center justify-between gap-3">
               <Label>{t("contracts.services")} *</Label>
-              <MotionButton type="button" variant="ghost" size="sm" onClick={addLineItem} {...motionTap}>
+              <MotionButton type="button" variant="outline" size="sm" onClick={addLineItem} {...motionTap}>
                 <PlusIcon data-icon="inline-start" />
                 {t("contracts.addService")}
               </MotionButton>
@@ -640,8 +679,8 @@ export function ContractsPage() {
                 transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
                 className="overflow-hidden"
               >
-              <div className="pt-2.5 pb-1">
-              <div className="flex flex-col gap-2 rounded-lg border border-border/50 p-2.5 sm:flex-row sm:items-start sm:border-0 sm:p-0">
+              <div className="pt-2 pb-1">
+              <div className="flex flex-col gap-2 rounded-xl border border-border/50 bg-background/90 p-3 shadow-sm sm:flex-row sm:items-end">
                 <Select
                   value={String(item.service_type_id)}
                   onValueChange={(value) => {
@@ -651,7 +690,7 @@ export function ContractsPage() {
                     setForm({ ...form, line_items: items });
                   }}
                 >
-                  <SelectTrigger className="w-full data-[size=default]:h-12 sm:mt-3 sm:w-44 sm:shrink-0">
+                  <SelectTrigger className="h-12 w-full sm:w-44 sm:shrink-0">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -664,7 +703,7 @@ export function ContractsPage() {
                     </SelectGroup>
                   </SelectContent>
                 </Select>
-                <div className="flex flex-1 items-center gap-2">
+                <div className="flex flex-1 items-end gap-2">
                   <FloatingLabelMoneyInput
                     containerClassName="w-full flex-1"
                     label={t("common.price")}
@@ -681,7 +720,7 @@ export function ContractsPage() {
                       type="button"
                       variant="ghost"
                       size="icon-sm"
-                      className="shrink-0 text-destructive"
+                      className="mb-1 shrink-0 text-destructive"
                       onClick={() => removeLineItem(index)}
                       {...motionTap}
                     >
@@ -694,17 +733,22 @@ export function ContractsPage() {
               </motion.div>
             ))}
             </AnimatePresence>
-          </div>
+          </motion.div>
 
-          <FloatingLabelTextarea
-            id="notes"
-            label={t("common.note")}
-            rows={2}
-            value={form.notes}
-            onChange={(e) => setForm({ ...form, notes: e.target.value })}
-          />
+          <motion.div variants={formSectionReveal}>
+            <FloatingLabelTextarea
+              id="notes"
+              label={t("common.note")}
+              rows={2}
+              value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+            />
+          </motion.div>
 
-          <div className="flex justify-end gap-2">
+          <motion.div
+            variants={formSectionReveal}
+            className="flex justify-end gap-2 border-t border-border/60 pt-4"
+          >
             <MotionButton type="button" variant="outline" onClick={closeModal} {...motionTap}>
               <CancelIcon />
               {t("common.cancel")}
@@ -713,8 +757,8 @@ export function ContractsPage() {
               {submitting ? <LoadingIconBtn /> : <SaveIconBtn />}
               {submitting ? t("common.saving") : t("common.save")}
             </MotionButton>
-          </div>
-        </form>
+          </motion.div>
+        </motion.form>
       </Modal>
 
       <Modal

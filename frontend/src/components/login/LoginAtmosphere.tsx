@@ -3,6 +3,8 @@ import { motion, useReducedMotion } from "framer-motion";
 
 interface LoginAtmosphereProps {
   revealed: boolean;
+  /** Mobil / past qatlam — og'ir animatsiyalarni o'chiradi */
+  lite?: boolean;
 }
 
 interface Particle {
@@ -32,20 +34,21 @@ function buildParticles(count: number): Particle[] {
  * (uchinchi tomon kutubxonasiz), 60 FPS uchun faqat transform/opacity
  * animatsiya qilinadi.
  */
-export function LoginAtmosphere({ revealed }: LoginAtmosphereProps) {
+export function LoginAtmosphere({ revealed, lite = false }: LoginAtmosphereProps) {
   const reduceMotion = useReducedMotion();
-  const particles = useMemo(() => buildParticles(10), []);
+  const particles = useMemo(() => buildParticles(lite ? 0 : 10), [lite]);
+  const animate = !reduceMotion && !lite;
 
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
       <div className="login-bg-mesh" />
-      <div className="login-bg-mesh login-bg-mesh--alt" />
-      {!reduceMotion && <div className="login-aurora-glow" />}
+      {!lite && <div className="login-bg-mesh login-bg-mesh--alt" />}
+      {animate && <div className="login-aurora-glow" />}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_55%_at_38%_48%,rgba(56,189,248,0.14),transparent_62%)] dark:bg-[radial-gradient(ellipse_70%_55%_at_38%_48%,rgba(56,189,248,0.22),transparent_62%)]" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_45%_40%_at_75%_75%,rgba(99,102,241,0.08),transparent_60%)] dark:bg-[radial-gradient(ellipse_45%_40%_at_75%_75%,rgba(99,102,241,0.14),transparent_60%)]" />
-      <div className="login-intro-stars absolute inset-0" />
+      {!lite && <div className="login-intro-stars absolute inset-0" />}
 
-      {!reduceMotion && (
+      {animate && (
         <motion.div
           className="absolute inset-0"
           initial={{ opacity: 0 }}
@@ -71,9 +74,9 @@ export function LoginAtmosphere({ revealed }: LoginAtmosphereProps) {
         </motion.div>
       )}
 
-      <div className="login-horizon-grid" />
-      <div className="dot-grid absolute inset-0 text-foreground/[0.06] dark:text-foreground/[0.12]" />
-      <div className="login-grain" />
+      {!lite && <div className="login-horizon-grid" />}
+      {!lite && <div className="dot-grid absolute inset-0 text-foreground/[0.06] dark:text-foreground/[0.12]" />}
+      {!lite && <div className="login-grain" />}
     </div>
   );
 }
