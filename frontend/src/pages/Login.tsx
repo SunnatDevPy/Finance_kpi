@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 const EASE = [0.16, 1, 0.3, 1] as const;
 const INTRO_MS = 2500;
 const TRANSITION_S = 1.15;
-const MOBILE_GLOBE_SIZE = 168;
+const MOBILE_GLOBE_SIZE = 158;
 
 /** Globusning aynan shu ulushi (30%) login karta ortida yashiringan turadi. */
 const OVERLAP_RATIO = 0.3;
@@ -47,7 +47,7 @@ function computeStageLayout(vw: number): StageLayout {
     };
   }
 
-  const diameter = clamp(420, vw * 0.5, 1500);
+  const diameter = clamp(370, vw * 0.44, 1200);
   const cardWidth = CARD_WIDTH;
   const visibleGlobeWidth = diameter * (1 - OVERLAP_RATIO);
   const totalWidth = visibleGlobeWidth + cardWidth;

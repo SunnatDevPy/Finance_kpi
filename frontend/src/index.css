@@ -236,12 +236,11 @@
   .login-globe-halo {
     background: radial-gradient(
       circle,
-      rgba(34, 211, 238, 0.2) 0%,
-      rgba(99, 102, 241, 0.14) 32%,
-      rgba(56, 189, 248, 0.06) 52%,
-      transparent 70%
+      rgba(56, 189, 248, 0.18) 0%,
+      rgba(99, 102, 241, 0.1) 38%,
+      transparent 72%
     );
-    animation: login-globe-halo-pulse 4s ease-in-out infinite;
+    animation: login-globe-halo-pulse 6s ease-in-out infinite;
   }
   .dark .login-globe-halo {
     background: radial-gradient(
@@ -256,8 +255,8 @@
     animation: login-globe-shimmer-drift 6s ease-in-out infinite alternate;
   }
   @keyframes login-globe-halo-pulse {
-    0%, 100% { opacity: 0.65; transform: scale(1); }
-    50% { opacity: 1; transform: scale(1.04); }
+    0%, 100% { opacity: 0.55; transform: scale(1); }
+    50% { opacity: 0.85; transform: scale(1.02); }
   }
   @keyframes login-globe-shimmer-drift {
     0% { opacity: 0.85; transform: translate(0, 0); }
@@ -272,6 +271,39 @@
       rgba(165, 243, 252, 0.5) 95%,
       rgba(255, 255, 255, 0.14) 100%
     );
+  }
+  /* Orbital ring — sof CSS conic-gradient + mask, faqat transform:rotate
+     bilan animatsiya qilinadi (GPU, layout-safe). Globusga premium
+     "sputnik pallasi" hissi beradi. */
+  .login-globe-orbit {
+    border-radius: 9999px;
+    background: conic-gradient(
+      from 0deg,
+      transparent 0%,
+      rgba(103, 232, 249, 0.55) 4%,
+      transparent 10%,
+      transparent 48%,
+      rgba(99, 102, 241, 0.4) 54%,
+      transparent 62%,
+      transparent 100%
+    );
+    -webkit-mask: radial-gradient(circle, transparent calc(50% - 1.5px), #000 calc(50% - 1px), #000 50%, transparent calc(50% + 1px));
+    mask: radial-gradient(circle, transparent calc(50% - 1.5px), #000 calc(50% - 1px), #000 50%, transparent calc(50% + 1px));
+    animation: login-globe-orbit-spin 16s linear infinite;
+    opacity: 0.7;
+  }
+  .login-globe-orbit--reverse {
+    animation-name: login-globe-orbit-spin-reverse;
+    animation-duration: 24s;
+    opacity: 0.4;
+  }
+  @keyframes login-globe-orbit-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  @keyframes login-globe-orbit-spin-reverse {
+    from { transform: rotate(35deg) scale(1.09); }
+    to { transform: rotate(-325deg) scale(1.09); }
   }
   .login-comet {
     position: absolute;
@@ -391,7 +423,8 @@
     .login-globe-shimmer,
     .login-aurora-glow,
     .login-particle,
-    .login-comet {
+    .login-comet,
+    .login-globe-orbit {
       animation: none;
       opacity: 0;
     }
@@ -402,11 +435,13 @@
     .login-intro-stars,
     .login-globe-halo,
     .login-globe-shimmer,
-    .login-comet {
+    .login-comet,
+    .login-globe-orbit {
       animation: none !important;
     }
     .login-aurora-glow,
-    .login-particle {
+    .login-particle,
+    .login-globe-orbit {
       display: none;
     }
     .login-intro-stars {
