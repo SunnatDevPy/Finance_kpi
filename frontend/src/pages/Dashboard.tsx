@@ -17,10 +17,10 @@ import {
 import {
   AlertTriangleIcon,
   BriefcaseIcon,
+  BanknoteIcon,
   CalendarDaysIcon,
   CheckCircle2Icon,
   CrownIcon,
-  PiggyBankIcon,
   ScaleIcon,
   TrendingUpIcon,
   UsersIcon,
@@ -34,7 +34,9 @@ import { TableViewLink } from "../components/TableViewLink";
 import { StaggerContainer, StaggerItem } from "../components/Stagger";
 import { PageShell, SectionHeader } from "../components/PageHeader";
 import {
+  MotionTableRow,
   PremiumDataTable,
+  rowEnter,
   TableBody,
   TableCell,
   TableCellCompany,
@@ -396,7 +398,7 @@ export function DashboardPage() {
             numericValue={toNumber(stats.net_profit)}
             formatValue={formatMoney}
             accent={toNumber(stats.net_profit) >= 0 ? "green" : "red"}
-            icon={PiggyBankIcon}
+            icon={BanknoteIcon}
           />
         </StaggerItem>
         <StaggerItem>
@@ -435,12 +437,14 @@ export function DashboardPage() {
                       </span>
                     </div>
                     <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                      <div
+                      <motion.div
                         className={cn(
                           "h-full rounded-full",
                           SERVICE_BAR_COLORS[index % SERVICE_BAR_COLORS.length],
                         )}
-                        style={{ width: `${Math.max(4, (item.amount / chartData.byServiceMax) * 100)}%` }}
+                        initial={{ width: 0 }}
+                        animate={{ width: `${Math.max(4, (item.amount / chartData.byServiceMax) * 100)}%` }}
+                        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: index * 0.05 }}
                       />
                     </div>
                   </div>
@@ -509,13 +513,17 @@ export function DashboardPage() {
             </CardHeader>
             <CardContent className="flex flex-col gap-5 pt-6">
               <div className="flex h-3.5 w-full overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full bg-emerald-500 transition-all duration-500"
-                  style={{ width: `${chartData.paidPercent}%` }}
+                <motion.div
+                  className="h-full bg-emerald-500"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${chartData.paidPercent}%` }}
+                  transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
                 />
-                <div
-                  className="h-full bg-red-400 transition-all duration-500"
-                  style={{ width: `${100 - chartData.paidPercent}%` }}
+                <motion.div
+                  className="h-full bg-red-400"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${100 - chartData.paidPercent}%` }}
+                  transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -578,8 +586,8 @@ export function DashboardPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {expiring.map((item) => (
-                <TableRow key={item.contract_id}>
+              {expiring.map((item, index) => (
+                <MotionTableRow key={item.contract_id} {...rowEnter(index)}>
                   <TableCellCompany to={`/clients/${item.client_id}`} name={item.company_name} />
                   <TableCellDate>{formatDateWithWeekday(item.end_date)}</TableCellDate>
                   <TableCell>
@@ -600,7 +608,7 @@ export function DashboardPage() {
                   <TableCell className="text-right">
                     <TableViewLink to={`/clients/${item.client_id}`} />
                   </TableCell>
-                </TableRow>
+                </MotionTableRow>
               ))}
             </TableBody>
           </PremiumDataTable>
@@ -734,14 +742,16 @@ export function DashboardPage() {
                     </span>
                   </div>
                   <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                    <div
+                    <motion.div
                       className={cn(
                         "h-full rounded-full",
                         SERVICE_BAR_COLORS[index % SERVICE_BAR_COLORS.length],
                       )}
-                      style={{
+                      initial={{ width: 0 }}
+                      animate={{
                         width: `${Math.max(4, (item.amount / chartData.expensesByCategoryMax) * 100)}%`,
                       }}
+                      transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: index * 0.05 }}
                     />
                   </div>
                 </div>
@@ -827,7 +837,7 @@ export function DashboardPage() {
                 const debt = toNumber(client.total_debt);
                 const ratio = Math.round((paid / Math.max(1, paid + debt)) * 100);
                 return (
-                  <TableRow key={client.client_id}>
+                  <MotionTableRow key={client.client_id} {...rowEnter(index)}>
                     <TableCell>
                       <span
                         className={cn(
@@ -848,12 +858,14 @@ export function DashboardPage() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
-                          <div
+                          <motion.div
                             className={cn(
                               "h-full rounded-full",
                               ratio >= 70 ? "bg-emerald-500" : ratio >= 40 ? "bg-amber-500" : "bg-red-400",
                             )}
-                            style={{ width: `${ratio}%` }}
+                            initial={{ width: 0 }}
+                            animate={{ width: `${ratio}%` }}
+                            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: Math.min(index, 12) * 0.02 }}
                           />
                         </div>
                         <span className="text-xs font-medium tabular-nums text-muted-foreground">
@@ -864,7 +876,7 @@ export function DashboardPage() {
                     <TableCell className="text-right">
                       <TableViewLink to={`/clients/${client.client_id}`} />
                     </TableCell>
-                  </TableRow>
+                  </MotionTableRow>
                 );
               })}
             </TableBody>
@@ -919,7 +931,7 @@ export function DashboardPage() {
             </TableHeader>
             <TableBody>
               {ltvClients.map((client, index) => (
-                <TableRow key={client.client_id}>
+                <MotionTableRow key={client.client_id} {...rowEnter(index)}>
                   <TableCell>
                     <span
                       className={cn(
@@ -938,9 +950,11 @@ export function DashboardPage() {
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
-                        <div
+                        <motion.div
                           className="h-full rounded-full bg-violet-500"
-                          style={{ width: `${Math.max(4, Math.min(100, client.share_pct))}%` }}
+                          initial={{ width: 0 }}
+                          animate={{ width: `${Math.max(4, Math.min(100, client.share_pct))}%` }}
+                          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: Math.min(index, 12) * 0.02 }}
                         />
                       </div>
                       <span className="text-xs font-medium tabular-nums text-muted-foreground">
@@ -951,7 +965,7 @@ export function DashboardPage() {
                   <TableCell className="text-right">
                     <TableViewLink to={`/clients/${client.client_id}`} />
                   </TableCell>
-                </TableRow>
+                </MotionTableRow>
               ))}
             </TableBody>
           </PremiumDataTable>

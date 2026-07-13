@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { CalendarRangeIcon, ChevronLeftIcon, ChevronRightIcon, XIcon } from "lucide-react";
+import { CalendarRangeIcon, XIcon } from "lucide-react";
 import { useI18n } from "../context/I18nContext";
+import { CalendarBodySwitch, CalendarMonthNav, type CalendarNavMode } from "./CalendarMonthNav";
 import { Button, MotionButton, motionTap } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -14,6 +15,7 @@ import {
   parseISODate,
   toISODate,
   type DateRangePreset,
+  type MonthKey,
 } from "@/lib/dateRange";
 
 interface DateRangePickerProps {
@@ -31,7 +33,7 @@ const PRESETS: DateRangePreset[] = ["today", "yesterday", "week", "month", "year
 const WEEKDAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 
 export function DateRangePicker({ from, to, onChange, onClear, className, onDark = false }: DateRangePickerProps) {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -40,12 +42,9 @@ export function DateRangePicker({ from, to, onChange, onClear, className, onDark
   const [draftFrom, setDraftFrom] = useState(from);
   const [draftTo, setDraftTo] = useState(to);
   const [hoverDate, setHoverDate] = useState<Date | null>(null);
+  const [navMode, setNavMode] = useState<CalendarNavMode>("days");
 
-  const dateLocale = locale === "ru" ? "ru-RU" : "uz-UZ";
-  const monthLabel = new Intl.DateTimeFormat(dateLocale, {
-    month: "long",
-    year: "numeric",
-  }).format(viewMonth);
+  const getMonthName = (key: MonthKey) => t(`dateRange.months.${key}`);
 
   const getWeekdayName = (key: (typeof WEEKDAY_KEYS)[number] | "sun") =>
     t(`dateRange.weekdayFull.${key}`);
@@ -53,13 +52,14 @@ export function DateRangePicker({ from, to, onChange, onClear, className, onDark
   const displayLabel = useMemo(() => {
     if (!from && !to) return "";
     return formatRangeLabelWithWeekday(from, to, getWeekdayName, " — ");
-  }, [from, to, locale, t]);
+  }, [from, to, t]);
 
   useEffect(() => {
     if (open) {
       setDraftFrom(from);
       setDraftTo(to);
       setViewMonth(startOfMonth(from ? parseISODate(from) : new Date()));
+      setNavMode("days");
     }
   }, [open, from, to]);
 
@@ -85,7 +85,7 @@ export function DateRangePicker({ from, to, onChange, onClear, className, onDark
       const trigger = containerRef.current;
       if (!trigger) return;
       const rect = trigger.getBoundingClientRect();
-      const dropdownWidth = window.innerWidth >= 640 ? 448 : Math.min(window.innerWidth - 32, 352);
+      const dropdownWidth = window.innerWidth >= 640 ? 520 : Math.min(window.innerWidth - 32, 400);
       const left = Math.min(
         Math.max(16, rect.left),
         Math.max(16, window.innerWidth - dropdownWidth - 16),
@@ -234,26 +234,20 @@ export function DateRangePicker({ from, to, onChange, onClear, className, onDark
 
               {/* Calendar */}
               <div className="flex-1 p-3">
-                <div className="mb-3 flex items-center justify-between">
-                  <button
-                    type="button"
-                    onClick={() => setViewMonth((m) => addMonths(m, -1))}
-                    className="flex size-8 items-center justify-center rounded-lg border border-border/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    aria-label={t("dateRange.prevMonth")}
-                  >
-                    <ChevronLeftIcon className="size-4" />
-                  </button>
-                  <p className="text-sm font-semibold capitalize text-foreground">{monthLabel}</p>
-                  <button
-                    type="button"
-                    onClick={() => setViewMonth((m) => addMonths(m, 1))}
-                    className="flex size-8 items-center justify-center rounded-lg border border-border/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    aria-label={t("dateRange.nextMonth")}
-                  >
-                    <ChevronRightIcon className="size-4" />
-                  </button>
-                </div>
+                <CalendarMonthNav
+                  viewMonth={viewMonth}
+                  onViewMonthChange={setViewMonth}
+                  mode={navMode}
+                  onModeChange={setNavMode}
+                  getMonthName={getMonthName}
+                  prevMonthLabel={t("dateRange.prevMonth")}
+                  nextMonthLabel={t("dateRange.nextMonth")}
+                  prevYearLabel={t("dateRange.prevYear")}
+                  nextYearLabel={t("dateRange.nextYear")}
+                  pickMonthYearLabel={t("dateRange.pickMonthYear")}
+                />
 
+                <CalendarBodySwitch mode={navMode}>
                 <div className="grid grid-cols-7 gap-0.5 text-center">
                   {WEEKDAY_KEYS.map((key) => (
                     <div
@@ -298,16 +292,17 @@ export function DateRangePicker({ from, to, onChange, onClear, className, onDark
                     );
                   })}
                 </div>
+                </CalendarBodySwitch>
 
-                <div className="mt-3 flex items-center justify-between gap-2 border-t border-border/50 pt-3">
-                  <p className="min-w-0 truncate text-xs text-muted-foreground">
+                <div className="mt-3 flex flex-col gap-2 border-t border-border/50 pt-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-xs leading-snug text-muted-foreground sm:min-w-0 sm:truncate">
                     {draftFrom && draftTo
                       ? formatRangeLabelWithWeekday(draftFrom, draftTo, getWeekdayName, " — ")
                       : draftFrom
                         ? t("dateRange.selectEnd")
                         : t("dateRange.selectStart")}
                   </p>
-                  <div className="flex shrink-0 gap-1.5">
+                  <div className="flex shrink-0 justify-end gap-1.5">
                     <Button type="button" variant="ghost" size="sm" onClick={handleClear}>
                       {t("dateRange.clear")}
                     </Button>
@@ -335,8 +330,4 @@ export function DateRangePicker({ from, to, onChange, onClear, className, onDark
 
 function startOfMonth(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), 1);
-}
-
-function addMonths(date: Date, count: number): Date {
-  return new Date(date.getFullYear(), date.getMonth() + count, 1);
 }

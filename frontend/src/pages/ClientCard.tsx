@@ -20,6 +20,7 @@ import { PageError } from "../components/PageError";
 import { PageHeader, PageShell } from "../components/PageHeader";
 import { ContractStatusBadge } from "../components/ContractStatusBadge";
 import { StatusBadge } from "../components/StatusBadge";
+import { StaggerContainer, StaggerItem } from "../components/Stagger";
 import { StatCard } from "../components/StatCard";
 import {
   MotionTableRow,
@@ -209,26 +210,32 @@ export function ClientCardPage() {
 
       <PageError message={error} />
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <StatCard
-          title={t("clients.totalDebt")}
-          value={formatMoney(card.total_debt)}
-          accent="red"
-        />
-        <StatCard
-          title={t("common.contracts")}
-          value={String(card.contracts.length)}
-          accent="blue"
-          icon={FileTextIcon}
-        />
-        <StatCard
-          title={t("clients.contact")}
-          value={card.contact_person || "—"}
-          subtitle={card.phone || undefined}
-          accent="green"
-          icon={UserIcon}
-        />
-      </div>
+      <StaggerContainer className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <StaggerItem>
+          <StatCard
+            title={t("clients.totalDebt")}
+            value={formatMoney(card.total_debt)}
+            accent="red"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            title={t("common.contracts")}
+            value={String(card.contracts.length)}
+            accent="blue"
+            icon={FileTextIcon}
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            title={t("clients.contact")}
+            value={card.contact_person || "—"}
+            subtitle={card.phone || undefined}
+            accent="green"
+            icon={UserIcon}
+          />
+        </StaggerItem>
+      </StaggerContainer>
 
       <Card className="content-card">
         <CardHeader className="border-b">

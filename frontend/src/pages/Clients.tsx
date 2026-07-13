@@ -235,8 +235,8 @@ export function ClientsPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <Select value={statusFilter} onValueChange={(v) => v && setStatusFilter(v)}>
-          <SelectTrigger className="w-[180px]">
+        <Select value={statusFilter} onValueChange={(v) => v && setStatusFilter(v)} className="w-full sm:w-56">
+          <SelectTrigger>
             <SelectValue placeholder={t("clients.state")} />
           </SelectTrigger>
           <SelectContent>

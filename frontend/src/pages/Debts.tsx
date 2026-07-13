@@ -20,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "../components/PremiumDataTable";
+import { StaggerContainer, StaggerItem } from "../components/Stagger";
 import { StatCard } from "../components/StatCard";
 import { useI18n } from "../context/I18nContext";
 import { useListLoading } from "../hooks/useListLoading";
@@ -61,26 +62,32 @@ export function DebtsPage() {
 
       <PageError message={error} />
 
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-        <StatCard
-          title={t("debts.totalDebt")}
-          value={formatMoney(data?.total_debt ?? 0)}
-          accent="red"
-          icon={AlertTriangleIcon}
-        />
-        <StatCard
-          title={t("debts.totalOverpaid")}
-          value={formatMoney(data?.total_overpaid ?? 0)}
-          accent="green"
-          icon={TrendingUpIcon}
-        />
-        <StatCard
-          title={t("debts.debtorCount")}
-          value={String(data?.debtor_count ?? 0)}
-          accent="amber"
-          icon={UsersIcon}
-        />
-      </div>
+      <StaggerContainer className="grid grid-cols-1 gap-5 md:grid-cols-3">
+        <StaggerItem>
+          <StatCard
+            title={t("debts.totalDebt")}
+            value={formatMoney(data?.total_debt ?? 0)}
+            accent="red"
+            icon={AlertTriangleIcon}
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            title={t("debts.totalOverpaid")}
+            value={formatMoney(data?.total_overpaid ?? 0)}
+            accent="green"
+            icon={TrendingUpIcon}
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            title={t("debts.debtorCount")}
+            value={String(data?.debtor_count ?? 0)}
+            accent="amber"
+            icon={UsersIcon}
+          />
+        </StaggerItem>
+      </StaggerContainer>
 
       <div className="filter-bar">
         <Input

@@ -236,40 +236,42 @@
   .login-globe-halo {
     background: radial-gradient(
       circle,
-      rgba(56, 189, 248, 0.18) 0%,
-      rgba(99, 102, 241, 0.1) 38%,
-      transparent 72%
+      rgba(56, 189, 248, 0.14) 0%,
+      rgba(99, 102, 241, 0.08) 32%,
+      rgba(56, 189, 248, 0.03) 55%,
+      transparent 78%
     );
-    animation: login-globe-halo-pulse 6s ease-in-out infinite;
+    animation: login-globe-halo-pulse 7s ease-in-out infinite;
   }
   .dark .login-globe-halo {
     background: radial-gradient(
       circle,
-      rgba(34, 211, 238, 0.28) 0%,
-      rgba(99, 102, 241, 0.2) 30%,
-      rgba(139, 92, 246, 0.08) 48%,
-      transparent 68%
+      rgba(34, 211, 238, 0.22) 0%,
+      rgba(99, 102, 241, 0.14) 28%,
+      rgba(139, 92, 246, 0.06) 48%,
+      transparent 74%
     );
   }
   .login-globe-shimmer {
     animation: login-globe-shimmer-drift 6s ease-in-out infinite alternate;
   }
   @keyframes login-globe-halo-pulse {
-    0%, 100% { opacity: 0.55; transform: scale(1); }
-    50% { opacity: 0.85; transform: scale(1.02); }
+    0%, 100% { opacity: 0.5; transform: scale(1); }
+    50% { opacity: 0.78; transform: scale(1.015); }
   }
   @keyframes login-globe-shimmer-drift {
-    0% { opacity: 0.85; transform: translate(0, 0); }
-    100% { opacity: 1; transform: translate(2%, 1%); }
+    0% { opacity: 0.8; transform: translate(0, 0); }
+    100% { opacity: 1; transform: translate(1.5%, 0.8%); }
   }
+  /* Soft limb glow — oq/cyan chiziq emas, yumshoq atmosfera */
   .login-globe-rim {
     background: radial-gradient(
       circle,
-      transparent 60%,
-      rgba(103, 232, 249, 0.16) 76%,
-      rgba(56, 189, 248, 0.32) 87%,
-      rgba(165, 243, 252, 0.5) 95%,
-      rgba(255, 255, 255, 0.14) 100%
+      transparent 58%,
+      rgba(56, 189, 248, 0.05) 72%,
+      rgba(103, 232, 249, 0.12) 84%,
+      rgba(165, 243, 252, 0.08) 92%,
+      transparent 100%
     );
   }
   /* Orbital ring — sof CSS conic-gradient + mask, faqat transform:rotate
@@ -296,6 +298,12 @@
     animation-name: login-globe-orbit-spin-reverse;
     animation-duration: 24s;
     opacity: 0.4;
+  }
+  .login-globe-orbit--slow {
+    animation-duration: 36s;
+    opacity: 0.35;
+    -webkit-mask: radial-gradient(circle, transparent calc(50% - 1px), #000 calc(50% - 0.5px), #000 50%, transparent calc(50% + 0.5px));
+    mask: radial-gradient(circle, transparent calc(50% - 1px), #000 calc(50% - 0.5px), #000 50%, transparent calc(50% + 0.5px));
   }
   @keyframes login-globe-orbit-spin {
     from { transform: rotate(0deg); }
@@ -424,7 +432,8 @@
     .login-aurora-glow,
     .login-particle,
     .login-comet,
-    .login-globe-orbit {
+    .login-globe-orbit,
+    .login-globe-orbit--slow {
       animation: none;
       opacity: 0;
     }
@@ -436,12 +445,14 @@
     .login-globe-halo,
     .login-globe-shimmer,
     .login-comet,
-    .login-globe-orbit {
+    .login-globe-orbit,
+    .login-globe-orbit--slow {
       animation: none !important;
     }
     .login-aurora-glow,
     .login-particle,
-    .login-globe-orbit {
+    .login-globe-orbit,
+    .login-globe-orbit--slow {
       display: none;
     }
     .login-intro-stars {

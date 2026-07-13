@@ -22,6 +22,7 @@ import { Modal } from "../components/Modal";
 import { PageError } from "../components/PageError";
 import { PageHeader, PageShell } from "../components/PageHeader";
 import { Pagination } from "../components/Pagination";
+import { StaggerContainer, StaggerItem } from "../components/Stagger";
 import { StatCard } from "../components/StatCard";
 import {
   MotionTableRow,
@@ -294,26 +295,32 @@ export function FinancePage() {
 
       <PageError message={error} />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard
-          title={t("finance.totalIncome")}
-          value={formatMoney(totalIncome)}
-          accent="green"
-          icon={ArrowUpCircleIcon}
-        />
-        <StatCard
-          title={t("finance.totalExpense")}
-          value={formatMoney(totalExpense)}
-          accent="red"
-          icon={ArrowDownCircleIcon}
-        />
-        <StatCard
-          title={t("finance.netBalance")}
-          value={formatMoney(netBalance)}
-          accent={Number(netBalance) >= 0 ? "blue" : "amber"}
-          icon={ScaleIcon}
-        />
-      </div>
+      <StaggerContainer className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StaggerItem>
+          <StatCard
+            title={t("finance.totalIncome")}
+            value={formatMoney(totalIncome)}
+            accent="green"
+            icon={ArrowUpCircleIcon}
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            title={t("finance.totalExpense")}
+            value={formatMoney(totalExpense)}
+            accent="red"
+            icon={ArrowDownCircleIcon}
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            title={t("finance.netBalance")}
+            value={formatMoney(netBalance)}
+            accent={Number(netBalance) >= 0 ? "blue" : "amber"}
+            icon={ScaleIcon}
+          />
+        </StaggerItem>
+      </StaggerContainer>
 
       <div className="filter-bar">
         <Input
@@ -325,8 +332,9 @@ export function FinancePage() {
         <Select
           value={entryType}
           onValueChange={(value) => value && setEntryType(value as FinanceEntryType | "all")}
+          className="w-full sm:w-56"
         >
-          <SelectTrigger className="w-full sm:w-48">
+          <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

@@ -8,6 +8,7 @@ import { Modal } from "../components/Modal";
 import { PageError } from "../components/PageError";
 import { PageHeader, PageShell } from "../components/PageHeader";
 import { Pagination } from "../components/Pagination";
+import { StaggerContainer, StaggerItem } from "../components/Stagger";
 import { StatCard } from "../components/StatCard";
 import {
   MotionTableRow,
@@ -208,14 +209,16 @@ export function ExpensesPage() {
 
       <PageError message={error} />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <StatCard
-          title={t("expenses.total")}
-          value={formatMoney(totalAmount)}
-          accent="red"
-          icon={WalletIcon}
-        />
-      </div>
+      <StaggerContainer className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <StaggerItem>
+          <StatCard
+            title={t("expenses.total")}
+            value={formatMoney(totalAmount)}
+            accent="red"
+            icon={WalletIcon}
+          />
+        </StaggerItem>
+      </StaggerContainer>
 
       <div className="filter-bar">
         <Input
@@ -227,8 +230,9 @@ export function ExpensesPage() {
         <Select
           value={category}
           onValueChange={(value) => value && setCategory(value as ExpenseCategory | "all")}
+          className="w-full sm:w-56"
         >
-          <SelectTrigger className="w-full sm:w-56">
+          <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

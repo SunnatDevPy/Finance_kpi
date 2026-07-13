@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { BarChart3Icon, MoreHorizontalIcon, Trash2Icon } from "lucide-react";
 import {
   ActivateIconBtn,
@@ -41,7 +42,9 @@ export const ServiceTypeCard = memo(function ServiceTypeCard({
   onDelete,
 }: ServiceTypeCardProps) {
   return (
-    <article
+    <motion.article
+      whileHover={{ y: -3 }}
+      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
       className={cn(
         "group relative overflow-hidden rounded-2xl border bg-card shadow-sm transition-[border-color,box-shadow] duration-200 hover:border-primary/25 hover:shadow-md",
         item.is_active ? "border-border/80" : "border-rose-200/70 dark:border-rose-500/35",
@@ -112,17 +115,23 @@ export const ServiceTypeCard = memo(function ServiceTypeCard({
         >
           <MoreHorizontalIcon className="size-4" />
         </MotionButton>
-        {menuOpen && (
-          <div
-            role="menu"
-            className="absolute right-0 z-30 mt-1 min-w-[10.5rem] rounded-lg border border-border bg-popover p-1 shadow-lg"
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => e.stopPropagation()}
-          >
+        <AnimatePresence>
+          {menuOpen && (
+            <motion.div
+              key="service-menu"
+              role="menu"
+              initial={{ opacity: 0, y: -4, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -4, scale: 0.98 }}
+              transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+              className="absolute right-0 top-full z-30 mt-1.5 min-w-[10.5rem] overflow-hidden rounded-xl border border-border/70 bg-popover/95 p-1 shadow-xl ring-1 ring-foreground/5 backdrop-blur-xl"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+            >
             <button
               type="button"
               role="menuitem"
-              className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm hover:bg-muted"
+              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm transition-colors hover:bg-muted/70"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -144,7 +153,7 @@ export const ServiceTypeCard = memo(function ServiceTypeCard({
             <button
               type="button"
               role="menuitem"
-              className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-40"
+              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-40"
               disabled={item.usage_count > 0}
               onClick={(e) => {
                 e.preventDefault();
@@ -155,9 +164,10 @@ export const ServiceTypeCard = memo(function ServiceTypeCard({
               <Trash2Icon className="size-3.5" />
               {labels.delete}
             </button>
-          </div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
-    </article>
+    </motion.article>
   );
 });

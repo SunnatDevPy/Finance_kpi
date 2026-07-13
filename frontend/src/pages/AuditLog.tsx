@@ -100,8 +100,9 @@ export function AuditLogPage() {
         <Select
           value={entityType}
           onValueChange={(value) => value && setEntityType(value as AuditEntityType | "all")}
+          className="w-full sm:w-56"
         >
-          <SelectTrigger className="w-full sm:w-56">
+          <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

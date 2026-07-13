@@ -87,6 +87,32 @@ export function formatRangeLabel(
   return fmt.format(parseISODate(to));
 }
 
+/** JS `getMonth()` indeksi → i18n kaliti (0 = yanvar). */
+export const MONTH_KEYS = [
+  "jan",
+  "feb",
+  "mar",
+  "apr",
+  "may",
+  "jun",
+  "jul",
+  "aug",
+  "sep",
+  "oct",
+  "nov",
+  "dec",
+] as const;
+
+export type MonthKey = (typeof MONTH_KEYS)[number];
+
+/** Kalendar sarlavhasi: "2026 Iyul" / "2026 Июль" (Intl `uz-UZ` ba'zi brauzerlarda "M07" qaytaradi). */
+export function formatMonthYear(
+  date: Date,
+  getMonthName: (key: MonthKey) => string,
+): string {
+  return `${date.getFullYear()} ${getMonthName(MONTH_KEYS[date.getMonth()])}`;
+}
+
 /** JS `getDay()` indeksi → i18n kaliti (0 = yakshanba). */
 const JS_DAY_TO_WEEKDAY_KEY = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
 

@@ -6,7 +6,9 @@ import { PageError } from "../components/PageError";
 import { PageHeader, PageShell } from "../components/PageHeader";
 import { RoleBadge } from "../components/UserBadges";
 import {
+  MotionTableRow,
   PremiumDataTable,
+  rowEnter,
   TableBody,
   TableCellDate,
   TableCellMuted,
@@ -15,6 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from "../components/PremiumDataTable";
+import { StaggerContainer, StaggerItem } from "../components/Stagger";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
 import { usePreferences } from "../context/PreferencesContext";
@@ -162,6 +165,8 @@ export function ProfilePage() {
     <PageShell className="max-w-2xl">
       <PageHeader title={t("profile.title")} subtitle={t("profile.subtitle")} />
 
+      <StaggerContainer className="flex flex-col gap-8">
+      <StaggerItem>
       <Card className="content-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -188,7 +193,9 @@ export function ProfilePage() {
           </dl>
         </CardContent>
       </Card>
+      </StaggerItem>
 
+      <StaggerItem>
       <Card className="content-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -223,8 +230,10 @@ export function ProfilePage() {
           </form>
         </CardContent>
       </Card>
+      </StaggerItem>
 
       {isAdmin && (
+        <StaggerItem>
         <Card className="content-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -265,9 +274,11 @@ export function ProfilePage() {
             </form>
           </CardContent>
         </Card>
+        </StaggerItem>
       )}
 
       {isAdmin && (
+        <StaggerItem>
         <Card className="content-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -368,9 +379,11 @@ export function ProfilePage() {
             </form>
           </CardContent>
         </Card>
+        </StaggerItem>
       )}
 
       {isAdmin && (
+        <StaggerItem>
         <Card className="content-card">
           <CardHeader className="border-b">
             <CardTitle className="flex items-center gap-2">
@@ -395,8 +408,8 @@ export function ProfilePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {loginHistory.map((entry) => (
-                  <TableRow key={entry.id}>
+                {loginHistory.map((entry, index) => (
+                  <MotionTableRow key={entry.id} {...rowEnter(index)}>
                     <TableCellPrimary>{entry.full_name}</TableCellPrimary>
                     <TableCellMuted>{entry.username}</TableCellMuted>
                     <TableCellMuted>{entry.ip_address ?? "—"}</TableCellMuted>
@@ -407,14 +420,16 @@ export function ProfilePage() {
                         minute: "2-digit",
                       })}
                     </TableCellDate>
-                  </TableRow>
+                  </MotionTableRow>
                 ))}
               </TableBody>
             </PremiumDataTable>
           </CardContent>
         </Card>
+        </StaggerItem>
       )}
 
+      <StaggerItem>
       <Card className="content-card">
         <CardHeader>
           <CardTitle>{t("profile.changePassword")}</CardTitle>
@@ -468,6 +483,8 @@ export function ProfilePage() {
           </form>
         </CardContent>
       </Card>
+      </StaggerItem>
+      </StaggerContainer>
     </PageShell>
   );
 }

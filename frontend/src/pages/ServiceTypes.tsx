@@ -18,6 +18,7 @@ import { PageError } from "../components/PageError";
 import { PageHeader, PageShell } from "../components/PageHeader";
 import { ServiceTypeCard } from "../components/ServiceTypeCard";
 import { ServiceTypeDetailModal } from "../components/ServiceTypeDetailModal";
+import { StaggerContainer, StaggerItem } from "../components/Stagger";
 import { StatCard } from "../components/StatCard";
 import { useListLoading } from "../hooks/useListLoading";
 import { useSubmitGuard } from "../hooks/useSubmitGuard";
@@ -184,32 +185,40 @@ export function ServiceTypesPage() {
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          title={t("services.summaryTotal")}
-          value={String(summary.total)}
-          accent="blue"
-          icon={LayersIcon}
-        />
-        <StatCard
-          title={t("services.summaryActive")}
-          value={String(summary.active)}
-          accent="green"
-          icon={CheckCircle2Icon}
-        />
-        <StatCard
-          title={t("services.summaryInactive")}
-          value={String(summary.inactive)}
-          accent="amber"
-          icon={XCircleIcon}
-        />
-        <StatCard
-          title={t("services.totalRevenue")}
-          value={formatCompactMoney(summary.totalRevenue)}
-          accent="violet"
-          icon={BarChart3Icon}
-        />
-      </div>
+      <StaggerContainer className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StaggerItem>
+          <StatCard
+            title={t("services.summaryTotal")}
+            value={String(summary.total)}
+            accent="blue"
+            icon={LayersIcon}
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            title={t("services.summaryActive")}
+            value={String(summary.active)}
+            accent="green"
+            icon={CheckCircle2Icon}
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            title={t("services.summaryInactive")}
+            value={String(summary.inactive)}
+            accent="amber"
+            icon={XCircleIcon}
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            title={t("services.totalRevenue")}
+            value={formatCompactMoney(summary.totalRevenue)}
+            accent="violet"
+            icon={BarChart3Icon}
+          />
+        </StaggerItem>
+      </StaggerContainer>
 
       <Card className="content-card">
         <CardHeader className="border-b">
@@ -221,21 +230,22 @@ export function ServiceTypesPage() {
           ) : filteredItems.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t("services.notFound")}</p>
           ) : (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <StaggerContainer className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {filteredItems.map((item) => (
-                <ServiceTypeCard
-                  key={item.id}
-                  item={item}
-                  menuOpen={menuOpenId === item.id}
-                  menuRef={menuOpenId === item.id ? menuRef : undefined}
-                  labels={cardLabels}
-                  onOpen={openDetail}
-                  onToggleMenu={handleToggleMenu}
-                  onToggleActive={toggleActive}
-                  onDelete={handleRequestDelete}
-                />
+                <StaggerItem key={item.id}>
+                  <ServiceTypeCard
+                    item={item}
+                    menuOpen={menuOpenId === item.id}
+                    menuRef={menuOpenId === item.id ? menuRef : undefined}
+                    labels={cardLabels}
+                    onOpen={openDetail}
+                    onToggleMenu={handleToggleMenu}
+                    onToggleActive={toggleActive}
+                    onDelete={handleRequestDelete}
+                  />
+                </StaggerItem>
               ))}
-            </div>
+            </StaggerContainer>
           )}
         </CardContent>
       </Card>

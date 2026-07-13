@@ -316,9 +316,8 @@ export function LoginPage() {
         }
         transition={{ duration: TRANSITION_S, ease: EASE }}
       >
-        <div className="pointer-events-none absolute -inset-[22%] rounded-full bg-indigo-500/14 blur-3xl dark:bg-indigo-500/28" />
-        <div className="pointer-events-none absolute -inset-[14%] rounded-full bg-cyan-400/10 blur-2xl dark:bg-cyan-400/22" />
-        <div className="pointer-events-none absolute -inset-[6%] rounded-full bg-violet-500/6 blur-xl dark:bg-violet-500/12" />
+        <div className="pointer-events-none absolute -inset-[48%] rounded-full bg-indigo-500/[0.07] blur-[80px] dark:bg-indigo-500/16" />
+        <div className="pointer-events-none absolute -inset-[34%] rounded-full bg-cyan-400/[0.06] blur-[64px] dark:bg-cyan-400/14" />
         <LoginGlobe className="relative z-10" size={layout.diameter} />
       </motion.div>
 

@@ -36,7 +36,7 @@ function buildParticles(count: number): Particle[] {
  */
 export function LoginAtmosphere({ revealed, lite = false }: LoginAtmosphereProps) {
   const reduceMotion = useReducedMotion();
-  const particles = useMemo(() => buildParticles(lite ? 0 : 10), [lite]);
+  const particles = useMemo(() => buildParticles(lite ? 0 : 18), [lite]);
   const animate = !reduceMotion && !lite;
 
   return (

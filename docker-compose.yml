@@ -18,7 +18,7 @@ services:
   api:
     build: ./backend
     ports:
-      - "8400:8000"
+      - "8002:8000"
     environment:
       DATABASE_URL: postgresql://finance:finance@db:5432/finance_db
       JWT_SECRET: dev-secret-change-in-production

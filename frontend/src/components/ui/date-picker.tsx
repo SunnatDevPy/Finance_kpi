@@ -1,11 +1,18 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { CalendarIcon } from "lucide-react";
 import { useI18n } from "@/context/I18nContext";
+import { CalendarBodySwitch, CalendarMonthNav, type CalendarNavMode } from "@/components/CalendarMonthNav";
 import { cn } from "@/lib/utils";
 import { floatedLabel, labelPeer } from "@/components/ui/floating-label-input";
-import { getMonthGrid, isSameDay, parseISODate, toISODate } from "@/lib/dateRange";
+import {
+  getMonthGrid,
+  isSameDay,
+  parseISODate,
+  toISODate,
+  type MonthKey,
+} from "@/lib/dateRange";
 
 const WEEKDAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 
@@ -23,10 +30,6 @@ interface FloatingLabelDatePickerProps {
 
 function startOfMonth(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), 1);
-}
-
-function addMonths(date: Date, count: number): Date {
-  return new Date(date.getFullYear(), date.getMonth() + count, 1);
 }
 
 export function FloatingLabelDatePicker({
@@ -48,9 +51,10 @@ export function FloatingLabelDatePicker({
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState<{ top: number; left: number; width: number } | null>(null);
   const [viewMonth, setViewMonth] = useState(() => startOfMonth(value ? parseISODate(value) : new Date()));
+  const [navMode, setNavMode] = useState<CalendarNavMode>("days");
 
   const dateLocale = locale === "ru" ? "ru-RU" : "uz-UZ";
-  const monthLabel = new Intl.DateTimeFormat(dateLocale, { month: "long", year: "numeric" }).format(viewMonth);
+  const getMonthName = (key: MonthKey) => t(`dateRange.months.${key}`);
   const displayDate = value
     ? new Intl.DateTimeFormat(dateLocale, { day: "2-digit", month: "2-digit", year: "numeric" }).format(
         parseISODate(value),
@@ -65,6 +69,7 @@ export function FloatingLabelDatePicker({
   useEffect(() => {
     if (open) {
       setViewMonth(startOfMonth(value ? parseISODate(value) : new Date()));
+      setNavMode("days");
     }
   }, [open, value]);
 
@@ -168,26 +173,20 @@ export function FloatingLabelDatePicker({
               role="dialog"
               aria-label={label}
             >
-              <div className="mb-3 flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => setViewMonth((m) => addMonths(m, -1))}
-                  className="flex size-8 items-center justify-center rounded-lg border border-border/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                  aria-label={t("dateRange.prevMonth")}
-                >
-                  <ChevronLeftIcon className="size-4" />
-                </button>
-                <p className="text-sm font-semibold capitalize text-foreground">{monthLabel}</p>
-                <button
-                  type="button"
-                  onClick={() => setViewMonth((m) => addMonths(m, 1))}
-                  className="flex size-8 items-center justify-center rounded-lg border border-border/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                  aria-label={t("dateRange.nextMonth")}
-                >
-                  <ChevronRightIcon className="size-4" />
-                </button>
-              </div>
+              <CalendarMonthNav
+                viewMonth={viewMonth}
+                onViewMonthChange={setViewMonth}
+                mode={navMode}
+                onModeChange={setNavMode}
+                getMonthName={getMonthName}
+                prevMonthLabel={t("dateRange.prevMonth")}
+                nextMonthLabel={t("dateRange.nextMonth")}
+                prevYearLabel={t("dateRange.prevYear")}
+                nextYearLabel={t("dateRange.nextYear")}
+                pickMonthYearLabel={t("dateRange.pickMonthYear")}
+              />
 
+              <CalendarBodySwitch mode={navMode}>
               <div className="grid grid-cols-7 gap-0.5 text-center">
                 {WEEKDAY_KEYS.map((key) => (
                   <div key={key} className="py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -221,6 +220,7 @@ export function FloatingLabelDatePicker({
                   );
                 })}
               </div>
+              </CalendarBodySwitch>
 
               <div className="mt-3 flex items-center justify-between border-t border-border/50 pt-3">
                 <button
