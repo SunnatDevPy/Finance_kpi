@@ -1,12 +1,8 @@
 import { memo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { BarChart3Icon, MoreHorizontalIcon, Trash2Icon } from "lucide-react";
-import {
-  ActivateIconBtn,
-  DeactivateIconBtn,
-} from "./ButtonIcons";
 import { CompanyAvatar } from "./CompanyAvatar";
-import { ActiveStatusBadge } from "./UserBadges";
+import { ActiveStatusToggle } from "./ActiveStatusToggle";
 import type { ServiceType } from "../types";
 import { formatCompactMoney } from "../utils/format";
 import { MotionButton, motionTap } from "@/components/ui/button";
@@ -21,13 +17,11 @@ interface ServiceTypeCardProps {
     revenueShort: string;
     viewStats: string;
     timesUsed: (count: number) => string;
-    deactivate: string;
-    activate: string;
     delete: string;
   };
   onOpen: (item: ServiceType) => void;
   onToggleMenu: (id: number) => void;
-  onToggleActive: (item: ServiceType) => void;
+  onSetActive: (item: ServiceType, active: boolean) => void;
   onDelete: (id: number) => void;
 }
 
@@ -38,7 +32,7 @@ export const ServiceTypeCard = memo(function ServiceTypeCard({
   labels,
   onOpen,
   onToggleMenu,
-  onToggleActive,
+  onSetActive,
   onDelete,
 }: ServiceTypeCardProps) {
   return (
@@ -68,7 +62,10 @@ export const ServiceTypeCard = memo(function ServiceTypeCard({
             <div className="min-w-0">
               <p className="truncate text-base font-semibold tracking-tight text-foreground">{item.name}</p>
               <div className="mt-1.5">
-                <ActiveStatusBadge active={item.is_active} />
+                <ActiveStatusToggle
+                  active={item.is_active}
+                  onActiveChange={(active) => onSetActive(item, active)}
+                />
               </div>
             </div>
           </div>
@@ -128,42 +125,20 @@ export const ServiceTypeCard = memo(function ServiceTypeCard({
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => e.stopPropagation()}
             >
-            <button
-              type="button"
-              role="menuitem"
-              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm transition-colors hover:bg-muted/70"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onToggleActive(item);
-              }}
-            >
-              {item.is_active ? (
-                <>
-                  <DeactivateIconBtn />
-                  {labels.deactivate}
-                </>
-              ) : (
-                <>
-                  <ActivateIconBtn />
-                  {labels.activate}
-                </>
-              )}
-            </button>
-            <button
-              type="button"
-              role="menuitem"
-              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-40"
-              disabled={item.usage_count > 0}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onDelete(item.id);
-              }}
-            >
-              <Trash2Icon className="size-3.5" />
-              {labels.delete}
-            </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-40"
+                disabled={item.usage_count > 0}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onDelete(item.id);
+                }}
+              >
+                <Trash2Icon className="size-3.5" />
+                {labels.delete}
+              </button>
             </motion.div>
           )}
         </AnimatePresence>

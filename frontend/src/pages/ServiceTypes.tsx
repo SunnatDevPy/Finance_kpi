@@ -18,6 +18,7 @@ import { PageError } from "../components/PageError";
 import { PageHeader, PageShell } from "../components/PageHeader";
 import { ServiceTypeCard } from "../components/ServiceTypeCard";
 import { ServiceTypeDetailModal } from "../components/ServiceTypeDetailModal";
+import { ActiveStatusToggle } from "../components/ActiveStatusToggle";
 import { StaggerContainer, StaggerItem } from "../components/Stagger";
 import { StatCard } from "../components/StatCard";
 import { useListLoading } from "../hooks/useListLoading";
@@ -45,6 +46,7 @@ export function ServiceTypesPage() {
   const [items, setItems] = useState<ServiceType[]>([]);
   const [search, setSearch] = useState("");
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createActive, setCreateActive] = useState(true);
   const [detailItem, setDetailItem] = useState<ServiceType | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [name, setName] = useState("");
@@ -83,8 +85,6 @@ export function ServiceTypesPage() {
       revenueShort: t("services.revenueShort"),
       viewStats: t("services.viewStats"),
       timesUsed: (count: number) => t("services.timesUsed").replace("{count}", String(count)),
-      deactivate: t("services.deactivate"),
-      activate: t("services.activate"),
       delete: t("common.delete"),
     }),
     [t],
@@ -106,17 +106,18 @@ export function ServiceTypesPage() {
     e.preventDefault();
     setError("");
     try {
-      const created = await api.serviceTypes.create({ name });
+      const created = await api.serviceTypes.create({ name, is_active: createActive });
       setItems((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
       setName("");
+      setCreateActive(true);
       setCreateModalOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("common.error"));
     }
   });
 
-  const toggleActive = useCallback(async (item: ServiceType) => {
-    const nextActive = !item.is_active;
+  const setServiceTypeActive = useCallback(async (item: ServiceType, nextActive: boolean) => {
+    if (item.is_active === nextActive) return;
     const snapshot = items;
     setError("");
     setMenuOpenId(null);
@@ -240,7 +241,7 @@ export function ServiceTypesPage() {
                     labels={cardLabels}
                     onOpen={openDetail}
                     onToggleMenu={handleToggleMenu}
-                    onToggleActive={toggleActive}
+                    onSetActive={setServiceTypeActive}
                     onDelete={handleRequestDelete}
                   />
                 </StaggerItem>
@@ -254,7 +255,7 @@ export function ServiceTypesPage() {
         item={detailItem}
         open={detailItem !== null}
         onClose={() => setDetailItem(null)}
-        onToggleActive={toggleActive}
+        onSetActive={setServiceTypeActive}
         onDelete={(id) => {
           setDeleteId(id);
         }}
@@ -268,6 +269,12 @@ export function ServiceTypesPage() {
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
+          />
+          <ActiveStatusToggle
+            layout="field"
+            label={t("clients.state")}
+            active={createActive}
+            onActiveChange={setCreateActive}
           />
           <div className="flex justify-end gap-2">
             <MotionButton type="button" variant="outline" onClick={() => setCreateModalOpen(false)} {...motionTap}>

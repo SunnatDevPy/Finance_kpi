@@ -10,14 +10,10 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { api } from "../api/client";
-import {
-  ActivateIconBtn,
-  DeactivateIconBtn,
-  DeleteIconBtn,
-} from "../components/ButtonIcons";
+import { DeleteIconBtn } from "../components/ButtonIcons";
 import { CompanyAvatar } from "../components/CompanyAvatar";
 import { Modal } from "../components/Modal";
-import { ActiveStatusBadge } from "../components/UserBadges";
+import { ActiveStatusToggle } from "../components/ActiveStatusToggle";
 import {
   PremiumDataTable,
   TableBody,
@@ -37,7 +33,7 @@ interface ServiceTypeDetailModalProps {
   item: ServiceType | null;
   open: boolean;
   onClose: () => void;
-  onToggleActive: (item: ServiceType) => void;
+  onSetActive: (item: ServiceType, active: boolean) => void;
   onDelete: (id: number) => void;
 }
 
@@ -76,7 +72,7 @@ export function ServiceTypeDetailModal({
   item,
   open,
   onClose,
-  onToggleActive,
+  onSetActive,
   onDelete,
 }: ServiceTypeDetailModalProps) {
   const { t } = useI18n();
@@ -137,7 +133,10 @@ export function ServiceTypeDetailModal({
             <div>
               <h3 className="text-lg font-semibold tracking-tight text-foreground">{item.name}</h3>
               <div className="mt-1.5">
-                <ActiveStatusBadge active={item.is_active} />
+                <ActiveStatusToggle
+                  active={item.is_active}
+                  onActiveChange={(active) => onSetActive(item, active)}
+                />
               </div>
             </div>
           </div>
@@ -241,19 +240,6 @@ export function ServiceTypeDetailModal({
         <div className="flex flex-wrap justify-end gap-2 border-t border-border/60 pt-4">
           <Button type="button" variant="outline" onClick={onClose}>
             {t("common.close")}
-          </Button>
-          <Button type="button" variant="outline" onClick={() => onToggleActive(item)}>
-            {item.is_active ? (
-              <>
-                <DeactivateIconBtn />
-                {t("services.deactivate")}
-              </>
-            ) : (
-              <>
-                <ActivateIconBtn />
-                {t("services.activate")}
-              </>
-            )}
           </Button>
           <Button
             type="button"

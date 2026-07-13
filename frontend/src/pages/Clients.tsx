@@ -44,7 +44,6 @@ import { MotionButton, motionTap } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FloatingLabelInput, FloatingLabelTextarea } from "@/components/ui/floating-label-input";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -58,7 +57,7 @@ import type { Client, ClientFormData, ClientImportResult } from "../types";
 import { useI18n } from "../context/I18nContext";
 import { emptyClientForm } from "../utils/format";
 import { PageHeader, PageShell } from "../components/PageHeader";
-import { StatusBadge } from "../components/StatusBadge";
+import { ActiveStatusToggle } from "../components/ActiveStatusToggle";
 import { useListLoading } from "../hooks/useListLoading";
 import { useSubmitGuard } from "../hooks/useSubmitGuard";
 
@@ -161,6 +160,22 @@ export function ClientsPage() {
       setError(err instanceof Error ? err.message : t("common.error"));
     }
   });
+
+  const updateClientStatus = async (client: Client, active: boolean) => {
+    const nextStatus = active ? "faol" : "nofaol";
+    if (client.status === nextStatus) return;
+    const snapshot = clients;
+    setError("");
+    setClients((prev) =>
+      prev.map((row) => (row.id === client.id ? { ...row, status: nextStatus } : row)),
+    );
+    try {
+      await api.clients.update(client.id, { status: nextStatus });
+    } catch (err) {
+      setClients(snapshot);
+      setError(err instanceof Error ? err.message : t("common.error"));
+    }
+  };
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -300,7 +315,10 @@ export function ClientsPage() {
                   <TableCellMuted>{client.phone}</TableCellMuted>
                   <TableCellMuted>{client.city}</TableCellMuted>
                   <TableCell>
-                    <StatusBadge status={client.status} />
+                    <ActiveStatusToggle
+                      active={client.status === "faol"}
+                      onActiveChange={(active) => void updateClientStatus(client, active)}
+                    />
                   </TableCell>
                   <TableCellActions>
                     <MotionButton variant="ghost" size="sm" onClick={() => openEdit(client)} {...motionTap}>
@@ -390,25 +408,14 @@ export function ClientsPage() {
             value={form.activity_type}
             onChange={(e) => setForm({ ...form, activity_type: e.target.value })}
           />
-          <div className="flex flex-col gap-2">
-            <Label>{t("clients.state")}</Label>
-            <Select
-              value={form.status}
-              onValueChange={(value) =>
-                setForm({ ...form, status: value as "faol" | "nofaol" })
-              }
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value="faol">Faol</SelectItem>
-                  <SelectItem value="nofaol">Nofaol</SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
+          <ActiveStatusToggle
+            layout="field"
+            label={t("clients.state")}
+            active={form.status === "faol"}
+            onActiveChange={(active) =>
+              setForm({ ...form, status: active ? "faol" : "nofaol" })
+            }
+          />
           <FloatingLabelTextarea
             id="notes"
             label={t("clients.notes")}

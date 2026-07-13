@@ -1,25 +1,23 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { BanIcon, PlusIcon, UsersIcon } from "lucide-react";
+import { PlusIcon, UsersIcon } from "lucide-react";
 import { api } from "../api/client";
 import {
-  BlockIconBtn,
   CancelIcon,
   CreateUserIconBtn,
   LoadingIconBtn,
-  UnblockIconBtn,
 } from "../components/ButtonIcons";
 import { CompanyAvatar } from "../components/CompanyAvatar";
 import { Modal } from "../components/Modal";
 import { PageError } from "../components/PageError";
 import { PageHeader, PageShell } from "../components/PageHeader";
-import { ActiveStatusBadge, RoleBadge } from "../components/UserBadges";
+import { ActiveStatusToggle } from "../components/ActiveStatusToggle";
+import { RoleBadge } from "../components/UserBadges";
 import {
   MotionTableRow,
   PremiumDataTable,
   rowEnter,
   TableBody,
   TableCell,
-  TableCellActions,
   TableHead,
   TableHeader,
   TableRow,
@@ -41,7 +39,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { User, UserRole } from "../types";
-import { cn } from "@/lib/utils";
 
 export function EmployeesPage() {
   const { user: currentUser, isAdmin } = useAuth();
@@ -95,13 +92,13 @@ export function EmployeesPage() {
     }
   });
 
-  const toggleActive = async (target: User) => {
-    if (currentUser && target.id === currentUser.id && target.is_active) {
+  const setUserActive = async (target: User, nextActive: boolean) => {
+    if (target.is_active === nextActive) return;
+    if (currentUser && target.id === currentUser.id && !nextActive) {
       setError(t("employees.cannotBlockSelf"));
       return;
     }
     const snapshot = users;
-    const nextActive = !target.is_active;
     setError("");
     setUsers((prev) =>
       prev.map((row) => (row.id === target.id ? { ...row, is_active: nextActive } : row)),
@@ -153,7 +150,7 @@ export function EmployeesPage() {
             loading={loading}
             empty={!loading && filteredUsers.length === 0}
             emptyMessage={t("common.noData")}
-            skeletonCols={5}
+            skeletonCols={4}
           >
             <TableHeader>
               <TableRow>
@@ -161,7 +158,6 @@ export function EmployeesPage() {
                 <TableHead>{t("auth.login")}</TableHead>
                 <TableHead>{t("employees.role")}</TableHead>
                 <TableHead>{t("clients.state")}</TableHead>
-                <TableHead className="text-right">{t("common.actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -185,43 +181,12 @@ export function EmployeesPage() {
                       <RoleBadge role={user.role} />
                     </TableCell>
                     <TableCell>
-                      <ActiveStatusBadge active={user.is_active} />
+                      <ActiveStatusToggle
+                        active={user.is_active}
+                        disabled={isSelf}
+                        onActiveChange={(active) => void setUserActive(user, active)}
+                      />
                     </TableCell>
-                    <TableCellActions>
-                      {isSelf ? (
-                        <span
-                          className="inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground/50"
-                          title={t("employees.selfNoBlock")}
-                          aria-label={t("employees.selfNoBlock")}
-                        >
-                          <BanIcon className="size-4" aria-hidden />
-                        </span>
-                      ) : (
-                        <MotionButton
-                          variant={user.is_active ? "outline" : "secondary"}
-                          size="sm"
-                          className={cn(
-                            "rounded-lg",
-                            user.is_active &&
-                              "border-amber-300/60 text-amber-800 hover:bg-amber-500/10 dark:border-amber-500/40 dark:text-amber-200",
-                          )}
-                          onClick={() => toggleActive(user)}
-                          {...motionTap}
-                        >
-                          {user.is_active ? (
-                            <>
-                              <BlockIconBtn />
-                              {t("employees.block")}
-                            </>
-                          ) : (
-                            <>
-                              <UnblockIconBtn />
-                              {t("employees.unblock")}
-                            </>
-                          )}
-                        </MotionButton>
-                      )}
-                    </TableCellActions>
                   </MotionTableRow>
                 );
               })}

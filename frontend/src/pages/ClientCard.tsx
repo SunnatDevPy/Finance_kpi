@@ -19,7 +19,7 @@ import { Modal } from "../components/Modal";
 import { PageError } from "../components/PageError";
 import { PageHeader, PageShell } from "../components/PageHeader";
 import { ContractStatusBadge } from "../components/ContractStatusBadge";
-import { StatusBadge } from "../components/StatusBadge";
+import { ActiveStatusToggle } from "../components/ActiveStatusToggle";
 import { StaggerContainer, StaggerItem } from "../components/Stagger";
 import { StatCard } from "../components/StatCard";
 import {
@@ -104,6 +104,21 @@ export function ClientCardPage() {
   };
 
   useEffect(load, [id]);
+
+  const toggleClientStatus = async (active: boolean) => {
+    if (!card) return;
+    const nextStatus = active ? "faol" : "nofaol";
+    if (card.status === nextStatus) return;
+    const snapshot = card;
+    setError("");
+    setCard((prev) => (prev ? { ...prev, status: nextStatus } : prev));
+    try {
+      await api.clients.update(card.id, { status: nextStatus });
+    } catch (err) {
+      setCard(snapshot);
+      setError(err instanceof Error ? err.message : t("common.error"));
+    }
+  };
 
   const handlePayment = guardPayment(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -205,7 +220,12 @@ export function ClientCardPage() {
       <PageHeader
         title={card.company_name}
         subtitle={t("clients.card")}
-        badge={<StatusBadge status={card.status} />}
+        badge={
+          <ActiveStatusToggle
+            active={card.status === "faol"}
+            onActiveChange={(active) => void toggleClientStatus(active)}
+          />
+        }
       />
 
       <PageError message={error} />
