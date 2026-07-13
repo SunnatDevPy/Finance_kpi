@@ -680,8 +680,9 @@ export function ContractsPage() {
                 className="overflow-hidden"
               >
               <div className="pt-2 pb-1">
-              <div className="flex flex-col gap-2 rounded-xl border border-border/50 bg-background/90 p-3 shadow-sm sm:flex-row sm:items-end">
+              <div className="grid grid-cols-1 gap-2 rounded-xl border border-border/50 bg-background/90 p-3 shadow-sm sm:grid-cols-[minmax(0,1fr)_minmax(12.5rem,14rem)_auto] sm:items-end sm:gap-3">
                 <Select
+                  className="min-w-0"
                   value={String(item.service_type_id)}
                   onValueChange={(value) => {
                     if (!value) return;
@@ -690,7 +691,7 @@ export function ContractsPage() {
                     setForm({ ...form, line_items: items });
                   }}
                 >
-                  <SelectTrigger className="h-12 w-full sm:w-44 sm:shrink-0">
+                  <SelectTrigger className="h-12 w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -703,31 +704,32 @@ export function ContractsPage() {
                     </SelectGroup>
                   </SelectContent>
                 </Select>
-                <div className="flex flex-1 items-end gap-2">
-                  <FloatingLabelMoneyInput
-                    containerClassName="w-full flex-1"
-                    label={t("common.price")}
-                    required
-                    value={item.price}
-                    onValueChange={(digits) => {
-                      const items = [...form.line_items];
-                      items[index].price = digits;
-                      setForm({ ...form, line_items: items });
-                    }}
-                  />
-                  {form.line_items.length > 1 && (
-                    <MotionButton
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      className="mb-1 shrink-0 text-destructive"
-                      onClick={() => removeLineItem(index)}
-                      {...motionTap}
-                    >
-                      <RemoveIconBtn />
-                    </MotionButton>
-                  )}
-                </div>
+                <FloatingLabelMoneyInput
+                  containerClassName="w-full min-w-0"
+                  className="tabular-nums"
+                  label={t("common.price")}
+                  required
+                  value={item.price}
+                  onValueChange={(digits) => {
+                    const items = [...form.line_items];
+                    items[index].price = digits;
+                    setForm({ ...form, line_items: items });
+                  }}
+                />
+                {form.line_items.length > 1 ? (
+                  <MotionButton
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="mb-1 shrink-0 justify-self-end text-destructive sm:justify-self-center"
+                    onClick={() => removeLineItem(index)}
+                    {...motionTap}
+                  >
+                    <RemoveIconBtn />
+                  </MotionButton>
+                ) : (
+                  <span className="hidden sm:block" aria-hidden />
+                )}
               </div>
               </div>
               </motion.div>
