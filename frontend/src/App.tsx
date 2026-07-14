@@ -29,7 +29,6 @@ const ClientCardPage = lazy(lazyWithRetry(() => import("./pages/ClientCard").the
 const ClientsPage = lazy(lazyWithRetry(() => import("./pages/Clients").then((m) => ({ default: m.ClientsPage }))));
 const ContractsPage = lazy(lazyWithRetry(() => import("./pages/Contracts").then((m) => ({ default: m.ContractsPage }))));
 const DashboardPage = lazy(lazyWithRetry(() => import("./pages/Dashboard").then((m) => ({ default: m.DashboardPage }))));
-const DebtsPage = lazy(lazyWithRetry(() => import("./pages/Debts").then((m) => ({ default: m.DebtsPage }))));
 const EmployeesPage = lazy(lazyWithRetry(() => import("./pages/Employees").then((m) => ({ default: m.EmployeesPage }))));
 const FinancePage = lazy(lazyWithRetry(() => import("./pages/Finance").then((m) => ({ default: m.FinancePage }))));
 const LoginPage = lazy(lazyWithRetry(() => import("./pages/Login").then((m) => ({ default: m.LoginPage }))));
@@ -59,7 +58,7 @@ export default function App() {
                       <Route path="payments" element={<PaymentsPage />} />
                       <Route path="expenses" element={<Navigate to="/finance" replace />} />
                       <Route path="finance" element={<FinancePage />} />
-                      <Route path="debts" element={<DebtsPage />} />
+                      <Route path="debts" element={<Navigate to="/clients?debtors=1" replace />} />
                       <Route path="service-types" element={<ServiceTypesPage />} />
                       <Route path="profile" element={<ProfilePage />} />
                       <Route element={<AdminRoute />}>

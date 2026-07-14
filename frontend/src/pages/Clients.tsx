@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangleIcon,
@@ -74,6 +75,7 @@ import { TableColumnPicker } from "../components/TableColumnPicker";
 import { useTableColumns } from "../hooks/useTableColumns";
 import { useListLoading } from "../hooks/useListLoading";
 import { useSubmitGuard } from "../hooks/useSubmitGuard";
+import { usePersistedState } from "../hooks/usePersistedState";
 
 const CLIENT_OPTIONAL_COLUMNS = [
   { id: "contact", defaultVisible: true },
@@ -87,6 +89,7 @@ type ClientOptionalColumn = (typeof CLIENT_OPTIONAL_COLUMNS)[number]["id"];
 
 export function ClientsPage() {
   const { t } = useI18n();
+  const [searchParams] = useSearchParams();
   const { isVisible, setColumnVisible, visibleCount } = useTableColumns(
     "wtma.clients.tableColumns",
     CLIENT_OPTIONAL_COLUMNS,
@@ -112,6 +115,10 @@ export function ClientsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [cityFilter, setCityFilter] = useState("all");
+  const [debtFilter, setDebtFilter] = usePersistedState<"all" | "debtors">(
+    "wtma.clients.debtFilter",
+    "all",
+  );
   const [cities, setCities] = useState<string[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Client | null>(null);
@@ -168,6 +175,7 @@ export function ClientsPage() {
           search: search || undefined,
           status: statusFilter === "all" ? undefined : statusFilter,
           city: cityFilter === "all" ? undefined : cityFilter,
+          hasDebt: debtFilter === "debtors" ? true : undefined,
           skip: (page - 1) * pageSize,
           limit: pageSize,
         })
@@ -178,7 +186,7 @@ export function ClientsPage() {
         .catch((e) => setError(e.message))
         .finally(() => finish());
     },
-    [search, statusFilter, cityFilter, page, pageSize, start, finish],
+    [search, statusFilter, cityFilter, debtFilter, page, pageSize, start, finish],
   );
 
   useEffect(() => {
@@ -187,7 +195,13 @@ export function ClientsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, statusFilter, cityFilter]);
+  }, [search, statusFilter, cityFilter, debtFilter]);
+
+  useEffect(() => {
+    if (searchParams.get("debtors") === "1") {
+      setDebtFilter("debtors");
+    }
+  }, [searchParams, setDebtFilter]);
 
   useEffect(() => {
     const timer = setTimeout(() => load(), 300);
@@ -440,6 +454,21 @@ export function ClientsPage() {
                 <SelectItem value="all">{t("clients.allStatus")}</SelectItem>
                 <SelectItem value="faol">{t("status.faol")}</SelectItem>
                 <SelectItem value="nofaol">{t("status.nofaol")}</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <Select
+            value={debtFilter}
+            onValueChange={(v) => v && setDebtFilter(v as "all" | "debtors")}
+            className="w-full sm:w-48"
+          >
+            <SelectTrigger>
+              <SelectValue placeholder={t("clients.debtFilter")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="all">{t("clients.allDebt")}</SelectItem>
+                <SelectItem value="debtors">{t("clients.onlyDebtors")}</SelectItem>
               </SelectGroup>
             </SelectContent>
           </Select>

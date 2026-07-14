@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  AlertTriangleIcon,
   ArchiveIcon,
   CreditCardIcon,
   FileTextIcon,
@@ -110,7 +109,6 @@ export function Layout() {
     { to: "/contracts", label: t("nav.contracts"), icon: FileTextIcon },
     { to: "/payments", label: t("nav.payments"), icon: CreditCardIcon },
     { to: "/finance", label: t("nav.finance"), icon: ScaleIcon },
-    { to: "/debts", label: t("nav.debts"), icon: AlertTriangleIcon },
     { to: "/service-types", label: t("nav.serviceTypes"), icon: LayersIcon },
   ];
 

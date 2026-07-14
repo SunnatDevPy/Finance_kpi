@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangleIcon,
@@ -110,6 +111,7 @@ const formSectionReveal = {
 
 export function ContractsPage() {
   const { t } = useI18n();
+  const [searchParams] = useSearchParams();
   const { isAdmin } = useAuth();
   const { isVisible, setColumnVisible, visibleCount, items: columnPickerItems } =
     usePickerColumns("wtma.contracts.tableColumns", CONTRACT_OPTIONAL_COLUMNS, t);
@@ -132,6 +134,10 @@ export function ContractsPage() {
   const [exportDateTo, setExportDateTo] = usePersistedState("wtma.contracts.dateTo", "");
   const [search, setSearch] = usePersistedState("wtma.contracts.search", "");
   const [statusFilter, setStatusFilter] = usePersistedState("wtma.contracts.statusFilter", "all");
+  const [hasDebtFilter, setHasDebtFilter] = usePersistedState<"all" | "with_debt">(
+    "wtma.contracts.hasDebtFilter",
+    "all",
+  );
   const selection = useRowSelection(contracts.map((c) => c.id));
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -165,6 +171,7 @@ export function ContractsPage() {
         dateFrom: exportDateFrom || undefined,
         dateTo: exportDateTo || undefined,
         status: statusFilter === "all" ? undefined : (statusFilter as ContractWorkflowStatus),
+        hasDebt: hasDebtFilter === "with_debt" ? true : undefined,
       }),
       api.clients.list({ limit: 200 }),
       api.serviceTypes.list(true),
@@ -189,12 +196,18 @@ export function ContractsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, exportDateFrom, exportDateTo, statusFilter]);
+  }, [search, exportDateFrom, exportDateTo, statusFilter, hasDebtFilter]);
+
+  useEffect(() => {
+    if (searchParams.get("has_debt") === "1") {
+      setHasDebtFilter("with_debt");
+    }
+  }, [searchParams, setHasDebtFilter]);
 
   useEffect(() => {
     const timer = window.setTimeout(load, 300);
     return () => window.clearTimeout(timer);
-  }, [page, pageSize, search, exportDateFrom, exportDateTo, statusFilter]);
+  }, [page, pageSize, search, exportDateFrom, exportDateTo, statusFilter, hasDebtFilter]);
 
   const clientName = (id: number) =>
     clients.find((c) => c.id === id)?.company_name || `#${id}`;
@@ -476,6 +489,21 @@ export function ContractsPage() {
                     {t(`contractWorkflowStatus.${s}`)}
                   </SelectItem>
                 ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <Select
+            value={hasDebtFilter}
+            onValueChange={(v) => v && setHasDebtFilter(v as "all" | "with_debt")}
+            className="w-full sm:w-44"
+          >
+            <SelectTrigger>
+              <SelectValue placeholder={t("contracts.debtFilter")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="all">{t("contracts.allDebt")}</SelectItem>
+                <SelectItem value="with_debt">{t("contracts.withDebt")}</SelectItem>
               </SelectGroup>
             </SelectContent>
           </Select>

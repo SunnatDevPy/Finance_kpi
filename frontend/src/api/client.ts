@@ -325,6 +325,7 @@ export const api = {
       status?: string;
       search?: string;
       city?: string;
+      hasDebt?: boolean;
       skip?: number;
       limit?: number;
     }) => {
@@ -332,6 +333,7 @@ export const api = {
       if (params?.status) q.set("status", params.status);
       if (params?.search) q.set("search", params.search);
       if (params?.city) q.set("city", params.city);
+      if (params?.hasDebt !== undefined) q.set("has_debt", params.hasDebt ? "true" : "false");
       if (params?.skip !== undefined) q.set("skip", String(params.skip));
       if (params?.limit !== undefined) q.set("limit", String(params.limit));
       const qs = q.toString();
@@ -384,6 +386,7 @@ export const api = {
       dateFrom?: string;
       dateTo?: string;
       status?: ContractWorkflowStatus;
+      hasDebt?: boolean;
       skip?: number;
       limit?: number;
     }) => {
@@ -393,6 +396,7 @@ export const api = {
       if (params?.dateFrom) q.set("date_from", params.dateFrom);
       if (params?.dateTo) q.set("date_to", params.dateTo);
       if (params?.status) q.set("status", params.status);
+      if (params?.hasDebt !== undefined) q.set("has_debt", params.hasDebt ? "true" : "false");
       if (params?.skip !== undefined) q.set("skip", String(params.skip));
       if (params?.limit !== undefined) q.set("limit", String(params.limit));
       const qs = q.toString();

@@ -22,7 +22,13 @@ from app.services.export_data import (
     fetch_client_payments_rows,
 )
 from app.services.export_files import build_client_card_xlsx
-from app.services.helpers import client_cancelled_amount, client_total_debt, contract_to_read, get_client_or_404
+from app.services.debt_queries import client_ids_with_debt_filter
+from app.services.helpers import (
+    client_cancelled_amount,
+    client_total_debt,
+    contract_to_read,
+    get_client_or_404,
+)
 from app.services.uploads import ALLOWED_LOGO_CONTENT_TYPES, MAX_LOGO_BYTES, delete_client_logo, save_client_logo
 
 router = APIRouter(prefix="/clients", dependencies=[Depends(get_current_user)])
@@ -51,6 +57,7 @@ def list_clients(
     status_filter: ClientStatus | None = Query(default=None, alias="status"),
     search: str | None = Query(default=None, min_length=1),
     city: str | None = Query(default=None, min_length=1),
+    has_debt: bool | None = Query(default=None),
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=20, ge=1, le=200),
 ) -> Page[ClientRead]:
@@ -59,6 +66,8 @@ def list_clients(
         filters.append(Client.status == status_filter)
     if city:
         filters.append(Client.city == city)
+    if has_debt is not None:
+        filters.append(Client.id.in_(client_ids_with_debt_filter(has_debt)))
     if search:
         pattern = f"%{search}%"
         filters.append(

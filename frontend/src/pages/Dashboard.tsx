@@ -338,7 +338,7 @@ export function DashboardPage() {
             formatValue={formatMoney}
             accent="red"
             icon={AlertTriangleIcon}
-            to="/debts"
+            to="/clients?debtors=1"
           />
         </StaggerItem>
         <StaggerItem>

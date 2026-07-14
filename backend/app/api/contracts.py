@@ -30,6 +30,7 @@ from app.services.contract_status import (
     sync_status_after_cancellation,
     sync_status_after_reactivation,
 )
+from app.services.debt_queries import contract_ids_with_debt_filter
 from app.services.documents import build_act_pdf, build_contract_pdf, build_invoice_pdf
 from app.services.helpers import (
     contract_to_read,
@@ -58,6 +59,7 @@ def list_contracts(
     date_from: date | None = Query(default=None),
     date_to: date | None = Query(default=None),
     status: ContractWorkflowStatus | None = Query(default=None),
+    has_debt: bool | None = Query(default=None),
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=20, ge=1, le=200),
 ) -> Page[ContractRead]:
@@ -67,6 +69,8 @@ def list_contracts(
         filters.append(Contract.client_id == client_id)
     if status is not None:
         filters.append(Contract.status == status)
+    if has_debt is not None:
+        filters.append(Contract.id.in_(contract_ids_with_debt_filter(has_debt)))
     if search:
         join_client = True
         pattern = f"%{search}%"
