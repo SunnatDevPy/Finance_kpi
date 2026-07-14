@@ -6,11 +6,13 @@
 
 | Term | Meaning |
 |------|---------|
-| **Client** | Mijoz (kompaniya). Status: `faol`, `nofaol`, `qarzdor`. |
-| **Contract** | Xizmat shartnomasi. Bir mijozda bir nechta bo‘lishi mumkin. |
-| **Payment** | To‘lov. Shartnoma yoki qarzga bog‘langan. |
-| **Service type** | Xizmat turi (masalan, marketing, logistika). |
-| **Debt** | Mijoz qarzi — shartnoma summasi minus to‘lovlar. |
+| **Client** | Mijoz (kompaniya). Status: `faol`, `nofaol`. Qarz `total_debt` orqali hisoblanadi. |
+| **Contract** | Xizmat shartnomasi. Workflow: `yangi`, `davom_etmoqda`, `tugadi`, `toxtatildi`. |
+| **Payment** | Shartnoma bo'yicha to'lov (mijozdan tushum). Manfiy = refund. |
+| **Income** | Shartnomaga bog'liq bo'lmagan boshqa kirim. |
+| **Expense** | Biznes xarajati (ijara, ish haqi, marketing, …). |
+| **Finance ledger** | Payment + Income + Expense birlashgan ko'rinish. |
+| **Debt** | `total_amount − paid_amount`. Mijozlar/Kontraktlar filtrlari orqali ko'riladi. |
 | **Employee** | Tizim foydalanuvchisi. Rol: `admin`, `menejer`. |
 
 ## Stack

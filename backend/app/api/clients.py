@@ -22,7 +22,11 @@ from app.services.export_data import (
     fetch_client_payments_rows,
 )
 from app.services.export_files import build_client_card_xlsx
-from app.services.debt_queries import client_ids_with_debt_filter
+from app.services.debt_queries import (
+    DebtFilter,
+    client_ids_with_debt_filter,
+    client_ids_without_positive_debt,
+)
 from app.services.helpers import (
     client_cancelled_amount,
     client_total_debt,
@@ -57,6 +61,7 @@ def list_clients(
     status_filter: ClientStatus | None = Query(default=None, alias="status"),
     search: str | None = Query(default=None, min_length=1),
     city: str | None = Query(default=None, min_length=1),
+    debt_filter: DebtFilter | None = Query(default=None),
     has_debt: bool | None = Query(default=None),
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=20, ge=1, le=200),
@@ -66,8 +71,13 @@ def list_clients(
         filters.append(Client.status == status_filter)
     if city:
         filters.append(Client.city == city)
-    if has_debt is not None:
-        filters.append(Client.id.in_(client_ids_with_debt_filter(has_debt)))
+    if debt_filter is not None:
+        filters.append(Client.id.in_(client_ids_with_debt_filter(debt_filter)))
+    elif has_debt is not None:
+        if has_debt:
+            filters.append(Client.id.in_(client_ids_with_debt_filter("debtors")))
+        else:
+            filters.append(Client.id.in_(client_ids_without_positive_debt()))
     if search:
         pattern = f"%{search}%"
         filters.append(

@@ -2,10 +2,15 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
+import { registerSW } from "virtual:pwa-register";
 import { forceReveal, markFontsReady } from "./lib/appReady";
 import { initRuntimeRecovery } from "./lib/runtimeRecovery";
 
 initRuntimeRecovery();
+
+if (import.meta.env.PROD) {
+  registerSW({ immediate: true });
+}
 
 const rootEl = document.getElementById("root")!;
 

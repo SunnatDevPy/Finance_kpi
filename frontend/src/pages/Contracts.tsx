@@ -16,7 +16,7 @@ import {
   XCircleIcon,
 } from "lucide-react";
 import { api } from "../api/client";
-import { ContractStatusPicker } from "../components/ContractStatusPicker";
+import { ContractStatusBadge } from "../components/ContractStatusBadge";
 import { CancelIcon, DeleteIconBtn, LoadingIconBtn, RemoveIconBtn, SaveIconBtn } from "../components/ButtonIcons";
 import { BulkActionBar } from "../components/BulkActionBar";
 import { DateRangePicker } from "../components/DateRangePicker";
@@ -69,7 +69,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { Client, Contract, ContractFormLineItem, ContractImportResult, ServiceType } from "../types";
+import type { Client, ClientDebtFilter, Contract, ContractFormLineItem, ContractImportResult, ServiceType } from "../types";
 import { useI18n } from "../context/I18nContext";
 import { useAuth } from "../context/AuthContext";
 import { useListLoading } from "../hooks/useListLoading";
@@ -123,7 +123,6 @@ export function ContractsPage() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [bulkArchiveConfirm, setBulkArchiveConfirm] = useState(false);
   const [bulkArchiving, setBulkArchiving] = useState(false);
-  const [statusUpdatingId, setStatusUpdatingId] = useState<number | null>(null);
   const [error, setError] = useState("");
   const { loading, start, finish } = useListLoading();
   const { submitting, guard } = useSubmitGuard();
@@ -134,8 +133,8 @@ export function ContractsPage() {
   const [exportDateTo, setExportDateTo] = usePersistedState("wtma.contracts.dateTo", "");
   const [search, setSearch] = usePersistedState("wtma.contracts.search", "");
   const [statusFilter, setStatusFilter] = usePersistedState("wtma.contracts.statusFilter", "all");
-  const [hasDebtFilter, setHasDebtFilter] = usePersistedState<"all" | "with_debt">(
-    "wtma.contracts.hasDebtFilter",
+  const [debtFilter, setDebtFilter] = usePersistedState<ClientDebtFilter>(
+    "wtma.contracts.debtFilter",
     "all",
   );
   const selection = useRowSelection(contracts.map((c) => c.id));
@@ -171,7 +170,7 @@ export function ContractsPage() {
         dateFrom: exportDateFrom || undefined,
         dateTo: exportDateTo || undefined,
         status: statusFilter === "all" ? undefined : (statusFilter as ContractWorkflowStatus),
-        hasDebt: hasDebtFilter === "with_debt" ? true : undefined,
+        debtFilter: debtFilter === "all" ? undefined : debtFilter,
       }),
       api.clients.list({ limit: 200 }),
       api.serviceTypes.list(true),
@@ -196,18 +195,18 @@ export function ContractsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, exportDateFrom, exportDateTo, statusFilter, hasDebtFilter]);
+  }, [search, exportDateFrom, exportDateTo, statusFilter, debtFilter]);
 
   useEffect(() => {
     if (searchParams.get("has_debt") === "1") {
-      setHasDebtFilter("with_debt");
+      setDebtFilter("debtors");
     }
-  }, [searchParams, setHasDebtFilter]);
+  }, [searchParams, setDebtFilter]);
 
   useEffect(() => {
     const timer = window.setTimeout(load, 300);
     return () => window.clearTimeout(timer);
-  }, [page, pageSize, search, exportDateFrom, exportDateTo, statusFilter, hasDebtFilter]);
+  }, [page, pageSize, search, exportDateFrom, exportDateTo, statusFilter, debtFilter]);
 
   const clientName = (id: number) =>
     clients.find((c) => c.id === id)?.company_name || `#${id}`;
@@ -371,21 +370,6 @@ export function ContractsPage() {
     }
   };
 
-  const handleQuickStatusChange = async (contract: Contract, status: ContractWorkflowStatus) => {
-    const previous = contract.status;
-    setStatusUpdatingId(contract.id);
-    setError("");
-    setContracts((prev) => prev.map((c) => (c.id === contract.id ? { ...c, status } : c)));
-    try {
-      await api.contracts.update(contract.id, { status });
-    } catch (err) {
-      setContracts((prev) => prev.map((c) => (c.id === contract.id ? { ...c, status: previous } : c)));
-      setError(err instanceof Error ? err.message : t("common.error"));
-    } finally {
-      setStatusUpdatingId(null);
-    }
-  };
-
   const handleBulkArchive = async () => {
     const ids = selection.selectedIds;
     if (ids.length === 0) return;
@@ -493,9 +477,9 @@ export function ContractsPage() {
             </SelectContent>
           </Select>
           <Select
-            value={hasDebtFilter}
-            onValueChange={(v) => v && setHasDebtFilter(v as "all" | "with_debt")}
-            className="w-full sm:w-44"
+            value={debtFilter}
+            onValueChange={(v) => v && setDebtFilter(v as ClientDebtFilter)}
+            className="w-full sm:w-52"
           >
             <SelectTrigger>
               <SelectValue placeholder={t("contracts.debtFilter")} />
@@ -503,7 +487,9 @@ export function ContractsPage() {
             <SelectContent>
               <SelectGroup>
                 <SelectItem value="all">{t("contracts.allDebt")}</SelectItem>
-                <SelectItem value="with_debt">{t("contracts.withDebt")}</SelectItem>
+                <SelectItem value="debtors">{t("contracts.withDebt")}</SelectItem>
+                <SelectItem value="no_debt">{t("contracts.noDebt")}</SelectItem>
+                <SelectItem value="overpaid">{t("contracts.debtOverpaid")}</SelectItem>
               </SelectGroup>
             </SelectContent>
           </Select>
@@ -672,11 +658,7 @@ export function ContractsPage() {
                         {t("clients.cancelled")}
                       </Badge>
                     ) : (
-                      <ContractStatusPicker
-                        value={contract.status}
-                        loading={statusUpdatingId === contract.id}
-                        onChange={(status) => handleQuickStatusChange(contract, status)}
-                      />
+                      <ContractStatusBadge status={contract.status} />
                     )}
                   </TableCell>
                   )}

@@ -66,7 +66,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import type { Client, ClientFormData, ClientImportResult, ServiceType } from "../types";
+import type { Client, ClientFormData, ClientImportResult, ClientDebtFilter, ServiceType } from "../types";
 import { useI18n } from "../context/I18nContext";
 import { emptyClientForm, formatMoney, toNumber } from "../utils/format";
 import { PageHeader, PageShell } from "../components/PageHeader";
@@ -115,7 +115,7 @@ export function ClientsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [cityFilter, setCityFilter] = useState("all");
-  const [debtFilter, setDebtFilter] = usePersistedState<"all" | "debtors">(
+  const [debtFilter, setDebtFilter] = usePersistedState<ClientDebtFilter>(
     "wtma.clients.debtFilter",
     "all",
   );
@@ -175,7 +175,7 @@ export function ClientsPage() {
           search: search || undefined,
           status: statusFilter === "all" ? undefined : statusFilter,
           city: cityFilter === "all" ? undefined : cityFilter,
-          hasDebt: debtFilter === "debtors" ? true : undefined,
+          debtFilter: debtFilter === "all" ? undefined : debtFilter,
           skip: (page - 1) * pageSize,
           limit: pageSize,
         })
@@ -459,8 +459,8 @@ export function ClientsPage() {
           </Select>
           <Select
             value={debtFilter}
-            onValueChange={(v) => v && setDebtFilter(v as "all" | "debtors")}
-            className="w-full sm:w-48"
+            onValueChange={(v) => v && setDebtFilter(v as ClientDebtFilter)}
+            className="w-full sm:w-52"
           >
             <SelectTrigger>
               <SelectValue placeholder={t("clients.debtFilter")} />
@@ -469,6 +469,8 @@ export function ClientsPage() {
               <SelectGroup>
                 <SelectItem value="all">{t("clients.allDebt")}</SelectItem>
                 <SelectItem value="debtors">{t("clients.onlyDebtors")}</SelectItem>
+                <SelectItem value="no_debt">{t("clients.noDebt")}</SelectItem>
+                <SelectItem value="overpaid">{t("clients.debtOverpaid")}</SelectItem>
               </SelectGroup>
             </SelectContent>
           </Select>

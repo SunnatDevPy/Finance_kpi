@@ -1,5 +1,7 @@
 import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { ToastViewport } from "./components/ToastViewport";
+import { PwaInstallBanner } from "./components/PwaInstallBanner";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { AdminRoute, ProtectedRoute } from "./components/ProtectedRoute";
 import { Layout } from "./components/Layout";
@@ -45,6 +47,8 @@ export default function App() {
         <AppErrorBoundary>
         <BrowserRouter>
           <AuthProvider>
+            <ToastViewport />
+            <PwaInstallBanner />
             <Suspense fallback={<PageLoader />}>
               <RouteReady>
                 <Routes>

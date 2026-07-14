@@ -13,6 +13,7 @@ import type {
   ContractWorkflowStatus,
   DashboardStats,
   DebtsSummary,
+  DebtFilter,
   Expense,
   ExpenseCategory,
   ExpenseSummary,
@@ -34,6 +35,7 @@ import type {
   User,
   UserRole,
 } from "../types";
+import { notifyMutationSuccess } from "../lib/toastBus";
 
 const API_BASE = "/api/v1";
 
@@ -130,8 +132,15 @@ async function performRequest<T>(path: string, options?: RequestInit): Promise<T
     throw new Error(message);
   }
 
-  if (response.status === 204) return undefined as T;
-  return response.json();
+  if (response.status === 204) {
+    const method = (options?.method ?? "GET").toUpperCase();
+    if (DEDUPE_METHODS.has(method)) notifyMutationSuccess(method, path);
+    return undefined as T;
+  }
+  const data = await response.json();
+  const method = (options?.method ?? "GET").toUpperCase();
+  if (DEDUPE_METHODS.has(method)) notifyMutationSuccess(method, path);
+  return data;
 }
 
 async function download(path: string, filename: string): Promise<void> {
@@ -196,7 +205,9 @@ async function uploadFile<T>(path: string, file: File): Promise<T> {
     throw new Error(message);
   }
 
-  return response.json();
+  const data = await response.json();
+  notifyMutationSuccess("POST", path);
+  return data;
 }
 
 export const api = {
@@ -325,6 +336,7 @@ export const api = {
       status?: string;
       search?: string;
       city?: string;
+      debtFilter?: DebtFilter;
       hasDebt?: boolean;
       skip?: number;
       limit?: number;
@@ -333,6 +345,7 @@ export const api = {
       if (params?.status) q.set("status", params.status);
       if (params?.search) q.set("search", params.search);
       if (params?.city) q.set("city", params.city);
+      if (params?.debtFilter) q.set("debt_filter", params.debtFilter);
       if (params?.hasDebt !== undefined) q.set("has_debt", params.hasDebt ? "true" : "false");
       if (params?.skip !== undefined) q.set("skip", String(params.skip));
       if (params?.limit !== undefined) q.set("limit", String(params.limit));
@@ -386,6 +399,7 @@ export const api = {
       dateFrom?: string;
       dateTo?: string;
       status?: ContractWorkflowStatus;
+      debtFilter?: DebtFilter;
       hasDebt?: boolean;
       skip?: number;
       limit?: number;
@@ -396,6 +410,7 @@ export const api = {
       if (params?.dateFrom) q.set("date_from", params.dateFrom);
       if (params?.dateTo) q.set("date_to", params.dateTo);
       if (params?.status) q.set("status", params.status);
+      if (params?.debtFilter) q.set("debt_filter", params.debtFilter);
       if (params?.hasDebt !== undefined) q.set("has_debt", params.hasDebt ? "true" : "false");
       if (params?.skip !== undefined) q.set("skip", String(params.skip));
       if (params?.limit !== undefined) q.set("limit", String(params.limit));

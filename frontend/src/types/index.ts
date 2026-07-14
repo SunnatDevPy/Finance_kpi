@@ -5,6 +5,8 @@ export type ContractWorkflowStatus =
   | "tugadi"
   | "toxtatildi";
 export type UserRole = "admin" | "menejer";
+export type DebtFilter = "debtors" | "no_debt" | "overpaid";
+export type ClientDebtFilter = "all" | DebtFilter;
 
 export interface CompanyProfile {
   company_name: string;

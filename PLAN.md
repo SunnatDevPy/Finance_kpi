@@ -346,4 +346,16 @@
 
 ---
 
+### 42. Qarz konsolidatsiyasi, toast, UI nozik tuzatishlar (2026-yil iyul)
+
+- [x] Alohida `/debts` sahifasi olib tashlandi — qarz filtrlari Mijozlar va Kontraktlar sahifalariga ko'chirildi (`debt_filter`: debtors / no_debt / overpaid); `/debts` → `/clients?debtors=1` redirect
+- [x] Backend: `debt_queries.py` — SQL filtrlash; `test_debt_filters.py`
+- [x] Kontrakt holatini jadvaldan inline o'zgartirish olib tashlandi — faqat tahrirlash modalida (`ContractStatusPicker` o'chirildi)
+- [x] Toast bildirishnomalar — yuqori o'ngda splavayushiy, max 4 ta, API mutatsiyalarida avtomatik (`ToastViewport`, `mutationToast`, `toastBus`)
+- [x] Dashboard donut markazidagi label: «Jami shartnomalar» / «Jami mijozlar» → «Jami»
+- [x] `README.md` to'liq qayta yozildi — joriy modullar, RBAC, roadmap
+- [x] PWA / mobil — `vite-plugin-pwa`, manifest, service worker, o'rnatish banneri, safe-area, nginx sw cache headers
+
+---
+
 *Bu fayl loyihaning yagona, yangilanib turadigan ish rejasi hisoblanadi. Yangi vazifalar shu yerga qo'shiladi, bajarilganda `[x]` bilan belgilanadi.*
