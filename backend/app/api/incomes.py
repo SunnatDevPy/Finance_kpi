@@ -59,15 +59,27 @@ def income_summary(
     return get_income_summary(db, date_from=date_from, date_to=date_to)
 
 
-@router.get("/trash", response_model=list[IncomeRead], dependencies=[Depends(require_admin)])
-def list_deleted_incomes(db: Session = Depends(get_db)) -> list[Income]:
+@router.get("/trash", response_model=Page[IncomeRead], dependencies=[Depends(require_admin)])
+def list_deleted_incomes(
+    db: Session = Depends(get_db),
+    search: str | None = Query(default=None, min_length=1),
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=200),
+) -> Page[IncomeRead]:
+    filters = [Income.deleted_at.is_not(None)]
+    if search:
+        filters.append(Income.title.ilike(f"%{search}%"))
+
+    total = db.scalar(select(func.count(Income.id)).where(*filters)) or 0
     stmt = (
         select(Income)
-        .where(Income.deleted_at.is_not(None))
+        .where(*filters)
         .order_by(Income.deleted_at.desc())
-        .limit(200)
+        .offset(skip)
+        .limit(limit)
     )
-    return list(db.scalars(stmt).all())
+    items = list(db.scalars(stmt).all())
+    return Page(items=items, total=total, skip=skip, limit=limit)
 
 
 @router.post("", response_model=IncomeRead, status_code=status.HTTP_201_CREATED)
@@ -124,7 +136,11 @@ def update_income(
     return income
 
 
-@router.delete("/{income_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{income_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_admin)],
+)
 def delete_income(
     income_id: int,
     db: Session = Depends(get_db),

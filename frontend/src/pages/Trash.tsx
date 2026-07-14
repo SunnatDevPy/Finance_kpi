@@ -3,6 +3,7 @@ import { ArchiveIcon, RotateCcwIcon } from "lucide-react";
 import { api } from "../api/client";
 import { PageError } from "../components/PageError";
 import { PageHeader, PageShell } from "../components/PageHeader";
+import { Pagination } from "../components/Pagination";
 import {
   MotionTableRow,
   PremiumDataTable,
@@ -31,6 +32,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { MotionButton, motionTap } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import type { Client, Contract, Expense, Income, Payment } from "../types";
 import { formatDateWithWeekday, formatMoney } from "../utils/format";
 import { expenseCategoryLabel } from "../utils/expenseCategory";
@@ -41,66 +43,122 @@ type TrashTab = "clients" | "contracts" | "payments" | "expenses" | "incomes";
 export function TrashPage() {
   const { t } = useI18n();
   const [tab, setTab] = useState<TrashTab>("clients");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+
   const [clients, setClients] = useState<Client[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [incomes, setIncomes] = useState<Income[]>([]);
+  const [total, setTotal] = useState(0);
+  const [counts, setCounts] = useState<Record<TrashTab, number>>({
+    clients: 0,
+    contracts: 0,
+    payments: 0,
+    expenses: 0,
+    incomes: 0,
+  });
+
   const [clientNames, setClientNames] = useState<Record<number, string>>({});
   const [error, setError] = useState("");
   const [restoreTarget, setRestoreTarget] = useState<{ tab: TrashTab; id: number } | null>(null);
   const { loading, start, finish } = useListLoading();
 
-  const load = (silent = false) => {
+  const loadCounts = () => {
+    Promise.all([
+      api.clients.trash({ limit: 1 }),
+      api.contracts.trash({ limit: 1 }),
+      api.payments.trash({ limit: 1 }),
+      api.expenses.trash({ limit: 1 }),
+      api.incomes.trash({ limit: 1 }),
+    ])
+      .then(([c, co, p, e, i]) => {
+        setCounts({
+          clients: c.total,
+          contracts: co.total,
+          payments: p.total,
+          expenses: e.total,
+          incomes: i.total,
+        });
+      })
+      .catch(() => {});
+  };
+
+  const loadClientNames = () => {
+    Promise.all([
+      api.clients.trash({ limit: 200 }),
+      api.clients.list({ limit: 200 }).catch(() => ({ items: [] as Client[], total: 0, skip: 0, limit: 0 })),
+    ])
+      .then(([trashedClients, activeClients]) => {
+        const map: Record<number, string> = {};
+        for (const c of [...trashedClients.items, ...activeClients.items]) {
+          map[c.id] = c.company_name;
+        }
+        setClientNames(map);
+      })
+      .catch(() => {});
+  };
+
+  const loadTab = (silent = false) => {
     start(silent);
     setError("");
-    Promise.all([
-      api.clients.trash(),
-      api.contracts.trash(),
-      api.payments.trash(),
-      api.expenses.trash(),
-      api.incomes.trash(),
-      api.clients.list({ limit: 200 }).catch(() => ({ items: [] as Client[] })),
-    ])
-      .then(
-        ([
-          trashedClients,
-          trashedContracts,
-          trashedPayments,
-          trashedExpenses,
-          trashedIncomes,
-          activeClients,
-        ]) => {
-          setClients(trashedClients);
-          setContracts(trashedContracts);
-          setPayments(trashedPayments);
-          setExpenses(trashedExpenses);
-          setIncomes(trashedIncomes);
-          const map: Record<number, string> = {};
-          for (const client of [...trashedClients, ...activeClients.items]) {
-            map[client.id] = client.company_name;
-          }
-          setClientNames(map);
-        },
-      )
-      .catch((e) => setError(e.message))
-      .finally(() => finish());
+    const params = { search: search || undefined, skip: (page - 1) * pageSize, limit: pageSize };
+    const request =
+      tab === "clients"
+        ? api.clients.trash(params).then((res) => {
+            setClients(res.items);
+            setTotal(res.total);
+          })
+        : tab === "contracts"
+          ? api.contracts.trash(params).then((res) => {
+              setContracts(res.items);
+              setTotal(res.total);
+            })
+          : tab === "payments"
+            ? api.payments.trash(params).then((res) => {
+                setPayments(res.items);
+                setTotal(res.total);
+              })
+            : tab === "expenses"
+              ? api.expenses.trash(params).then((res) => {
+                  setExpenses(res.items);
+                  setTotal(res.total);
+                })
+              : api.incomes.trash(params).then((res) => {
+                  setIncomes(res.items);
+                  setTotal(res.total);
+                });
+
+    request.catch((e) => setError(e.message)).finally(() => finish());
   };
 
   useEffect(() => {
-    load(false);
+    loadCounts();
+    loadClientNames();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    setPage(1);
+  }, [tab, search, pageSize]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => loadTab(true), 250);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, search, page, pageSize]);
+
   const tabs: { id: TrashTab; label: string; count: number }[] = useMemo(
     () => [
-      { id: "clients", label: t("trash.tabClients"), count: clients.length },
-      { id: "contracts", label: t("trash.tabContracts"), count: contracts.length },
-      { id: "payments", label: t("trash.tabPayments"), count: payments.length },
-      { id: "expenses", label: t("trash.tabExpenses"), count: expenses.length },
-      { id: "incomes", label: t("trash.tabIncomes"), count: incomes.length },
+      { id: "clients", label: t("trash.tabClients"), count: counts.clients },
+      { id: "contracts", label: t("trash.tabContracts"), count: counts.contracts },
+      { id: "payments", label: t("trash.tabPayments"), count: counts.payments },
+      { id: "expenses", label: t("trash.tabExpenses"), count: counts.expenses },
+      { id: "incomes", label: t("trash.tabIncomes"), count: counts.incomes },
     ],
-    [t, clients.length, contracts.length, payments.length, expenses.length, incomes.length],
+    [t, counts],
   );
 
   const handleRestore = async () => {
@@ -124,6 +182,8 @@ export function TrashPage() {
         await api.incomes.restore(id);
         setIncomes((prev) => prev.filter((item) => item.id !== id));
       }
+      setTotal((prev) => Math.max(0, prev - 1));
+      loadCounts();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("common.error"));
     }
@@ -165,14 +225,19 @@ export function TrashPage() {
             <div>
               <CardTitle>{tabs.find((option) => option.id === tab)?.label}</CardTitle>
               <CardDescription>
-                {t("common.itemsFound").replace(
-                  "{count}",
-                  String(tabs.find((option) => option.id === tab)?.count ?? 0),
-                )}
+                {t("common.itemsFound").replace("{count}", String(total))}
               </CardDescription>
             </div>
           </div>
         </CardHeader>
+        <div className="table-card-toolbar">
+          <Input
+            className="w-full min-w-[12rem] flex-1 sm:max-w-xs"
+            placeholder={t("common.search")}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
         <CardContent className="p-0">
           {tab === "clients" && (
             <PremiumDataTable
@@ -378,6 +443,14 @@ export function TrashPage() {
               </TableBody>
             </PremiumDataTable>
           )}
+          <Pagination
+            embedded
+            page={page}
+            pageSize={pageSize}
+            total={total}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         </CardContent>
       </Card>
 

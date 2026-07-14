@@ -140,7 +140,7 @@ export function FloatingLabelDatePicker({
         aria-expanded={open}
         aria-haspopup="dialog"
         className={cn(
-          "peer flex h-12 w-full min-w-0 items-center justify-between gap-2 rounded-lg border border-input bg-transparent px-3 pb-2.5 pt-5 text-left text-base transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm",
+          "peer flex h-12 w-full min-w-0 items-center justify-between gap-2 rounded-lg border border-input bg-transparent px-3 text-left text-base transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm",
           className,
         )}
       >
@@ -226,14 +226,14 @@ export function FloatingLabelDatePicker({
                 <button
                   type="button"
                   onClick={handleClear}
-                  className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                  className="text-btn-surface text-xs font-medium text-muted-foreground hover:text-foreground"
                 >
                   {t("dateRange.clear")}
                 </button>
                 <button
                   type="button"
                   onClick={handleToday}
-                  className="text-xs font-medium text-primary transition-colors hover:text-primary/80"
+                  className="text-btn-surface text-xs font-medium text-primary"
                 >
                   {t("dateRange.today")}
                 </button>

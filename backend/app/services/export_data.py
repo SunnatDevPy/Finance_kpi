@@ -4,7 +4,7 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import Client, Contract, ContractLineItem, Expense, Income, Payment
+from app.models import Client, Contract, ContractLineItem, ContractWorkflowStatus, Expense, Income, Payment
 
 EXPENSE_CATEGORY_NAMES: dict[str, str] = {
     "salary": "Ish haqi",
@@ -57,6 +57,7 @@ def fetch_contracts_rows(
     db: Session,
     date_from: date | None = None,
     date_to: date | None = None,
+    ids: list[int] | None = None,
 ) -> list[list[str]]:
     stmt = (
         select(Contract)
@@ -72,6 +73,8 @@ def fetch_contracts_rows(
         stmt = stmt.where(Contract.end_date >= date_from)
     if date_to is not None:
         stmt = stmt.where(Contract.end_date <= date_to)
+    if ids:
+        stmt = stmt.where(Contract.id.in_(ids))
 
     contracts = list(db.scalars(stmt).all())
     rows: list[list[str]] = []
@@ -100,6 +103,7 @@ def fetch_payments_rows(
     db: Session,
     date_from: date | None = None,
     date_to: date | None = None,
+    ids: list[int] | None = None,
 ) -> list[list[str]]:
     stmt = (
         select(Payment)
@@ -112,6 +116,8 @@ def fetch_payments_rows(
         stmt = stmt.where(Payment.paid_at >= date_from)
     if date_to is not None:
         stmt = stmt.where(Payment.paid_at <= date_to)
+    if ids:
+        stmt = stmt.where(Payment.id.in_(ids))
 
     payments = list(db.scalars(stmt).all())
     return [
@@ -227,3 +233,101 @@ EXPORT_TITLES = {
     "expenses": "Xarajatlar",
     "incomes": "Kirimlar",
 }
+
+CLIENT_STATUS_LABELS = {
+    "faol": "Faol",
+    "nofaol": "Nofaol",
+}
+
+CONTRACT_STATUS_LABELS = {
+    ContractWorkflowStatus.YANGI: "Yangi",
+    ContractWorkflowStatus.DAVOM_ETMOQDA: "Davom etmoqda",
+    ContractWorkflowStatus.TUGADI: "Tugadi",
+    ContractWorkflowStatus.TOXTATILDI: "To'xtatildi",
+}
+
+
+def fetch_client_card_profile_rows(client: Client) -> list[list[str]]:
+    return [
+        ["Korxona nomi", client.company_name],
+        ["Mas'ul shaxs", client.contact_person or ""],
+        ["Telefon", client.phone or ""],
+        ["Veb-sayt", client.website or ""],
+        ["Mamlakat", client.country or ""],
+        ["Shahar", client.city or ""],
+        ["Faoliyat turi", client.activity_type or ""],
+        ["Holat", CLIENT_STATUS_LABELS.get(client.status.value, client.status.value)],
+        ["Izohlar", client.notes or ""],
+    ]
+
+
+def fetch_client_contracts_rows(db: Session, client_id: int) -> list[list[str]]:
+    stmt = (
+        select(Contract)
+        .options(
+            selectinload(Contract.line_items).selectinload(ContractLineItem.service_type),
+            selectinload(Contract.payments),
+        )
+        .where(Contract.client_id == client_id, Contract.deleted_at.is_(None))
+        .order_by(Contract.start_date.desc())
+    )
+    contracts = list(db.scalars(stmt).all())
+    rows: list[list[str]] = []
+    for contract in contracts:
+        services = ", ".join(
+            f"{item.service_type.name} ({_money(item.price)})"
+            + (" [bekor]" if item.is_cancelled else "")
+            for item in contract.line_items
+        )
+        rows.append(
+            [
+                contract.contract_number or "",
+                CONTRACT_STATUS_LABELS.get(contract.status, contract.status.value),
+                contract.start_date.isoformat(),
+                contract.end_date.isoformat(),
+                _money(contract.total_amount),
+                _money(contract.paid_amount),
+                _money(contract.debt_amount),
+                services,
+                contract.invoice_number or "",
+            ]
+        )
+    return rows
+
+
+def fetch_client_payments_rows(db: Session, client_id: int) -> list[list[str]]:
+    stmt = (
+        select(Payment)
+        .join(Payment.contract)
+        .where(
+            Contract.client_id == client_id,
+            Payment.deleted_at.is_(None),
+            Contract.deleted_at.is_(None),
+        )
+        .order_by(Payment.paid_at.desc())
+    )
+    payments = list(db.scalars(stmt).all())
+    return [
+        [
+            payment.paid_at.isoformat(),
+            str(payment.contract_id),
+            _money(payment.amount),
+            payment.note or "",
+        ]
+        for payment in payments
+    ]
+
+
+CLIENT_CARD_CONTRACT_HEADERS = [
+    "Shartnoma №",
+    "Holat",
+    "Boshlanish",
+    "Tugash",
+    "Jami",
+    "To'langan",
+    "Qarz",
+    "Xizmatlar",
+    "ЭСФ",
+]
+CLIENT_CARD_PAYMENT_HEADERS = ["Sana", "Shartnoma ID", "Summa", "Izoh"]
+CLIENT_CARD_PROFILE_HEADERS = ["Maydon", "Qiymat"]

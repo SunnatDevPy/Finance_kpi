@@ -62,7 +62,7 @@ def test_delete_income_is_soft_delete_and_restorable(client, auth_headers):
     assert get_resp.status_code == 404
 
     trash = client.get("/api/v1/incomes/trash", headers=auth_headers)
-    assert any(item["id"] == income_id for item in trash.json())
+    assert any(item["id"] == income_id for item in trash.json()["items"])
 
     restore_resp = client.post(f"/api/v1/incomes/{income_id}/restore", headers=auth_headers)
     assert restore_resp.status_code == 200

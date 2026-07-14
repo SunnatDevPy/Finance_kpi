@@ -47,35 +47,19 @@ export function Pagination({
   return (
     <div
       className={cn(
-        "flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between",
-        !embedded && "border-t pt-4",
+        "flex flex-wrap items-center justify-between gap-x-3 gap-y-2",
+        !embedded && "border-t pt-3",
       )}
     >
-      <p className="text-sm text-muted-foreground">
+      <p className="shrink-0 text-xs text-muted-foreground sm:text-sm">
         {t("pagination.showing")
           .replace("{from}", String(from))
           .replace("{to}", String(to))
           .replace("{total}", String(total))}
       </p>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <Select
-          value={String(pageSize)}
-          onValueChange={(value) => value && onPageSizeChange(Number(value))}
-        >
-          <SelectTrigger className="h-8 w-[110px]" aria-label={t("pagination.perPage")}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {pageSizeOptions.map((size) => (
-              <SelectItem key={size} value={String(size)}>
-                {size} / {t("pagination.pageShort")}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <div className="flex items-center gap-1">
+      <div className="flex shrink-0 flex-nowrap items-center gap-2">
+        <div className="flex shrink-0 items-center gap-0.5">
           <MotionButton
             type="button"
             variant="outline"
@@ -117,6 +101,23 @@ export function Pagination({
             <ChevronRightIcon className="size-4" />
           </MotionButton>
         </div>
+
+        <Select
+          className="w-auto shrink-0"
+          value={String(pageSize)}
+          onValueChange={(value) => value && onPageSizeChange(Number(value))}
+        >
+          <SelectTrigger className="h-8 w-[6.75rem] shrink-0" aria-label={t("pagination.perPage")}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {pageSizeOptions.map((size) => (
+              <SelectItem key={size} value={String(size)}>
+                {size} / {t("pagination.pageShort")}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
     </div>
   );

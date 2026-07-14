@@ -42,8 +42,8 @@ function SkeletonBar({ className, delay = 0 }: { className?: string; delay?: num
 
 function TableSkeleton({ rows, cols }: { rows: number; cols: number }) {
   return (
-    <div className="glass-panel shine-border overflow-hidden">
-      <div className="border-b bg-muted/30 px-4 py-3 backdrop-blur-sm">
+    <div className="glass-panel shine-border overflow-hidden rounded-xl">
+      <div className="border-b bg-muted/30 px-5 py-3.5 backdrop-blur-sm">
         <div className="flex gap-4">
           {Array.from({ length: cols }).map((_, i) => (
             <SkeletonBar key={i} className="h-3 flex-1" delay={i * 0.05} />
@@ -62,7 +62,7 @@ function TableSkeleton({ rows, cols }: { rows: number; cols: number }) {
               ease: [0.16, 1, 0.3, 1],
             }}
             className={cn(
-              "flex items-center gap-4 border-b border-border/40 px-4 py-4 last:border-0",
+              "flex items-center gap-4 border-b border-border/40 px-5 py-4 last:border-0",
               row % 2 === 1 && "bg-muted/15",
             )}
           >
@@ -91,6 +91,8 @@ function TableEmpty({ message }: { message: string }) {
   )
 }
 
+const tableInset = "px-4 pb-4 sm:px-5 sm:pb-5"
+
 export function PremiumDataTable({
   loading = false,
   empty = false,
@@ -102,20 +104,28 @@ export function PremiumDataTable({
   className,
 }: PremiumDataTableProps) {
   if (loading) {
-    return <TableSkeleton rows={skeletonRows} cols={skeletonCols} />
+    return (
+      <div className={cn(tableInset, className)}>
+        <TableSkeleton rows={skeletonRows} cols={skeletonCols} />
+      </div>
+    )
   }
 
   if (empty) {
-    return <TableEmpty message={emptyMessage} />
+    return (
+      <div className={cn(tableInset, className)}>
+        <TableEmpty message={emptyMessage} />
+      </div>
+    )
   }
 
   return (
-    <div className={cn("flex flex-col", className)}>
-      <div className="glass-panel shine-border overflow-hidden">
+    <div className={cn("flex flex-col", tableInset, className)}>
+      <div className="glass-panel shine-border overflow-hidden rounded-xl">
         <Table variant="default">{children}</Table>
       </div>
       {footer ? (
-        <div className="-mt-px rounded-b-2xl border border-t-0 border-border/50 bg-muted/20 px-5 py-4 backdrop-blur-sm">
+        <div className="-mt-px rounded-b-xl border border-t-0 border-border/50 bg-muted/15 px-4 py-2 sm:px-5">
           {footer}
         </div>
       ) : null}
@@ -193,7 +203,7 @@ export function TableCellLink({ to, children, subtitle, className }: TableCellLi
       <div className="flex flex-col gap-0.5">
         <Link
           to={to}
-          className="font-semibold text-primary transition-colors hover:text-primary/80 hover:underline"
+          className="link-surface font-semibold text-primary"
         >
           {children}
         </Link>
@@ -221,7 +231,7 @@ export function TableCellCompany({ to, name, subtitle, className, logoUrl }: Tab
         <div className="flex min-w-0 flex-col gap-0.5">
           <Link
             to={to}
-            className="truncate font-semibold text-primary transition-colors hover:text-primary/80 hover:underline"
+            className="link-surface truncate font-semibold text-primary"
           >
             {name}
           </Link>

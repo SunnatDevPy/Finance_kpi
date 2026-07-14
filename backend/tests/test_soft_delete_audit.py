@@ -26,7 +26,7 @@ def test_delete_client_is_soft_delete(client, auth_headers):
 
     trash = client.get("/api/v1/clients/trash", headers=auth_headers)
     assert trash.status_code == 200
-    assert any(item["id"] == client_id for item in trash.json())
+    assert any(item["id"] == client_id for item in trash.json()["items"])
 
 
 def test_restore_client_brings_it_back(client, auth_headers):
@@ -42,7 +42,7 @@ def test_restore_client_brings_it_back(client, auth_headers):
     assert any(item["id"] == client_id for item in listing.json()["items"])
 
     trash = client.get("/api/v1/clients/trash", headers=auth_headers)
-    assert all(item["id"] != client_id for item in trash.json())
+    assert all(item["id"] != client_id for item in trash.json()["items"])
 
 
 def test_delete_client_cascades_soft_delete_to_contracts(
@@ -98,7 +98,7 @@ def test_deleted_contract_excluded_from_debts_and_dashboard(
     assert Decimal(after["total_debt"]) == Decimal("0")
 
     trash = client.get("/api/v1/contracts/trash", headers=auth_headers)
-    assert any(item["id"] == contract_id for item in trash.json())
+    assert any(item["id"] == contract_id for item in trash.json()["items"])
 
     restore_resp = client.post(f"/api/v1/contracts/{contract_id}/restore", headers=auth_headers)
     assert restore_resp.status_code == 200
@@ -137,7 +137,7 @@ def test_deleted_payment_excluded_from_totals(client, auth_headers, sample_contr
     assert Decimal(contract_after["paid_amount"]) == Decimal("0")
 
     trash = client.get("/api/v1/payments/trash", headers=auth_headers)
-    assert any(item["id"] == payment_id for item in trash.json())
+    assert any(item["id"] == payment_id for item in trash.json()["items"])
 
     restore_resp = client.post(f"/api/v1/payments/{payment_id}/restore", headers=auth_headers)
     assert restore_resp.status_code == 200

@@ -1,7 +1,9 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from app.models import ContractWorkflowStatus
 
 
 class ContractLineItemBase(BaseModel):
@@ -11,6 +13,11 @@ class ContractLineItemBase(BaseModel):
 
 class ContractLineItemCreate(ContractLineItemBase):
     pass
+
+
+class ContractLineItemUpdate(BaseModel):
+    service_type_id: int
+    price: Decimal = Field(gt=0, decimal_places=2, max_digits=18)
 
 
 class ContractLineItemRead(ContractLineItemBase):
@@ -29,6 +36,7 @@ class ContractBase(BaseModel):
     notes: str | None = None
     contract_number: str | None = Field(default=None, max_length=50)
     invoice_number: str | None = Field(default=None, max_length=100)
+    status: ContractWorkflowStatus = ContractWorkflowStatus.YANGI
 
     @model_validator(mode="after")
     def validate_dates(self) -> "ContractBase":
@@ -47,6 +55,7 @@ class ContractUpdate(BaseModel):
     notes: str | None = None
     contract_number: str | None = Field(default=None, max_length=50)
     invoice_number: str | None = Field(default=None, max_length=100)
+    status: ContractWorkflowStatus | None = None
     line_items: list[ContractLineItemCreate] | None = None
 
     @model_validator(mode="after")
@@ -67,6 +76,7 @@ class ContractRead(ContractBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    status: ContractWorkflowStatus
     line_items: list[ContractLineItemRead]
     total_amount: Decimal
     paid_amount: Decimal

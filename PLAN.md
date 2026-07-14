@@ -305,4 +305,45 @@
 
 ---
 
+### 39. Moliyachi nuqtai nazaridan UI/UX audit — ikki bosqich (2026-yil iyul)
+
+**Birinchi bosqich:**
+- [x] Qarzdorlikni ko'rish: Clients ro'yxatiga "Qarz" ustuni, Dashboard'dan `/debts`ga link, Debts.tsx'ga shartnoma raqami ustuni + pagination, qidiruv telefon bo'yicha ham; bonus: `reactivate_line_item`dagi `contract aniqlanmagan` 500-xato tuzatildi
+- [x] Contracts sahifasidagi sana filtri bug'i — `DateRangePicker` endi jadval ro'yxatini ham filtrlaydi (`date_from`/`date_to`, `Contract.end_date`)
+- [x] Qidiruvni kengaytirish — Contracts (shartnoma/invoys raqami), Payments (shartnoma raqami, mijoz telefoni), Debts (telefon); filtrlar `localStorage`da saqlanadi
+- [x] To'lov kiritish oqimi — Payments'ga "Yangi to'lov" tugmasi/modal, "Saqlash va yana qo'shish", delete'ga `useSubmitGuard`
+- [x] Raqam formatlash — `formatMoney`/`formatCompactMoney` NaN/Infinity fallback, Payments jami summa backend `SUM`dan
+- [x] Bildirishnomalar — qarz muddati o'tgan mijozlar bo'limi (`/notifications/overdue-debts`), NotificationBell 3 daqiqalik polling
+- [x] Audit jurnali — mijoz/shartnoma ID filtri, sana oralig'i filtri
+- [x] Mobil jadval scroll — `ui/table.tsx` premium variantdagi `overflow-hidden` olib tashlandi, `overflow-x-auto` ishlaydi
+- [x] ClientCard'ga breadcrumb ("Mijozlar / {kompaniya nomi}")
+
+**Ikkinchi bosqich:**
+- [x] Expenses → Finance birlashtirildi — `/expenses` sahifasi olib tashlandi (`/finance`ga redirect), sidebar linki o'chirildi, Finance'ga alohida "Xarajat qo'shish" tugmasi
+- [x] Hodim (User) o'zgarishlari uchun audit yo'q edi — tuzatildi: `users.py`da `create_user`/`update_user` endi `record_audit` chaqiradi (`entity_type="user"`), Audit jurnalida "Hodim" filtri, Employees sahifasida har qatorda "Tarix" tugmasi
+- [x] Bulk export (Contracts, Payments) — checkbox + "hammasini tanlash" (indeterminate), tanlangan yozuvlarni Excel/PDF eksport (`/export/{resource}?ids=1,2,3`)
+- [x] Sessiya muddati tugab (401) avtomatik chiqarilganda ogohlantirishsiz forma yopilishi — `AuthContext`ga `sessionExpired` flag (oddiy "Chiqish"dan ajratilgan), Login sahifasida "Sessiya muddati tugadi" xabari
+- [x] Bulk arxivlash — Contracts/Payments BulkActionBar'ga "Arxivga o'tkazish" tugmasi (tasdiqlash bilan, mavjud soft-delete endpointlari orqali parallel)
+- [x] Debts sahifasiga bulk export — jadval qatorlari shartnomalar bo'lgani uchun mavjud `contracts` eksport endpointidan (ids bilan) foydalanildi
+- [x] Bonus/muhim tuzatish: Expenses→Finance birlashtirishda Finance sahifasida eksport tugmalari umuman yo'q qolib ketgan edi (`incomes`/`expenses`) — qaytarildi
+
+### 40. Kontraktlar jadvali — status rang-kodlash va tezkor tahrirlash (2026-yil iyul)
+- [x] Butun qator rangi workflow-statusga qarab o'zgaradi (Sheets-uslubida, yumshoq pastel fon): yangi=sariq, davom etmoqda=yashil, tugadi=och moviy, to'xtatildi/bekor qilingan=qizil (`contractRowTint()`, `!important` bilan zebra-striping'dan ustun)
+- [x] Status badge'lar ham shu rang sxemasiga moslashtirildi (`.contract-workflow-badge--*`), shu orqali ClientCard'dagi shartnoma ro'yxati ham avtomatik yangilandi
+- [x] Statusni to'liq tahrirlash oynasini ochmasdan, jadvaldan to'g'ridan-to'g'ri o'zgartirish — `ContractStatusPicker` (status pill o'zi bosiladigan `Select` bo'lib, ichida qalamcha belgisi bilan)
+- [x] Ustunlar tartibi qayta tuzildi: Mijoz → Muddat → Jami → Tushum (yangi ustun) → Qarz → Xizmatlar → ЭСФ (endi alohida ustun, avval Muddat ichida yashiringan edi) → Holat (oxiriga ko'chirildi) → Amallar
+
+### 41. Moliyachi nuqtai nazaridan UI/UX audit — uchinchi bosqich (2026-yil iyul)
+
+- [x] RBAC bo'shlig'i — kontrakt/mijoz/to'lov/xarajat/kirim `delete` endpointlari endi `require_admin` (avval `restore` admin-only edi, `delete` esa har qanday login qilgan foydalanuvchiga ochiq edi); Xizmat turlari (`service-types`) `create`/`update`/`delete` ham endi faqat admin; frontend'da menejer uchun bu tugmalar butunlay yashirilgan (Contracts/Payments qator va bulk-archive, ServiceTypes kartochka menyusi/tafsilot oynasi)
+- [x] Kontraktlar uchun status bo'yicha tezkor filtr — backend `GET /contracts?status=`, frontend'da `Select` (`localStorage`da saqlanadi)
+- [x] Qaytarma (manfiy) to'lovlar endi qizil rangda — Payments va ClientCard jadvallarida summa belgisiga qarab `tone`
+- [x] Employees: mavjud xodimni tahrirlash oynasi (ism, rol, ixtiyoriy parol) + bloklashdan oldin tasdiqlash oynasi (`AlertDialog`)
+- [x] Trash: barcha 5 bo'lim (mijoz/kontrakt/to'lov/xarajat/kirim) endi sahifalab yuklanadi va qidiruvga ega — backend `Page[...]` + `search`/`skip`/`limit`, frontend faqat faol tabni yuklaydi, tab pill'lardagi sonlar alohida yengil so'rov bilan yangilanadi
+- [x] ClientCard to'lov tarixi 200 limitini endi sahifalab (`skip`/`limit` loop) to'liq yuklaydi — uzoq mijozlarning butun tarixi ko'rinadi
+- [x] ServiceTypes: nomni tahrirlash imkoniyati (tafsilot oynasida qalamcha) + faol/nofaol filtri
+- [x] Profile: sozlamalar/kirish tarixi yuklanmasa endi jim qolmaydi, xato xabari chiqadi; Dashboard: asosiy statistika, muddati tugayotgan shartnomalar, LTV va daromad trendi endi mustaqil so'rovlar — bittasi xato bersa qolganlari ko'rinishda qoladi
+
+---
+
 *Bu fayl loyihaning yagona, yangilanib turadigan ish rejasi hisoblanadi. Yangi vazifalar shu yerga qo'shiladi, bajarilganda `[x]` bilan belgilanadi.*

@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 class DebtContractItem(BaseModel):
     contract_id: int
+    contract_number: str | None
     start_date: date
     end_date: date
     total_amount: Decimal
@@ -27,3 +28,4 @@ class DebtsSummary(BaseModel):
     total_debt: Decimal
     total_overpaid: Decimal
     debtor_count: int
+    cancelled_amount: Decimal

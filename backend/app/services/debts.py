@@ -1,10 +1,11 @@
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models import Client, Contract
 from app.schemas.debt import DebtClientItem, DebtContractItem, DebtsSummary
+from app.services.cancelled_stats import sum_cancelled_line_items
 
 
 def get_debts_overview(db: Session, search: str | None = None) -> DebtsSummary:
@@ -19,7 +20,10 @@ def get_debts_overview(db: Session, search: str | None = None) -> DebtsSummary:
         .order_by(Client.company_name)
     )
     if search:
-        stmt = stmt.where(Client.company_name.ilike(f"%{search}%"))
+        pattern = f"%{search}%"
+        stmt = stmt.where(
+            or_(Client.company_name.ilike(pattern), Client.phone.ilike(pattern))
+        )
     clients = list(db.scalars(stmt).all())
 
     result: list[DebtClientItem] = []
@@ -39,6 +43,7 @@ def get_debts_overview(db: Session, search: str | None = None) -> DebtsSummary:
             contract_items.append(
                 DebtContractItem(
                     contract_id=contract.id,
+                    contract_number=contract.contract_number,
                     start_date=contract.start_date,
                     end_date=contract.end_date,
                     total_amount=contract.total_amount,
@@ -75,4 +80,5 @@ def get_debts_overview(db: Session, search: str | None = None) -> DebtsSummary:
         total_debt=total_debt,
         total_overpaid=total_overpaid,
         debtor_count=sum(1 for item in result if item.total_debt > 0),
+        cancelled_amount=sum_cancelled_line_items(db),
     )

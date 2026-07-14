@@ -1,27 +1,35 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeftIcon,
-  BanIcon,
   BanknoteIcon,
-  Building2Icon,
-  ClipboardCheckIcon,
+  CheckCircle2Icon,
+  ChevronRightIcon,
+  ClockIcon,
+  DownloadIcon,
   FileTextIcon,
-  ReceiptIcon,
+  FlagIcon,
+  PencilIcon,
+  PlusIcon,
   RotateCcwIcon,
-  UserIcon,
+  Trash2Icon,
   XCircleIcon,
 } from "lucide-react";
 import { api } from "../api/client";
 import { CancelIcon, LoadingIconBtn, SaveIconBtn } from "../components/ButtonIcons";
-import { ClientLogoUploader } from "../components/ClientLogoUploader";
+import { ClientCardOverview } from "../components/ClientCardOverview";
+import { ClientLogoUploader } from "@/components/ClientLogoUploader";
+import { CountryCityFields } from "../components/CountryCityFields";
+import {
+  ContractFormFields,
+  emptyContractForm,
+  type ContractFormState,
+} from "../components/ContractFormFields";
 import { Modal } from "../components/Modal";
 import { PageError } from "../components/PageError";
 import { PageHeader, PageShell } from "../components/PageHeader";
 import { ContractStatusBadge } from "../components/ContractStatusBadge";
-import { ActiveStatusToggle } from "../components/ActiveStatusToggle";
 import { StaggerContainer, StaggerItem } from "../components/Stagger";
-import { StatCard } from "../components/StatCard";
 import {
   MotionTableRow,
   PremiumDataTable,
@@ -52,7 +60,7 @@ import { useSubmitGuard } from "../hooks/useSubmitGuard";
 import { Button, MotionButton, motionTap } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FloatingLabelDatePicker } from "@/components/ui/date-picker";
-import { FloatingLabelInput, FloatingLabelMoneyInput } from "@/components/ui/floating-label-input";
+import { FloatingLabelInput, FloatingLabelMoneyInput, FloatingLabelPhoneInput, FloatingLabelTextarea } from "@/components/ui/floating-label-input";
 import {
   Select,
   SelectContent,
@@ -61,9 +69,39 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { ClientCard, Payment } from "../types";
+import type { AuditLogEntry, ClientCard, ClientFormData, Contract, Payment, ServiceType } from "../types";
+import { ActiveStatusToggle } from "../components/ActiveStatusToggle";
+import { resolveCountryValue, resolveRegionValue } from "@/data/geoRegions";
+import { parsePhoneNational, toPhoneE164 } from "@/hooks/usePhoneInput";
 import { cn } from "@/lib/utils";
-import { formatDateWithWeekday, formatMoney, toNumber } from "../utils/format";
+import {
+  emptyClientForm,
+  formatDateTimeWithWeekday,
+  formatDateWithWeekday,
+  formatMoney,
+  toNumber,
+  toWholeAmountDigits,
+} from "../utils/format";
+
+function activeLineItemCount(contract: Contract): number {
+  return contract.line_items.filter((item) => !item.is_cancelled).length;
+}
+
+function contractWasModified(contract: Contract): boolean {
+  return (
+    new Date(contract.updated_at).getTime() - new Date(contract.created_at).getTime() > 2000
+  );
+}
+
+function auditActionLabel(action: AuditLogEntry["action"], t: (key: string) => string): string {
+  const keys: Record<AuditLogEntry["action"], string> = {
+    create: "auditLog.actionCreate",
+    update: "auditLog.actionUpdate",
+    delete: "auditLog.actionDelete",
+    restore: "auditLog.actionRestore",
+  };
+  return t(keys[action]);
+}
 
 export function ClientCardPage() {
   const { id } = useParams<{ id: string }>();
@@ -79,8 +117,48 @@ export function ClientCardPage() {
     lineItemId: number;
   } | null>(null);
   const [cancelContractTarget, setCancelContractTarget] = useState<number | null>(null);
+  const [historyContractId, setHistoryContractId] = useState<number | null>(null);
+  const [historyEntries, setHistoryEntries] = useState<AuditLogEntry[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [editLineItemTarget, setEditLineItemTarget] = useState<{
+    contractId: number;
+    lineItemId: number;
+    serviceTypeId: number;
+    price: string;
+  } | null>(null);
+  const [contractModalOpen, setContractModalOpen] = useState(false);
+  const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
+  const [contractForm, setContractForm] = useState<ContractFormState>(() =>
+    emptyContractForm([]),
+  );
+  const [contractNumberHint, setContractNumberHint] = useState<{
+    last: string | null;
+    next: string;
+  } | null>(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editForm, setEditForm] = useState<ClientFormData>(emptyClientForm());
+  const [exportBusy, setExportBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const { submitting: payingSubmitting, guard: guardPayment } = useSubmitGuard();
+  const { submitting: contractSubmitting, guard: guardContract } = useSubmitGuard();
+  const { submitting: editPriceSubmitting, guard: guardEditPrice } = useSubmitGuard();
+  const { submitting: editClientSubmitting, guard: guardEditClient } = useSubmitGuard();
+
+  /** Bitta shartnoma bo'yicha barcha to'lovlarni sahifalab yuklaydi
+   * — backend sahifa hajmi 200 bilan cheklangani uchun, uzoq mijozlarning
+   * to'liq to'lov tarixi (200 tadan ortiq bo'lsa) kesib qolib ketmasligi kerak. */
+  const fetchAllPaymentsForContract = async (contractId: number): Promise<Payment[]> => {
+    const limit = 200;
+    let skip = 0;
+    const all: Payment[] = [];
+    while (true) {
+      const page = await api.payments.list({ contractId, skip, limit });
+      all.push(...page.items);
+      if (page.items.length < limit || all.length >= page.total) break;
+      skip += limit;
+    }
+    return all;
+  };
 
   const load = () => {
     if (!id) return;
@@ -93,17 +171,111 @@ export function ClientCardPage() {
           setPayments([]);
           return;
         }
-        const pages = await Promise.all(
-          contractIds.map((contractId) =>
-            api.payments.list({ contractId, limit: 200 }),
-          ),
-        );
-        setPayments(pages.flatMap((p) => p.items));
+        const pages = await Promise.all(contractIds.map(fetchAllPaymentsForContract));
+        setPayments(pages.flat());
       })
       .catch((e) => setError(e.message));
   };
 
   useEffect(load, [id]);
+
+  const loadServiceTypes = useCallback(() => {
+    api.serviceTypes
+      .list(true)
+      .then((types) => {
+        setServiceTypes(types);
+        setContractForm(emptyContractForm(types));
+      })
+      .catch(() => {
+        setServiceTypes([]);
+        setContractForm(emptyContractForm([]));
+      });
+  }, []);
+
+  const openContractModal = async () => {
+    if (!card) return;
+    setError("");
+    setContractNumberHint(null);
+    setContractModalOpen(true);
+    try {
+      const [types, numberData] = await Promise.all([
+        api.serviceTypes.list(true),
+        api.contracts.nextNumber(card.id),
+      ]);
+      setServiceTypes(types);
+      setContractForm({
+        ...emptyContractForm(types),
+        contract_number: numberData.next_number,
+      });
+      setContractNumberHint({ last: numberData.last_number, next: numberData.next_number });
+    } catch {
+      loadServiceTypes();
+      setContractNumberHint(null);
+    }
+  };
+
+  const closeContractModal = () => {
+    setContractModalOpen(false);
+    setContractNumberHint(null);
+    setContractForm(emptyContractForm(serviceTypes));
+  };
+
+  const updateContractForm = (patch: Partial<ContractFormState>) => {
+    setContractForm((prev) => ({ ...prev, ...patch }));
+  };
+
+  const addContractLineItem = () => {
+    setContractForm((prev) => ({
+      ...prev,
+      line_items: [
+        ...prev.line_items,
+        { service_type_id: serviceTypes[0]?.id || 0, price: "" },
+      ],
+    }));
+  };
+
+  const removeContractLineItem = (index: number) => {
+    setContractForm((prev) => {
+      if (prev.line_items.length <= 1) return prev;
+      return {
+        ...prev,
+        line_items: prev.line_items.filter((_, i) => i !== index),
+      };
+    });
+  };
+
+  const handleCreateContract = guardContract(async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!card) return;
+    setError("");
+    if (!contractForm.start_date || !contractForm.end_date) {
+      setError(t("clients.selectDateError"));
+      return;
+    }
+    if (contractForm.line_items.some((item) => !item.price)) {
+      setError(t("common.error"));
+      return;
+    }
+    try {
+      await api.contracts.create({
+        client_id: card.id,
+        start_date: contractForm.start_date,
+        end_date: contractForm.end_date,
+        status: contractForm.status,
+        notes: contractForm.notes || undefined,
+        contract_number: contractForm.contract_number || undefined,
+        invoice_number: contractForm.invoice_number || undefined,
+        line_items: contractForm.line_items.map((item) => ({
+          service_type_id: item.service_type_id,
+          price: parseFloat(item.price),
+        })),
+      });
+      closeContractModal();
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("common.error"));
+    }
+  });
 
   const toggleClientStatus = async (active: boolean) => {
     if (!card) return;
@@ -120,9 +292,64 @@ export function ClientCardPage() {
     }
   };
 
-  const handlePayment = guardPayment(async (e: React.FormEvent) => {
+  const openEditModal = () => {
+    if (!card) return;
+    setError("");
+    setEditForm({
+      company_name: card.company_name,
+      contact_person: card.contact_person || "",
+      phone: parsePhoneNational(card.phone || ""),
+      website: card.website || "",
+      country: resolveCountryValue(card.country || ""),
+      city: resolveRegionValue(resolveCountryValue(card.country || ""), card.city || ""),
+      activity_type: card.activity_type || "",
+      status: card.status,
+      notes: card.notes || "",
+    });
+    setEditModalOpen(true);
+  };
+
+  const handleEditClient = guardEditClient(async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!card) return;
+    setError("");
+    try {
+      const payload = {
+        ...editForm,
+        contact_person: editForm.contact_person || undefined,
+        phone: editForm.phone ? toPhoneE164(editForm.phone) : undefined,
+        website: editForm.website || undefined,
+        country: editForm.country || undefined,
+        city: editForm.city || undefined,
+        activity_type: editForm.activity_type || undefined,
+        notes: editForm.notes || undefined,
+      };
+      const updated = await api.clients.update(card.id, payload);
+      setCard((prev) => (prev ? { ...prev, ...updated } : prev));
+      setEditModalOpen(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("common.error"));
+    }
+  });
+
+  const handleExportCard = async () => {
+    if (!card) return;
+    setExportBusy(true);
+    setError("");
+    try {
+      await api.clients.exportCard(card.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("common.error"));
+    } finally {
+      setExportBusy(false);
+    }
+  };
+
+  const handlePayment = guardPayment(async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!payModal) return;
+    const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    const keepOpen = submitter?.dataset.keepOpen === "true";
     setError("");
     if (!payForm.paid_at) {
       setError(t("clients.selectDateError"));
@@ -136,23 +363,23 @@ export function ClientCardPage() {
         paid_at: payForm.paid_at,
         note: payForm.note || undefined,
       });
-      setPayModal(null);
-      setPayForm({ amount: "", paid_at: "", note: "" });
-      setPayType("income");
+      if (keepOpen) {
+        setPayForm((prev) => ({ ...prev, amount: "", note: "" }));
+      } else {
+        setPayModal(null);
+        setPayForm({ amount: "", paid_at: "", note: "" });
+        setPayType("income");
+      }
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("common.error"));
     }
   });
 
-  const handleDownloadDocument = async (
-    contractId: number,
-    type: "invoice" | "act",
-    contractNumber: string | null,
-  ) => {
+  const handleDownloadContract = async (contractId: number, contractNumber: string | null) => {
     setError("");
     try {
-      await api.contracts.downloadDocument(contractId, type, contractNumber);
+      await api.contracts.downloadDocument(contractId, "contract", contractNumber);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("common.error"));
     }
@@ -173,18 +400,8 @@ export function ClientCardPage() {
     }
   };
 
-  const handleReactivateLineItem = async (contractId: number, lineItemId: number) => {
-    setError("");
-    try {
-      await api.contracts.reactivateLineItem(contractId, lineItemId);
-      load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t("common.error"));
-    }
-  };
-
   const handleCancelContract = async () => {
-    if (!cancelContractTarget) return;
+    if (cancelContractTarget === null) return;
     setBusy(true);
     setError("");
     try {
@@ -197,6 +414,99 @@ export function ClientCardPage() {
       setBusy(false);
     }
   };
+
+  const handleConfirmContract = async (contractId: number) => {
+    setError("");
+    try {
+      await api.contracts.confirm(contractId);
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("common.error"));
+    }
+  };
+
+  const handleCompleteContract = async (contractId: number) => {
+    setError("");
+    try {
+      await api.contracts.complete(contractId);
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("common.error"));
+    }
+  };
+
+  const handleReactivateLineItem = async (contractId: number, lineItemId: number) => {
+    setError("");
+    try {
+      await api.contracts.reactivateLineItem(contractId, lineItemId);
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("common.error"));
+    }
+  };
+
+  const openContractHistory = async (contractId: number) => {
+    setHistoryContractId(contractId);
+    setHistoryLoading(true);
+    setHistoryEntries([]);
+    try {
+      const data = await api.contracts.history(contractId, { limit: 100 });
+      setHistoryEntries(data.items);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("common.error"));
+      setHistoryContractId(null);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const closeContractHistory = () => {
+    setHistoryContractId(null);
+    setHistoryEntries([]);
+  };
+
+  const openEditLineItem = async (
+    contractId: number,
+    lineItemId: number,
+    serviceTypeId: number,
+    price: string,
+  ) => {
+    if (serviceTypes.length === 0) {
+      try {
+        const types = await api.serviceTypes.list(true);
+        setServiceTypes(types);
+      } catch {
+        setServiceTypes([]);
+      }
+    }
+    setEditLineItemTarget({
+      contractId,
+      lineItemId,
+      serviceTypeId,
+      price: toWholeAmountDigits(price),
+    });
+  };
+
+  const handleEditLineItem = guardEditPrice(async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editLineItemTarget) return;
+    const amount = parseFloat(editLineItemTarget.price);
+    if (!Number.isFinite(amount) || amount <= 0 || !editLineItemTarget.serviceTypeId) {
+      setError(t("common.error"));
+      return;
+    }
+    setError("");
+    try {
+      await api.contracts.updateLineItem(editLineItemTarget.contractId, editLineItemTarget.lineItemId, {
+        service_type_id: editLineItemTarget.serviceTypeId,
+        price: amount,
+      });
+      setEditLineItemTarget(null);
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("common.error"));
+    }
+  });
 
   if (error && !card) {
     return <PageError message={error} />;
@@ -212,101 +522,97 @@ export function ClientCardPage() {
 
   return (
     <PageShell>
-      <Button variant="ghost" size="sm" className="-mb-2 w-fit" render={<Link to="/clients" />}>
-        <ArrowLeftIcon data-icon="inline-start" />
-        {t("nav.clients")}
-      </Button>
+      <nav className="-mb-2 flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground" aria-label="Breadcrumb">
+        <Link
+          to="/clients"
+          className="link-surface flex items-center gap-1.5 font-medium text-foreground/80 transition-colors hover:text-primary"
+        >
+          <ArrowLeftIcon className="size-3.5" />
+          {t("nav.clients")}
+        </Link>
+        <ChevronRightIcon className="size-3.5 shrink-0 text-muted-foreground/50" />
+        <span className="truncate font-medium text-foreground">{card.company_name}</span>
+      </nav>
 
       <PageHeader
-        title={card.company_name}
-        subtitle={t("clients.card")}
-        badge={
-          <ActiveStatusToggle
-            active={card.status === "faol"}
-            onActiveChange={(active) => void toggleClientStatus(active)}
-          />
+        title={
+          <span className="flex flex-wrap items-center gap-3">
+            {card.company_name}
+            <MotionButton
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-9 text-sm font-medium"
+              disabled={exportBusy}
+              onClick={() => void handleExportCard()}
+              {...motionTap}
+            >
+              <DownloadIcon data-icon="inline-start" className={exportBusy ? "animate-pulse" : undefined} />
+              {exportBusy ? t("export.downloading") : t("clients.exportExcel")}
+            </MotionButton>
+          </span>
         }
+        subtitle={t("clients.card")}
       />
 
       <PageError message={error} />
 
-      <StaggerContainer className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <StaggerContainer>
         <StaggerItem>
-          <StatCard
-            title={t("clients.totalDebt")}
-            value={formatMoney(card.total_debt)}
-            accent="red"
-          />
-        </StaggerItem>
-        <StaggerItem>
-          <StatCard
-            title={t("common.contracts")}
-            value={String(card.contracts.length)}
-            accent="blue"
-            icon={FileTextIcon}
-          />
-        </StaggerItem>
-        <StaggerItem>
-          <StatCard
-            title={t("clients.contact")}
-            value={card.contact_person || "—"}
-            subtitle={card.phone || undefined}
-            accent="green"
-            icon={UserIcon}
+          <ClientCardOverview
+            client={card}
+            contracts={card.contracts}
+            totalDebt={card.total_debt}
+            cancelledAmount={card.cancelled_amount}
+            onClientUpdated={(updated) => setCard((prev) => (prev ? { ...prev, ...updated } : prev))}
+            onEdit={openEditModal}
+            onStatusChange={(active) => void toggleClientStatus(active)}
           />
         </StaggerItem>
       </StaggerContainer>
 
       <Card className="content-card">
-        <CardHeader className="border-b">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Building2Icon className="size-4 text-primary" />
-            {t("clients.basicInfo")}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-5 pt-5">
-          <ClientLogoUploader
-            client={card}
-            size="lg"
-            onUpdated={(updated) => setCard((prev) => (prev ? { ...prev, ...updated } : prev))}
-          />
-          <dl className="info-grid grid grid-cols-1 gap-5 md:grid-cols-2">
-            {(
-              [
-                [t("clients.phone"), card.phone],
-                [t("clients.website"), card.website],
-                [t("clients.country"), card.country],
-                [t("clients.city"), card.city],
-                [t("clients.activity"), card.activity_type],
-                [t("clients.notes"), card.notes],
-              ] as const
-            ).map(([label, value]) => (
-              <div key={label}>
-                <dt>{label}</dt>
-                <dd>{value || "—"}</dd>
-              </div>
-            ))}
-          </dl>
-        </CardContent>
-      </Card>
-
-      <Card className="content-card">
-        <CardHeader className="border-b">
-          <CardTitle className="text-base">{t("common.contracts")}</CardTitle>
-          <CardDescription>{t("clients.contractsDesc")}</CardDescription>
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 border-b">
+          <div>
+            <CardTitle className="text-base">{t("common.contracts")}</CardTitle>
+            <CardDescription>{t("clients.contractsDesc")}</CardDescription>
+          </div>
+          <MotionButton onClick={() => void openContractModal()} {...motionTap}>
+            <PlusIcon data-icon="inline-start" />
+            {t("clients.newContract")}
+          </MotionButton>
         </CardHeader>
         <CardContent className="pt-5">
           {card.contracts.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">{t("clients.noContracts")}</p>
+            <div className="flex flex-col items-center gap-4 py-10">
+              <p className="text-sm text-muted-foreground">{t("clients.noContracts")}</p>
+              <MotionButton variant="outline" onClick={() => void openContractModal()} {...motionTap}>
+                <PlusIcon data-icon="inline-start" />
+                {t("clients.newContract")}
+              </MotionButton>
+            </div>
           ) : (
             <div className="flex flex-col gap-4">
-              {card.contracts.map((contract) => (
+              {card.contracts.map((contract) => {
+                const activeItems = activeLineItemCount(contract);
+                const canRemoveService = activeItems > 1;
+                return (
                 <div
                   key={contract.id}
                   className="overflow-hidden rounded-xl border border-border/70 bg-card shadow-sm"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/60 bg-muted/20 px-4 py-4">
                     <div className="flex flex-col gap-1.5">
+                      {contractWasModified(contract) && (
+                        <button
+                          type="button"
+                          onClick={() => void openContractHistory(contract.id)}
+                          className="link-surface flex w-fit items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                        >
+                          <ClockIcon className="size-3.5 shrink-0" />
+                          {t("clients.modified")}
+                        </button>
+                      )}
                       <div className="flex flex-wrap items-center gap-2">
                         {contract.contract_number && (
                           <span className="text-sm font-semibold text-primary/80">
@@ -322,7 +628,7 @@ export function ClientCardPage() {
                             {t("clients.cancelled")}
                           </Badge>
                         ) : (
-                          <ContractStatusBadge endDate={contract.end_date} />
+                          <ContractStatusBadge status={contract.status} />
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground">
@@ -336,35 +642,15 @@ export function ClientCardPage() {
                       <MotionButton
                         size="icon-sm"
                         variant="ghost"
-                        title={t("contracts.downloadInvoice")}
-                        onClick={() => handleDownloadDocument(contract.id, "invoice", contract.contract_number)}
+                        title={t("contracts.downloadContract")}
+                        onClick={() => handleDownloadContract(contract.id, contract.contract_number)}
                         {...motionTap}
                       >
-                        <ReceiptIcon data-icon="inline-start" />
+                        <FileTextIcon data-icon="inline-start" />
                       </MotionButton>
-                      <MotionButton
-                        size="icon-sm"
-                        variant="ghost"
-                        title={t("contracts.downloadAct")}
-                        onClick={() => handleDownloadDocument(contract.id, "act", contract.contract_number)}
-                        {...motionTap}
-                      >
-                        <ClipboardCheckIcon data-icon="inline-start" />
-                      </MotionButton>
-                      {!contract.is_cancelled && (
-                        <MotionButton
-                          size="sm"
-                          variant="outline"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => setCancelContractTarget(contract.id)}
-                          {...motionTap}
-                        >
-                          <BanIcon data-icon="inline-start" />
-                          {t("clients.cancelContract")}
-                        </MotionButton>
-                      )}
                       <MotionButton
                         size="sm"
+                        className="bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700"
                         onClick={() => {
                           setPayModal(contract.id);
                           setPayType("income");
@@ -379,6 +665,42 @@ export function ClientCardPage() {
                         <BanknoteIcon data-icon="inline-start" />
                         {t("clients.payment")}
                       </MotionButton>
+                      {!contract.is_cancelled && contract.status === "yangi" && (
+                        <MotionButton
+                          size="sm"
+                          variant="outline"
+                          className="border-primary/40 text-primary hover:bg-primary/10"
+                          onClick={() => void handleConfirmContract(contract.id)}
+                          {...motionTap}
+                        >
+                          <CheckCircle2Icon data-icon="inline-start" />
+                          {t("clients.confirmContract")}
+                        </MotionButton>
+                      )}
+                      {!contract.is_cancelled && contract.status === "davom_etmoqda" && (
+                        <MotionButton
+                          size="sm"
+                          variant="outline"
+                          className="border-blue-500/40 text-blue-600 hover:bg-blue-500/10 dark:text-blue-400"
+                          onClick={() => void handleCompleteContract(contract.id)}
+                          {...motionTap}
+                        >
+                          <FlagIcon data-icon="inline-start" />
+                          {t("clients.completeContract")}
+                        </MotionButton>
+                      )}
+                      {!contract.is_cancelled && (
+                        <MotionButton
+                          size="sm"
+                          variant="outline"
+                          className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() => setCancelContractTarget(contract.id)}
+                          {...motionTap}
+                        >
+                          <XCircleIcon data-icon="inline-start" />
+                          {t("clients.cancelContract")}
+                        </MotionButton>
+                      )}
                     </div>
                   </div>
                   <div className="grid grid-cols-1 gap-3 border-b border-border/40 px-4 py-3 text-sm sm:grid-cols-3">
@@ -448,26 +770,53 @@ export function ClientCardPage() {
                               {item.is_cancelled ? (
                                 <MotionButton
                                   variant="ghost"
-                                  size="sm"
+                                  size="icon-sm"
+                                  title={t("clients.reactivateLineItem")}
                                   onClick={() => handleReactivateLineItem(contract.id, item.id)}
                                   {...motionTap}
                                 >
-                                  <RotateCcwIcon data-icon="inline-start" />
-                                  {t("clients.reactivateLineItem")}
+                                  <RotateCcwIcon className="size-4" />
                                 </MotionButton>
                               ) : (
-                                <MotionButton
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-destructive hover:text-destructive"
-                                  onClick={() =>
-                                    setCancelItemTarget({ contractId: contract.id, lineItemId: item.id })
-                                  }
-                                  {...motionTap}
-                                >
-                                  <XCircleIcon data-icon="inline-start" />
-                                  {t("clients.cancelLineItem")}
-                                </MotionButton>
+                                <div className="action-toolbar ml-auto w-fit">
+                                  <MotionButton
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    className="size-8"
+                                    title={t("clients.editService")}
+                                    onClick={() =>
+                                      openEditLineItem(
+                                        contract.id,
+                                        item.id,
+                                        item.service_type_id,
+                                        item.price,
+                                      )
+                                    }
+                                    {...motionTap}
+                                  >
+                                    <PencilIcon className="size-3.5" />
+                                  </MotionButton>
+                                  <MotionButton
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    className="size-8 text-destructive hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
+                                    title={
+                                      canRemoveService
+                                        ? t("clients.cancelLineItem")
+                                        : t("clients.lastServiceCannotDelete")
+                                    }
+                                    disabled={!canRemoveService}
+                                    onClick={() =>
+                                      setCancelItemTarget({
+                                        contractId: contract.id,
+                                        lineItemId: item.id,
+                                      })
+                                    }
+                                    {...motionTap}
+                                  >
+                                    <Trash2Icon className="size-3.5" />
+                                  </MotionButton>
+                                </div>
                               )}
                             </TableCell>
                           </MotionTableRow>
@@ -476,7 +825,8 @@ export function ClientCardPage() {
                     </PremiumDataTable>
                   </div>
                 </div>
-              ))}
+              );
+              })}
             </div>
           )}
         </CardContent>
@@ -502,7 +852,9 @@ export function ClientCardPage() {
                   <MotionTableRow key={p.id} {...rowEnter(index)}>
                     <TableCellDate>{formatDateWithWeekday(p.paid_at)}</TableCellDate>
                     <TableCellMuted>#{p.contract_id}</TableCellMuted>
-                    <TableCellMoney tone="positive">{formatMoney(p.amount)}</TableCellMoney>
+                    <TableCellMoney tone={toNumber(p.amount) < 0 ? "negative" : "positive"}>
+                      {formatMoney(p.amount)}
+                    </TableCellMoney>
                     <TableCellMuted>{p.note}</TableCellMuted>
                   </MotionTableRow>
                 ))}
@@ -511,6 +863,35 @@ export function ClientCardPage() {
           </CardContent>
         </Card>
       )}
+
+      <Modal
+        title={t("clients.newContract")}
+        open={contractModalOpen}
+        onClose={closeContractModal}
+        wide
+      >
+        <form onSubmit={handleCreateContract} className="flex flex-col gap-4">
+          <ContractFormFields
+            form={contractForm}
+            onChange={updateContractForm}
+            serviceTypes={serviceTypes}
+            contractNumberHint={contractNumberHint}
+            showContractNumberHint
+            onAddLineItem={addContractLineItem}
+            onRemoveLineItem={removeContractLineItem}
+          />
+          <div className="flex flex-wrap justify-end gap-2 pt-2">
+            <MotionButton type="button" variant="outline" onClick={closeContractModal} {...motionTap}>
+              <CancelIcon />
+              {t("common.cancel")}
+            </MotionButton>
+            <MotionButton type="submit" disabled={contractSubmitting} {...motionTap}>
+              {contractSubmitting ? <LoadingIconBtn /> : <SaveIconBtn />}
+              {contractSubmitting ? t("common.saving") : t("common.save")}
+            </MotionButton>
+          </div>
+        </form>
+      </Modal>
 
       <Modal
         title={t("clients.addPayment")}
@@ -554,10 +935,20 @@ export function ClientCardPage() {
             value={payForm.note}
             onChange={(e) => setPayForm({ ...payForm, note: e.target.value })}
           />
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex flex-wrap justify-end gap-2 pt-2">
             <MotionButton type="button" variant="outline" onClick={() => setPayModal(null)} {...motionTap}>
               <CancelIcon />
               {t("common.cancel")}
+            </MotionButton>
+            <MotionButton
+              type="submit"
+              variant="outline"
+              data-keep-open="true"
+              disabled={payingSubmitting}
+              {...motionTap}
+            >
+              {payingSubmitting ? <LoadingIconBtn /> : <PlusIcon data-icon="inline-start" />}
+              {t("clients.saveAndAddAnother")}
             </MotionButton>
             <MotionButton type="submit" disabled={payingSubmitting} {...motionTap}>
               {payingSubmitting ? <LoadingIconBtn /> : <SaveIconBtn />}
@@ -565,6 +956,182 @@ export function ClientCardPage() {
             </MotionButton>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        title={t("clients.editService")}
+        open={editLineItemTarget !== null}
+        onClose={() => setEditLineItemTarget(null)}
+      >
+        {editLineItemTarget && (
+          <form onSubmit={handleEditLineItem} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-foreground" htmlFor="line_item_service">
+                {t("clients.service")}
+              </label>
+              <Select
+                value={String(editLineItemTarget.serviceTypeId)}
+                onValueChange={(value) => {
+                  if (!value) return;
+                  setEditLineItemTarget((prev) =>
+                    prev ? { ...prev, serviceTypeId: parseInt(value, 10) } : prev,
+                  );
+                }}
+              >
+                <SelectTrigger id="line_item_service" className="h-12 w-full">
+                  <SelectValue placeholder={t("clients.service")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {serviceTypes.map((st) => (
+                      <SelectItem key={st.id} value={String(st.id)}>
+                        {st.name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+            <FloatingLabelMoneyInput
+              id="line_item_price"
+              label={t("common.price")}
+              required
+              value={editLineItemTarget.price}
+              onValueChange={(digits) =>
+                setEditLineItemTarget((prev) => (prev ? { ...prev, price: digits } : prev))
+              }
+            />
+            <div className="flex flex-wrap justify-end gap-2 pt-2">
+              <MotionButton
+                type="button"
+                variant="outline"
+                onClick={() => setEditLineItemTarget(null)}
+                {...motionTap}
+              >
+                <CancelIcon />
+                {t("common.cancel")}
+              </MotionButton>
+              <MotionButton type="submit" disabled={editPriceSubmitting} {...motionTap}>
+                {editPriceSubmitting ? <LoadingIconBtn /> : <SaveIconBtn />}
+                {editPriceSubmitting ? t("common.saving") : t("common.save")}
+              </MotionButton>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      <Modal
+        title={t("clients.edit")}
+        open={editModalOpen}
+        onClose={() => setEditModalOpen(false)}
+        wide
+      >
+        <form onSubmit={handleEditClient} className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="md:col-span-2">
+            <ClientLogoUploader
+              client={card}
+              onUpdated={(updated) => setCard((prev) => (prev ? { ...prev, ...updated } : prev))}
+            />
+          </div>
+          <FloatingLabelInput
+            id="edit_company_name"
+            label={t("clients.company")}
+            required
+            containerClassName="md:col-span-2"
+            value={editForm.company_name}
+            onChange={(e) => setEditForm((prev) => ({ ...prev, company_name: e.target.value }))}
+          />
+          <FloatingLabelInput
+            id="edit_contact"
+            label={t("clients.contact")}
+            value={editForm.contact_person}
+            onChange={(e) => setEditForm((prev) => ({ ...prev, contact_person: e.target.value }))}
+          />
+          <FloatingLabelPhoneInput
+            id="edit_phone"
+            label={t("clients.phone")}
+            value={editForm.phone}
+            onValueChange={(phone) => setEditForm((prev) => ({ ...prev, phone }))}
+          />
+          <FloatingLabelInput
+            id="edit_website"
+            label={t("clients.website")}
+            value={editForm.website}
+            onChange={(e) => setEditForm((prev) => ({ ...prev, website: e.target.value }))}
+          />
+          <FloatingLabelInput
+            id="edit_activity"
+            label={t("clients.activity")}
+            value={editForm.activity_type}
+            onChange={(e) => setEditForm((prev) => ({ ...prev, activity_type: e.target.value }))}
+          />
+          <CountryCityFields
+            country={editForm.country}
+            city={editForm.city}
+            onCountryChange={(country) => setEditForm((prev) => ({ ...prev, country }))}
+            onCityChange={(city) => setEditForm((prev) => ({ ...prev, city }))}
+          />
+          <ActiveStatusToggle
+            layout="field"
+            label={t("clients.state")}
+            active={editForm.status === "faol"}
+            onActiveChange={(active) =>
+              setEditForm((prev) => ({ ...prev, status: active ? "faol" : "nofaol" }))
+            }
+          />
+          <FloatingLabelTextarea
+            id="edit_notes"
+            label={t("clients.notes")}
+            rows={3}
+            containerClassName="md:col-span-2"
+            value={editForm.notes}
+            onChange={(e) => setEditForm((prev) => ({ ...prev, notes: e.target.value }))}
+          />
+          <div className="flex flex-wrap justify-end gap-2 md:col-span-2">
+            <Button type="button" variant="outline" onClick={() => setEditModalOpen(false)}>
+              <CancelIcon />
+              {t("common.cancel")}
+            </Button>
+            <Button type="submit" disabled={editClientSubmitting}>
+              {editClientSubmitting ? <LoadingIconBtn /> : <SaveIconBtn />}
+              {t("common.save")}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        title={t("clients.contractHistory")}
+        open={historyContractId !== null}
+        onClose={closeContractHistory}
+        wide
+      >
+        <p className="mb-4 text-sm text-muted-foreground">{t("clients.contractHistoryDesc")}</p>
+        <PremiumDataTable
+          loading={historyLoading}
+          empty={!historyLoading && historyEntries.length === 0}
+          emptyMessage={t("clients.historyEmpty")}
+          skeletonCols={3}
+        >
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t("auditLog.time")}</TableHead>
+              <TableHead>{t("auditLog.action")}</TableHead>
+              <TableHead>{t("auditLog.summary")}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {historyEntries.map((entry, index) => (
+              <MotionTableRow key={entry.id} {...rowEnter(index)}>
+                <TableCellDate>{formatDateTimeWithWeekday(entry.created_at)}</TableCellDate>
+                <TableCellMuted>{auditActionLabel(entry.action, t)}</TableCellMuted>
+                <TableCellPrimary subtitle={entry.username}>
+                  {entry.summary ?? "—"}
+                </TableCellPrimary>
+              </MotionTableRow>
+            ))}
+          </TableBody>
+        </PremiumDataTable>
       </Modal>
 
       <AlertDialog
@@ -582,7 +1149,7 @@ export function ClientCardPage() {
               {t("common.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction variant="destructive" disabled={busy} onClick={handleCancelLineItem}>
-              <XCircleIcon data-icon="inline-start" />
+              <Trash2Icon data-icon="inline-start" />
               {t("clients.cancelLineItem")}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -604,7 +1171,7 @@ export function ClientCardPage() {
               {t("common.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction variant="destructive" disabled={busy} onClick={handleCancelContract}>
-              <BanIcon data-icon="inline-start" />
+              <XCircleIcon data-icon="inline-start" />
               {t("clients.cancelContract")}
             </AlertDialogAction>
           </AlertDialogFooter>

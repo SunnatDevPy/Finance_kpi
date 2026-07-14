@@ -21,9 +21,10 @@ import { StaggerContainer, StaggerItem } from "../components/Stagger";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
 import { usePreferences } from "../context/PreferencesContext";
-import { formatDateWithWeekday, toWholeAmountDigits } from "../utils/format";
+import { formatDateTimeWithWeekday, toWholeAmountDigits } from "../utils/format";
 import type { CompanyProfile, LoginHistoryEntry } from "../types";
-import { FloatingLabelInput } from "@/components/ui/floating-label-input";
+import { FloatingLabelInput, FloatingLabelPhoneInput } from "@/components/ui/floating-label-input";
+import { parsePhoneNational, toPhoneE164 } from "@/hooks/usePhoneInput";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, MoneyInput } from "@/components/ui/input";
@@ -58,6 +59,8 @@ export function ProfilePage() {
   const [companyLoading, setCompanyLoading] = useState(false);
   const [loginHistory, setLoginHistory] = useState<LoginHistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyLoadError, setHistoryLoadError] = useState("");
+  const [settingsLoadError, setSettingsLoadError] = useState("");
 
   useEffect(() => {
     setNotifyDaysInput(String(notifyDays));
@@ -65,19 +68,29 @@ export function ProfilePage() {
 
   useEffect(() => {
     if (!isAdmin) return;
+    setSettingsLoadError("");
     api.settings
       .get()
       .then((data) => {
         setMonthlyPlanInput(toWholeAmountDigits(data.monthly_plan));
-        setCompanyForm(data.company);
+        setCompanyForm({
+          ...data.company,
+          company_phone: parsePhoneNational(data.company.company_phone || ""),
+        });
       })
-      .catch(() => {});
+      .catch((err) => {
+        setSettingsLoadError(err instanceof Error ? err.message : t("common.error"));
+      });
     setHistoryLoading(true);
+    setHistoryLoadError("");
     api.audit
       .loginHistory(50)
       .then(setLoginHistory)
-      .catch(() => {})
+      .catch((err) => {
+        setHistoryLoadError(err instanceof Error ? err.message : t("common.error"));
+      })
       .finally(() => setHistoryLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
 
   const [form, setForm] = useState({
@@ -149,8 +162,17 @@ export function ProfilePage() {
     setCompanySuccess("");
     setCompanyLoading(true);
     try {
-      const data = await api.settings.updateCompanyProfile(companyForm);
-      setCompanyForm(data.company);
+      const payload = {
+        ...companyForm,
+        company_phone: companyForm.company_phone
+          ? toPhoneE164(companyForm.company_phone)
+          : "",
+      };
+      const data = await api.settings.updateCompanyProfile(payload);
+      setCompanyForm({
+        ...data.company,
+        company_phone: parsePhoneNational(data.company.company_phone || ""),
+      });
       setCompanySuccess(t("profile.companyProfileSaved"));
     } catch (err) {
       setCompanyError(err instanceof Error ? err.message : t("common.error"));
@@ -243,6 +265,11 @@ export function ProfilePage() {
             <CardDescription>{t("profile.systemSettingsDesc")}</CardDescription>
           </CardHeader>
           <CardContent>
+            {settingsLoadError && (
+              <p className="mb-4 text-sm text-red-600 dark:text-red-400">
+                {t("profile.settingsLoadError")}: {settingsLoadError}
+              </p>
+            )}
             {planError && <p className="mb-4 text-sm text-red-600 dark:text-red-400">{planError}</p>}
             {planSuccess && (
               <p className="mb-4 text-sm text-emerald-600 dark:text-emerald-400">{planSuccess}</p>
@@ -288,6 +315,11 @@ export function ProfilePage() {
             <CardDescription>{t("profile.companyProfileDesc")}</CardDescription>
           </CardHeader>
           <CardContent>
+            {settingsLoadError && (
+              <p className="mb-4 text-sm text-red-600 dark:text-red-400">
+                {t("profile.settingsLoadError")}: {settingsLoadError}
+              </p>
+            )}
             {companyError && (
               <p className="mb-4 text-sm text-red-600 dark:text-red-400">{companyError}</p>
             )}
@@ -304,14 +336,14 @@ export function ProfilePage() {
                     onChange={(e) => setCompanyForm({ ...companyForm, company_name: e.target.value })}
                   />
                 </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="company_phone">{t("profile.companyPhone")}</Label>
-                  <Input
-                    id="company_phone"
-                    value={companyForm.company_phone}
-                    onChange={(e) => setCompanyForm({ ...companyForm, company_phone: e.target.value })}
-                  />
-                </div>
+                <FloatingLabelPhoneInput
+                  id="company_phone"
+                  label={t("profile.companyPhone")}
+                  value={companyForm.company_phone}
+                  onValueChange={(company_phone) =>
+                    setCompanyForm({ ...companyForm, company_phone })
+                  }
+                />
                 <div className="flex flex-col gap-2 sm:col-span-2">
                   <Label htmlFor="company_address">{t("profile.companyAddress")}</Label>
                   <Input
@@ -393,9 +425,14 @@ export function ProfilePage() {
             <CardDescription>{t("profile.loginHistoryDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
+            {historyLoadError && (
+              <p className="px-6 pt-4 text-sm text-red-600 dark:text-red-400">
+                {t("profile.historyLoadError")}: {historyLoadError}
+              </p>
+            )}
             <PremiumDataTable
               loading={historyLoading}
-              empty={!historyLoading && loginHistory.length === 0}
+              empty={!historyLoading && !historyLoadError && loginHistory.length === 0}
               emptyMessage={t("profile.loginHistoryEmpty")}
               skeletonCols={4}
             >
@@ -414,11 +451,7 @@ export function ProfilePage() {
                     <TableCellMuted>{entry.username}</TableCellMuted>
                     <TableCellMuted>{entry.ip_address ?? "—"}</TableCellMuted>
                     <TableCellDate>
-                      {formatDateWithWeekday(entry.logged_in_at, "short")}{" "}
-                      {new Date(entry.logged_in_at).toLocaleTimeString(undefined, {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {formatDateTimeWithWeekday(entry.logged_in_at)}
                     </TableCellDate>
                   </MotionTableRow>
                 ))}

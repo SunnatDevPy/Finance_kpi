@@ -16,7 +16,6 @@ import {
 } from "recharts";
 import {
   AlertTriangleIcon,
-  BriefcaseIcon,
   BanknoteIcon,
   CalendarDaysIcon,
   CheckCircle2Icon,
@@ -25,6 +24,7 @@ import {
   TrendingUpIcon,
   UsersIcon,
   WalletIcon,
+  XCircleIcon,
 } from "lucide-react";
 import { api } from "../api/client";
 import { ExportButtons } from "../components/ExportButtons";
@@ -66,6 +66,7 @@ import { usePreferences } from "../context/PreferencesContext";
 import { useI18n } from "../context/I18nContext";
 import { formatCompactMoney, formatDateWithWeekday, formatMoney, formatPercent, toNumber } from "../utils/format";
 import { cn } from "@/lib/utils";
+import { CONTRACT_WORKFLOW_STATUSES } from "@/data/contractWorkflow";
 
 const SERVICE_BAR_COLORS = [
   "bg-brand-600",
@@ -84,6 +85,13 @@ const RANK_STYLES = [
 
 const LTV_LIMIT_OPTIONS = [10, 20, 30] as const;
 const TREND_MONTH_OPTIONS = [6, 12] as const;
+
+const CONTRACT_STATUS_COLORS: Record<(typeof CONTRACT_WORKFLOW_STATUSES)[number], string> = {
+  yangi: "hsl(220 70% 50%)",
+  davom_etmoqda: "hsl(160 72% 38%)",
+  tugadi: "hsl(220 13% 55%)",
+  toxtatildi: "hsl(38 92% 50%)",
+};
 
 function moneyTooltip(value: unknown) {
   return formatMoney(Number(value));
@@ -111,13 +119,16 @@ export function DashboardPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [error, setError] = useState("");
+  const [expiringError, setExpiringError] = useState("");
   const [loading, setLoading] = useState(true);
   const [ltvClients, setLtvClients] = useState<TopClientLtvItem[]>([]);
   const [ltvLimit, setLtvLimit] = useState<(typeof LTV_LIMIT_OPTIONS)[number]>(10);
   const [ltvLoading, setLtvLoading] = useState(true);
+  const [ltvError, setLtvError] = useState("");
   const [trendMonths, setTrendMonths] = useState<(typeof TREND_MONTH_OPTIONS)[number]>(12);
   const [trendPoints, setTrendPoints] = useState<ChartPoint[]>([]);
   const [trendLoading, setTrendLoading] = useState(true);
+  const [trendError, setTrendError] = useState("");
 
   const revenueConfig = useMemo(
     () =>
@@ -138,36 +149,42 @@ export function DashboardPage() {
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([
-      api.dashboard({
+    setError("");
+    api
+      .dashboard({
         date_from: dateFrom || undefined,
         date_to: dateTo || undefined,
-      }),
-      api.notifications.expiringContracts(notifyDays),
-    ])
-      .then(([dashboardStats, expiringContracts]) => {
-        setStats(dashboardStats);
-        setExpiring(expiringContracts);
       })
+      .then(setStats)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [notifyDays, dateFrom, dateTo]);
+  }, [dateFrom, dateTo]);
+
+  useEffect(() => {
+    setExpiringError("");
+    api.notifications
+      .expiringContracts(notifyDays)
+      .then(setExpiring)
+      .catch((e) => setExpiringError(e.message));
+  }, [notifyDays]);
 
   useEffect(() => {
     setLtvLoading(true);
+    setLtvError("");
     api
       .dashboardTopClients(ltvLimit)
       .then(setLtvClients)
-      .catch((e) => setError(e.message))
+      .catch((e) => setLtvError(e.message))
       .finally(() => setLtvLoading(false));
   }, [ltvLimit]);
 
   useEffect(() => {
     setTrendLoading(true);
+    setTrendError("");
     api
       .dashboardRevenueTrend(trendMonths)
       .then(setTrendPoints)
-      .catch((e) => setError(e.message))
+      .catch((e) => setTrendError(e.message))
       .finally(() => setTrendLoading(false));
   }, [trendMonths]);
 
@@ -201,10 +218,21 @@ export function DashboardPage() {
       { name: t("status.nofaol"), value: stats.clients.nofaol, color: "hsl(220 13% 69%)" },
     ].filter((item) => item.value > 0);
 
+    const contractStatusAll = CONTRACT_WORKFLOW_STATUSES.map((status) => ({
+      key: status,
+      name: t(`contractWorkflowStatus.${status}`),
+      value: stats.contracts[status],
+      color: CONTRACT_STATUS_COLORS[status],
+    }));
+    const contractStatus = contractStatusAll.filter((item) => item.value > 0);
+
     const totalPaid = toNumber(stats.total_paid);
     const totalDebt = toNumber(stats.total_debt);
-    const balanceTotal = Math.max(1, totalPaid + totalDebt);
+    const cancelledAmount = toNumber(stats.cancelled_amount);
+    const balanceTotal = Math.max(1, totalPaid + totalDebt + cancelledAmount);
     const paidPercent = Math.round((totalPaid / balanceTotal) * 100);
+    const cancelledPercent = Math.round((cancelledAmount / balanceTotal) * 100);
+    const debtPercent = Math.max(0, 100 - paidPercent - cancelledPercent);
 
     const byExpenseSorted = [...stats.charts.expenses_by_category]
       .map((item) => ({ name: item.name, amount: toNumber(item.amount) }))
@@ -230,9 +258,14 @@ export function DashboardPage() {
       byService,
       byServiceMax,
       clientStatus,
+      contractStatus,
+      contractStatusAll,
       totalPaid,
       totalDebt,
+      cancelledAmount,
       paidPercent,
+      cancelledPercent,
+      debtPercent,
       expensesByCategory,
       expensesByCategoryMax,
       profitTrend,
@@ -270,7 +303,7 @@ export function DashboardPage() {
         <div className="pointer-events-none absolute right-24 bottom-2 h-32 w-32 rounded-full bg-blue-400/15 blur-2xl" />
 
         <div className="relative flex flex-wrap items-start justify-between gap-6">
-          <div className="min-w-0">
+          <div className="max-w-full">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-300/90">
               World Textile Marketing Agency
             </p>
@@ -296,7 +329,7 @@ export function DashboardPage() {
       </div>
 
       {/* ── Stat cards ── */}
-      <StaggerContainer className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+      <StaggerContainer className="grid grid-cols-1 gap-5 md:grid-cols-3">
         <StaggerItem>
           <StatCard
             title={t("dashboard.totalDebt")}
@@ -305,6 +338,7 @@ export function DashboardPage() {
             formatValue={formatMoney}
             accent="red"
             icon={AlertTriangleIcon}
+            to="/debts"
           />
         </StaggerItem>
         <StaggerItem>
@@ -330,20 +364,9 @@ export function DashboardPage() {
             icon={WalletIcon}
           />
         </StaggerItem>
-        <StaggerItem>
-          <StatCard
-            title={t("dashboard.totalClients")}
-            value={String(stats.clients.total)}
-            numericValue={stats.clients.total}
-            formatValue={(n) => String(Math.round(n))}
-            subtitle={`${t("dashboard.activeClients")}: ${stats.clients.faol}`}
-            accent="blue"
-            icon={UsersIcon}
-          />
-        </StaggerItem>
       </StaggerContainer>
 
-      <StaggerContainer className="grid grid-cols-1 gap-5 md:grid-cols-3">
+      <StaggerContainer className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
         <StaggerItem>
           <StatCard
             title={t("dashboard.totalPaid")}
@@ -368,18 +391,27 @@ export function DashboardPage() {
         </StaggerItem>
         <StaggerItem>
           <StatCard
-            title={t("dashboard.contractsCount")}
-            value={String(stats.total_contracts)}
-            numericValue={stats.total_contracts}
-            formatValue={(n) => String(Math.round(n))}
-            subtitle={`${t("dashboard.activeContracts")}: ${stats.active_contracts}`}
+            title={t("dashboard.cancelledAmount")}
+            value={formatMoney(stats.cancelled_amount)}
+            numericValue={toNumber(stats.cancelled_amount)}
+            formatValue={formatMoney}
+            subtitle={`${t("dashboard.cancelledContractsCount")}: ${stats.cancelled_contracts_count}`}
             accent="amber"
-            icon={BriefcaseIcon}
+            icon={XCircleIcon}
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            title={t("dashboard.periodCancelledAmount")}
+            value={formatMoney(stats.period_cancelled_amount)}
+            numericValue={toNumber(stats.period_cancelled_amount)}
+            formatValue={formatMoney}
+            accent="red"
+            icon={XCircleIcon}
           />
         </StaggerItem>
       </StaggerContainer>
 
-      {/* ── P&L: expenses / net profit / margin ── */}
       <StaggerContainer className="grid grid-cols-1 gap-5 md:grid-cols-3">
         <StaggerItem>
           <StatCard
@@ -416,7 +448,7 @@ export function DashboardPage() {
       {/* ── Insights: services / client status / balance ── */}
       <section className="page-section">
         <SectionHeader title={t("dashboard.insights")} description={t("dashboard.insightsDesc")} />
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2 2xl:grid-cols-4">
           {/* Revenue by service */}
           <RevealCard>
           <Card className="content-card">
@@ -504,6 +536,56 @@ export function DashboardPage() {
           </Card>
           </RevealCard>
 
+          {/* Contract status donut */}
+          <RevealCard>
+          <Card className="content-card">
+            <CardHeader className="border-b">
+              <CardTitle className="text-base">{t("dashboard.charts.contractStatus")}</CardTitle>
+              <CardDescription className="text-xs">{t("dashboard.charts.contractStatusDesc")}</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center gap-2 pt-4">
+              <div className="relative h-[180px] w-full">
+                <ChartContainer config={revenueConfig} className="h-full w-full">
+                  <PieChart>
+                    <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+                    <Pie
+                      data={chartData.contractStatus}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius={50}
+                      outerRadius={72}
+                      paddingAngle={3}
+                      strokeWidth={0}
+                    >
+                      {chartData.contractStatus.map((entry) => (
+                        <Cell key={entry.key} fill={entry.color} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ChartContainer>
+                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-2xl font-bold tracking-tight text-foreground">
+                    {stats.contracts.total}
+                  </span>
+                  <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    {t("dashboard.charts.totalContracts")}
+                  </span>
+                </div>
+              </div>
+              <div className="grid w-full grid-cols-2 gap-x-3 gap-y-2 text-xs sm:grid-cols-4">
+                {chartData.contractStatusAll.map((item) => (
+                  <span key={item.key} className="flex items-center gap-1.5">
+                    <span className="size-2.5 shrink-0 rounded-full" style={{ background: item.color }} />
+                    <span className="truncate">
+                      {item.name}: <strong className="text-foreground">{item.value}</strong>
+                    </span>
+                  </span>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+          </RevealCard>
+
           {/* Paid vs debt balance */}
           <RevealCard>
           <Card className="content-card">
@@ -519,14 +601,22 @@ export function DashboardPage() {
                   animate={{ width: `${chartData.paidPercent}%` }}
                   transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
                 />
+                {chartData.cancelledPercent > 0 && (
+                  <motion.div
+                    className="h-full bg-amber-400"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${chartData.cancelledPercent}%` }}
+                    transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+                  />
+                )}
                 <motion.div
                   className="h-full bg-red-400"
                   initial={{ width: 0 }}
-                  animate={{ width: `${100 - chartData.paidPercent}%` }}
+                  animate={{ width: `${chartData.debtPercent}%` }}
                   transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                 <div className="flex flex-col gap-1">
                   <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                     <span className="size-2 rounded-full bg-emerald-500" />
@@ -536,8 +626,19 @@ export function DashboardPage() {
                     {formatCompactMoney(chartData.totalPaid)}
                   </span>
                 </div>
-                <div className="flex flex-col gap-1 text-right">
-                  <span className="flex items-center justify-end gap-1.5 text-xs font-medium text-muted-foreground">
+                {chartData.cancelledAmount > 0 && (
+                  <div className="flex flex-col gap-1">
+                    <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                      <span className="size-2 rounded-full bg-amber-400" />
+                      {t("clients.cancelledAmount")}
+                    </span>
+                    <span className="text-lg font-bold tabular-nums text-amber-600 dark:text-amber-400">
+                      {formatCompactMoney(chartData.cancelledAmount)}
+                    </span>
+                  </div>
+                )}
+                <div className="flex flex-col gap-1 sm:text-right">
+                  <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:justify-end">
                     {t("common.debt")}
                     <span className="size-2 rounded-full bg-red-400" />
                   </span>
@@ -571,6 +672,12 @@ export function DashboardPage() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
+          {expiringError && (
+            <p className="px-6 py-4 text-sm text-red-600 dark:text-red-400">
+              {t("common.error")}: {expiringError}
+            </p>
+          )}
+          {!expiringError && (
           <PremiumDataTable
             empty={expiring.length === 0}
             emptyMessage={t("dashboard.noExpiring")}
@@ -612,6 +719,7 @@ export function DashboardPage() {
               ))}
             </TableBody>
           </PremiumDataTable>
+          )}
         </CardContent>
       </Card>
 
@@ -642,6 +750,11 @@ export function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent className={cn("pt-4", trendLoading && "pointer-events-none opacity-60")}>
+            {trendError && (
+              <p className="mb-3 text-sm text-red-600 dark:text-red-400">
+                {t("common.error")}: {trendError}
+              </p>
+            )}
             <ChartContainer config={revenueConfig} className="h-[260px] w-full">
               <AreaChart data={chartData.revenueTrend} margin={{ left: 8, right: 8, top: 4, bottom: 0 }}>
                 <defs>
@@ -914,6 +1027,12 @@ export function DashboardPage() {
           </div>
         </CardHeader>
         <CardContent className={cn("p-0 pt-2", ltvLoading && "pointer-events-none opacity-60")}>
+          {ltvError && (
+            <p className="px-6 pb-3 text-sm text-red-600 dark:text-red-400">
+              {t("common.error")}: {ltvError}
+            </p>
+          )}
+          {!ltvError && (
           <PremiumDataTable
             empty={ltvClients.length === 0}
             emptyMessage={t("common.noData")}
@@ -969,6 +1088,7 @@ export function DashboardPage() {
               ))}
             </TableBody>
           </PremiumDataTable>
+          )}
         </CardContent>
       </Card>
     </PageShell>

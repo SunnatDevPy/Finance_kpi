@@ -17,6 +17,7 @@ def test_create_contract(client, auth_headers, sample_client, sample_service_typ
     assert response.status_code == 201
     data = response.json()
     assert data["client_id"] == sample_client.id
+    assert data["status"] == "yangi"
     assert len(data["line_items"]) == 1
     assert float(data["total_amount"]) == 2_500_000.0
 

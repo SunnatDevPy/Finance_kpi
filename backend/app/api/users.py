@@ -4,8 +4,9 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import require_admin
 from app.database import get_db
-from app.models import User
+from app.models import AuditAction, User
 from app.schemas.user import UserCreate, UserRead, UserUpdate
+from app.services.audit import diff_fields, record_audit
 from app.services.auth import hash_password
 
 router = APIRouter(prefix="/users", dependencies=[Depends(require_admin)])
@@ -17,7 +18,11 @@ def list_users(db: Session = Depends(get_db)) -> list[User]:
 
 
 @router.post("", response_model=UserRead, status_code=status.HTTP_201_CREATED)
-def create_user(payload: UserCreate, db: Session = Depends(get_db)) -> User:
+def create_user(
+    payload: UserCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> User:
     existing = db.scalars(select(User).where(User.username == payload.username)).first()
     if existing:
         raise HTTPException(
@@ -35,6 +40,14 @@ def create_user(payload: UserCreate, db: Session = Depends(get_db)) -> User:
     db.add(user)
     db.commit()
     db.refresh(user)
+    record_audit(
+        db,
+        user=current_user,
+        entity_type="user",
+        entity_id=user.id,
+        action=AuditAction.CREATE,
+        summary=f"Yangi hodim yaratildi: {user.full_name} ({user.username}), rol: {user.role.value}",
+    )
     return user
 
 
@@ -56,12 +69,40 @@ def update_user(
             detail="O'zingizni bloklab bo'lmaydi",
         )
 
+    before = {
+        "full_name": user.full_name,
+        "role": user.role,
+        "is_active": user.is_active,
+    }
+
     if "password" in data:
         user.password_hash = hash_password(data.pop("password"))
+        password_changed = True
+    else:
+        password_changed = False
 
     for field, value in data.items():
         setattr(user, field, value)
 
     db.commit()
     db.refresh(user)
+
+    after = {
+        "full_name": user.full_name,
+        "role": user.role,
+        "is_active": user.is_active,
+    }
+    changes = diff_fields(before, after)
+    if password_changed:
+        changes["password"] = ("***", "***")
+    if changes:
+        record_audit(
+            db,
+            user=current_user,
+            entity_type="user",
+            entity_id=user.id,
+            action=AuditAction.UPDATE,
+            changes=changes,
+            summary=f"Hodim ma'lumotlari o'zgartirildi: {user.full_name} ({user.username})",
+        )
     return user

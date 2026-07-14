@@ -23,6 +23,13 @@ class ClientStatus(str, enum.Enum):
     NOFAOL = "nofaol"
 
 
+class ContractWorkflowStatus(str, enum.Enum):
+    YANGI = "yangi"
+    DAVOM_ETMOQDA = "davom_etmoqda"
+    TUGADI = "tugadi"
+    TOXTATILDI = "toxtatildi"
+
+
 class UserRole(str, enum.Enum):
     ADMIN = "admin"
     MENEJER = "menejer"
@@ -142,6 +149,16 @@ class Contract(Base):
     notes: Mapped[str | None] = mapped_column(Text)
     contract_number: Mapped[str | None] = mapped_column(String(50))
     invoice_number: Mapped[str | None] = mapped_column(String(100))
+    status: Mapped[ContractWorkflowStatus] = mapped_column(
+        Enum(
+            ContractWorkflowStatus,
+            name="contract_workflow_status",
+            values_callable=lambda enum_cls: [item.value for item in enum_cls],
+        ),
+        nullable=False,
+        default=ContractWorkflowStatus.YANGI,
+        server_default=ContractWorkflowStatus.YANGI.value,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

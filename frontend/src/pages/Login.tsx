@@ -194,13 +194,20 @@ function LoginFooter() {
 }
 
 export function LoginPage() {
-  const { user, login } = useAuth();
+  const { user, login, sessionExpired, clearSessionExpired } = useAuth();
   const { t } = useI18n();
   const isMobile = useMediaQuery("(max-width: 639px)");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState(() => (sessionExpired ? t("auth.sessionExpired") : ""));
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (sessionExpired) {
+      setError(t("auth.sessionExpired"));
+      clearSessionExpired();
+    }
+  }, [sessionExpired, clearSessionExpired, t]);
   const reduceMotion = useReducedMotion();
   const skipIntro = reduceMotion || isMobile;
   const [phase, setPhase] = useState<Phase>(() => (skipIntro ? "revealed" : "intro"));

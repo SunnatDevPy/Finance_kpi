@@ -14,9 +14,10 @@ interface ModalProps {
   onClose: () => void;
   children: ReactNode;
   wide?: boolean;
+  extraWide?: boolean;
 }
 
-export function Modal({ title, open, onClose, children, wide }: ModalProps) {
+export function Modal({ title, open, onClose, children, wide, extraWide }: ModalProps) {
   const scrollYRef = useRef(0);
 
   useEffect(() => {
@@ -33,6 +34,7 @@ export function Modal({ title, open, onClose, children, wide }: ModalProps) {
         className={cn(
           "max-h-[90vh] overflow-y-auto border-border/70 shadow-xl sm:max-w-lg",
           wide && "sm:max-w-2xl",
+          extraWide && "sm:max-w-3xl",
         )}
       >
         <DialogHeader className="border-b border-border/60 pb-4">

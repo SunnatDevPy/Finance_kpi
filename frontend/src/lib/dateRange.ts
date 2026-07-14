@@ -8,8 +8,28 @@ export function toISODate(date: Date): string {
 }
 
 export function parseISODate(value: string): Date {
-  const [y, m, d] = value.split("-").map(Number);
-  return new Date(y, m - 1, d);
+  const trimmed = value.trim();
+
+  // Faqat sana: YYYY-MM-DD — mahalliy vaqt zonasida (kun siljimasin)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    const [y, m, d] = trimmed.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  }
+
+  // ISO datetime (masalan logged_in_at, created_at)
+  const parsed = new Date(trimmed);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed;
+  }
+
+  // Fallback: boshidagi sana qismi
+  const datePart = trimmed.slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+    const [y, m, d] = datePart.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  }
+
+  return parsed;
 }
 
 export function startOfDay(date: Date): Date {
@@ -114,7 +134,11 @@ export function formatMonthYear(
 }
 
 /** JS `getDay()` indeksi → i18n kaliti (0 = yakshanba). */
-const JS_DAY_TO_WEEKDAY_KEY = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
+export const JS_DAY_TO_WEEKDAY_KEY = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
+
+export type WeekdayKey = (typeof JS_DAY_TO_WEEKDAY_KEY)[number];
+
+const JS_DAY_TO_WEEKDAY_KEY_INTERNAL = JS_DAY_TO_WEEKDAY_KEY;
 
 export function formatDateWithWeekday(
   iso: string,
@@ -124,7 +148,7 @@ export function formatDateWithWeekday(
   const day = String(date.getDate()).padStart(2, "0");
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const year = date.getFullYear();
-  const weekdayKey = JS_DAY_TO_WEEKDAY_KEY[date.getDay()];
+  const weekdayKey = JS_DAY_TO_WEEKDAY_KEY_INTERNAL[date.getDay()];
   return `${day}.${month}.${year} ${getWeekdayName(weekdayKey)}`;
 }
 

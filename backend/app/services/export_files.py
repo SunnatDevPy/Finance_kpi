@@ -37,6 +37,33 @@ def build_xlsx(title: str, headers: list[str], rows: list[list[str]]) -> BytesIO
     return buffer
 
 
+def build_client_card_xlsx(
+    company_name: str,
+    sheets: list[tuple[str, list[str], list[list[str]]]],
+) -> BytesIO:
+    wb = Workbook()
+    wb.remove(wb.active)
+    for index, (title, headers, rows) in enumerate(sheets):
+        ws = wb.create_sheet(title=title[:31], index=index)
+        ws.append(headers)
+        for cell in ws[1]:
+            cell.font = Font(bold=True)
+        for row in rows:
+            ws.append(row)
+        for column in ws.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                if cell.value:
+                    max_length = max(max_length, len(str(cell.value)))
+            ws.column_dimensions[column_letter].width = min(max_length + 2, 48)
+
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+
 def build_pdf(title: str, headers: list[str], rows: list[list[str]]) -> BytesIO:
     font_regular, font_bold = ensure_unicode_fonts()
     buffer = BytesIO()

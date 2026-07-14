@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_admin
 from app.database import get_db
 from app.models import ServiceType
 from app.schemas.service_type import (
@@ -49,7 +49,12 @@ def list_service_types(
     return _enrich_service_types(db, items)
 
 
-@router.post("", response_model=ServiceTypeRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=ServiceTypeRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_admin)],
+)
 def create_service_type(
     payload: ServiceTypeCreate, db: Session = Depends(get_db)
 ) -> ServiceType:
@@ -80,7 +85,11 @@ def get_service_type(service_type_id: int, db: Session = Depends(get_db)) -> Ser
     return _enrich_service_types(db, [service_type])[0]
 
 
-@router.patch("/{service_type_id}", response_model=ServiceTypeRead)
+@router.patch(
+    "/{service_type_id}",
+    response_model=ServiceTypeRead,
+    dependencies=[Depends(require_admin)],
+)
 def update_service_type(
     service_type_id: int, payload: ServiceTypeUpdate, db: Session = Depends(get_db)
 ) -> ServiceType:
@@ -104,7 +113,11 @@ def update_service_type(
     return _enrich_service_types(db, [service_type])[0]
 
 
-@router.delete("/{service_type_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{service_type_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_admin)],
+)
 def delete_service_type(service_type_id: int, db: Session = Depends(get_db)) -> None:
     service_type = get_service_type_or_404(db, service_type_id)
     if service_type.line_items:

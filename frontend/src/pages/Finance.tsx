@@ -18,9 +18,12 @@ import {
 import { api } from "../api/client";
 import { CancelIcon, DeleteIconBtn, LoadingIconBtn, SaveIconBtn } from "../components/ButtonIcons";
 import { DateRangePicker } from "../components/DateRangePicker";
+import { ExportButtons } from "../components/ExportButtons";
 import { Modal } from "../components/Modal";
 import { PageError } from "../components/PageError";
 import { PageHeader, PageShell } from "../components/PageHeader";
+import { TableColumnPicker } from "../components/TableColumnPicker";
+import { usePickerColumns } from "../hooks/usePickerColumns";
 import { Pagination } from "../components/Pagination";
 import { StaggerContainer, StaggerItem } from "../components/Stagger";
 import { StatCard } from "../components/StatCard";
@@ -75,6 +78,16 @@ import { EXPENSE_CATEGORIES, expenseCategoryLabel } from "../utils/expenseCatego
 import { INCOME_CATEGORIES, incomeCategoryLabel } from "../utils/incomeCategory";
 import { formatDateWithWeekday, formatMoney } from "../utils/format";
 
+const FINANCE_OPTIONAL_COLUMNS = [
+  { id: "type", labelKey: "finance.typeIncome", defaultVisible: true },
+  { id: "title", labelKey: "expenses.titleField", defaultVisible: true },
+  { id: "category", labelKey: "finance.category", defaultVisible: true },
+  { id: "amount", labelKey: "common.amount", defaultVisible: true },
+  { id: "note", labelKey: "common.note", defaultVisible: true },
+] as const;
+
+type FinanceOptionalColumn = (typeof FINANCE_OPTIONAL_COLUMNS)[number]["id"];
+
 type EntryKind = "income" | "expense";
 
 interface EntryForm {
@@ -106,6 +119,8 @@ function typeBadgeClass(type: FinanceEntryType): string {
 export function FinancePage() {
   const { t } = useI18n();
   const navigate = useNavigate();
+  const { isVisible, setColumnVisible, visibleCount, items: columnPickerItems } =
+    usePickerColumns("wtma.finance.tableColumns", FINANCE_OPTIONAL_COLUMNS, t);
 
   const [items, setItems] = useState<FinanceLedgerItem[]>([]);
   const [entryType, setEntryType] = useState<FinanceEntryType | "all">("all");
@@ -282,9 +297,15 @@ export function FinancePage() {
     <PageShell>
       <PageHeader title={t("finance.title")} subtitle={t("finance.subtitle")}>
         <div className="flex flex-wrap items-center gap-2">
+          <ExportButtons resource="incomes" dateFrom={dateFrom} dateTo={dateTo} showLabel={false} />
+          <ExportButtons resource="expenses" dateFrom={dateFrom} dateTo={dateTo} showLabel={false} />
           <MotionButton type="button" variant="outline" onClick={openImportModal} {...motionTap}>
             <FileUpIcon data-icon="inline-start" />
             {t("finance.importFromExcel")}
+          </MotionButton>
+          <MotionButton type="button" variant="outline" onClick={() => openCreate("expense")} {...motionTap}>
+            <ArrowDownCircleIcon data-icon="inline-start" />
+            {t("finance.addExpense")}
           </MotionButton>
           <MotionButton type="button" onClick={() => openCreate("income")} {...motionTap}>
             <PlusIcon data-icon="inline-start" />
@@ -322,53 +343,56 @@ export function FinancePage() {
         </StaggerItem>
       </StaggerContainer>
 
-      <div className="filter-bar">
-        <Input
-          className="max-w-sm flex-1"
-          placeholder={t("common.search")}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <Select
-          value={entryType}
-          onValueChange={(value) => value && setEntryType(value as FinanceEntryType | "all")}
-          className="w-full sm:w-56"
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t("finance.allTypes")}</SelectItem>
-            <SelectItem value="income">{t("finance.typeIncome")}</SelectItem>
-            <SelectItem value="expense">{t("finance.typeExpense")}</SelectItem>
-            <SelectItem value="payment">{t("finance.typePayment")}</SelectItem>
-          </SelectContent>
-        </Select>
-        <DateRangePicker
-          from={dateFrom}
-          to={dateTo}
-          onChange={(from, to) => {
-            setDateFrom(from);
-            setDateTo(to);
-          }}
-        />
-      </div>
-
       <Card className="content-card">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>{t("finance.listTitle")}</CardTitle>
-            <CardDescription>
-              {total} {t("finance.records")}
-            </CardDescription>
-          </div>
+        <CardHeader className="pb-3">
+          <CardTitle>{t("finance.listTitle")}</CardTitle>
+          <CardDescription>
+            {total} {t("finance.records")}
+          </CardDescription>
         </CardHeader>
+        <div className="table-card-toolbar">
+          <Input
+            className="w-full min-w-[12rem] flex-1 sm:max-w-xs"
+            placeholder={t("common.search")}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <Select
+            value={entryType}
+            onValueChange={(value) => value && setEntryType(value as FinanceEntryType | "all")}
+            className="w-full sm:w-56"
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("finance.allTypes")}</SelectItem>
+              <SelectItem value="income">{t("finance.typeIncome")}</SelectItem>
+              <SelectItem value="expense">{t("finance.typeExpense")}</SelectItem>
+              <SelectItem value="payment">{t("finance.typePayment")}</SelectItem>
+            </SelectContent>
+          </Select>
+          <DateRangePicker
+            from={dateFrom}
+            to={dateTo}
+            onChange={(from, to) => {
+              setDateFrom(from);
+              setDateTo(to);
+            }}
+          />
+          <TableColumnPicker
+            columns={columnPickerItems}
+            isVisible={(id: FinanceOptionalColumn) => isVisible(id)}
+            onVisibleChange={setColumnVisible}
+            className="sm:ml-auto"
+          />
+        </div>
         <CardContent className="p-0">
           <PremiumDataTable
             loading={loading}
             empty={!loading && items.length === 0}
             emptyMessage={t("finance.notFound")}
-            skeletonCols={7}
+            skeletonCols={2 + visibleCount}
             footer={
               <Pagination
                 embedded
@@ -386,11 +410,11 @@ export function FinancePage() {
             <TableHeader>
               <TableRow>
                 <TableHead>{t("common.date")}</TableHead>
-                <TableHead>{t("finance.typeIncome")}</TableHead>
-                <TableHead>{t("expenses.titleField")}</TableHead>
-                <TableHead>{t("finance.category")}</TableHead>
-                <TableHead>{t("common.amount")}</TableHead>
-                <TableHead>{t("common.note")}</TableHead>
+                {isVisible("type") && <TableHead>{t("finance.typeIncome")}</TableHead>}
+                {isVisible("title") && <TableHead>{t("expenses.titleField")}</TableHead>}
+                {isVisible("category") && <TableHead>{t("finance.category")}</TableHead>}
+                {isVisible("amount") && <TableHead>{t("common.amount")}</TableHead>}
+                {isVisible("note") && <TableHead>{t("common.note")}</TableHead>}
                 <TableHead className="text-right">{t("common.actions")}</TableHead>
               </TableRow>
             </TableHeader>
@@ -398,6 +422,7 @@ export function FinancePage() {
               {items.map((item, index) => (
                 <MotionTableRow key={`${item.type}-${item.id}`} {...rowEnter(index)}>
                   <TableCellDate>{formatDateWithWeekday(item.date)}</TableCellDate>
+                  {isVisible("type") && (
                   <TableCellMuted>
                     <Badge variant="outline" className={typeBadgeClass(item.type)}>
                       {item.type === "income" && t("finance.typeIncome")}
@@ -405,7 +430,11 @@ export function FinancePage() {
                       {item.type === "payment" && t("finance.typePayment")}
                     </Badge>
                   </TableCellMuted>
+                  )}
+                  {isVisible("title") && (
                   <TableCellPrimary>{item.title}</TableCellPrimary>
+                  )}
+                  {isVisible("category") && (
                   <TableCellMuted>
                     {item.type === "income" && item.category
                       ? incomeCategoryLabel(t, item.category)
@@ -413,45 +442,54 @@ export function FinancePage() {
                         ? expenseCategoryLabel(t, item.category)
                         : "—"}
                   </TableCellMuted>
+                  )}
+                  {isVisible("amount") && (
                   <TableCellMoney tone={Number(item.amount) >= 0 ? "positive" : "negative"}>
                     {formatMoney(item.amount)}
                   </TableCellMoney>
+                  )}
+                  {isVisible("note") && (
                   <TableCellMuted className="max-w-xs">{item.note}</TableCellMuted>
+                  )}
                   <TableCellActions>
+                    <div className="action-toolbar">
                     {item.type === "payment" ? (
                       <MotionButton
                         variant="ghost"
-                        size="sm"
+                        size="icon-sm"
+                        className="size-8"
                         onClick={() => item.client_id && navigate(`/clients/${item.client_id}`)}
                         disabled={!item.client_id}
+                        title={t("finance.viewClient")}
                         {...motionTap}
                       >
-                        <ExternalLinkIcon data-icon="inline-start" />
-                        {t("finance.viewClient")}
+                        <ExternalLinkIcon className="size-3.5" />
                       </MotionButton>
                     ) : (
                       <>
                         <MotionButton
                           variant="ghost"
-                          size="sm"
+                          size="icon-sm"
+                          className="size-8"
                           onClick={() => openEdit(item)}
+                          title={t("common.edit")}
                           {...motionTap}
                         >
-                          <PencilIcon data-icon="inline-start" />
-                          {t("common.edit")}
+                          <PencilIcon className="size-3.5" />
                         </MotionButton>
                         <MotionButton
                           variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive"
+                          size="icon-sm"
+                          className="size-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
                           onClick={() => setDeleteTarget({ kind: item.type as EntryKind, id: item.id })}
+                          title={t("common.delete")}
                           {...motionTap}
                         >
-                          <Trash2Icon data-icon="inline-start" />
-                          {t("common.delete")}
+                          <Trash2Icon className="size-3.5" />
                         </MotionButton>
                       </>
                     )}
+                    </div>
                   </TableCellActions>
                 </MotionTableRow>
               ))}
@@ -550,7 +588,7 @@ export function FinancePage() {
             onChange={(e) => setForm({ ...form, note: e.target.value })}
             rows={3}
           />
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex flex-wrap justify-end gap-2 pt-2">
             <MotionButton type="button" variant="outline" onClick={() => setModalOpen(false)} {...motionTap}>
               <CancelIcon />
               {t("common.cancel")}
@@ -595,7 +633,7 @@ export function FinancePage() {
 
               {importError && <p className="text-sm text-destructive">{importError}</p>}
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex flex-wrap justify-end gap-2 pt-2">
                 <MotionButton type="button" variant="outline" onClick={closeImportModal} {...motionTap}>
                   <CancelIcon />
                   {t("common.cancel")}
@@ -644,7 +682,7 @@ export function FinancePage() {
                 </div>
               )}
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex flex-wrap justify-end gap-2 pt-2">
                 <MotionButton type="button" variant="outline" onClick={() => setImportResult(null)} {...motionTap}>
                   <UploadCloudIcon data-icon="inline-start" />
                   {t("finance.importAnother")}

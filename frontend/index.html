@@ -96,6 +96,64 @@
         <img src="/logo.svg" alt="" />
       </div>
     </div>
+    <script>
+      (function () {
+        var RELOAD_KEY = "wtma_recovery_reload_count";
+        var MAX_RELOADS = 3;
+
+        function localeText() {
+          return localStorage.getItem("finance_locale") === "ru"
+            ? {
+                title: "Страница не загрузилась",
+                hint: "Попробуйте обновить страницу",
+                reload: "Обновить",
+              }
+            : {
+                title: "Sahifa yuklanmadi",
+                hint: "Sahifani yangilab ko'ring",
+                reload: "Yangilash",
+              };
+        }
+
+        window.setTimeout(function () {
+          var root = document.getElementById("root");
+          if (root && root.childElementCount > 0) return;
+          if (document.getElementById("app-static-recovery")) return;
+
+          var count = Number(sessionStorage.getItem(RELOAD_KEY) || 0);
+          if (count < MAX_RELOADS) {
+            sessionStorage.setItem(RELOAD_KEY, String(count + 1));
+            window.location.reload();
+            return;
+          }
+
+          var text = localeText();
+          var panel = document.createElement("div");
+          panel.id = "app-static-recovery";
+          panel.style.cssText =
+            "position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:24px;background:#fafbfc;font-family:IBM Plex Sans,system-ui,sans-serif;";
+          if (document.documentElement.classList.contains("dark")) {
+            panel.style.background = "#101216";
+            panel.style.color = "#f8fafc";
+          }
+          panel.innerHTML =
+            '<div style="max-width:360px;text-align:center;border:1px solid rgba(148,163,184,.35);border-radius:16px;padding:24px;background:#fff;box-shadow:0 8px 24px rgba(15,23,42,.08);">' +
+            '<h1 style="margin:0 0 8px;font-size:18px;font-weight:600;">' +
+            text.title +
+            "</h1>" +
+            '<p style="margin:0 0 16px;font-size:14px;opacity:.75;">' +
+            text.hint +
+            "</p>" +
+            '<button type="button" id="app-static-recovery-btn" style="width:100%;border:0;border-radius:10px;padding:10px 14px;font-size:14px;font-weight:600;cursor:pointer;background:#0f172a;color:#fff;">' +
+            text.reload +
+            "</button></div>";
+          document.body.appendChild(panel);
+          document.getElementById("app-static-recovery-btn").addEventListener("click", function () {
+            window.location.reload();
+          });
+        }, 12000);
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

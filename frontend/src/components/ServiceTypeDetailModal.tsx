@@ -2,11 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import {
   Building2Icon,
   CalendarIcon,
+  CheckIcon,
   FileTextIcon,
+  PencilIcon,
   RepeatIcon,
   TrendingUpIcon,
   UsersIcon,
   XCircleIcon,
+  XIcon,
   type LucideIcon,
 } from "lucide-react";
 import { api } from "../api/client";
@@ -14,6 +17,7 @@ import { DeleteIconBtn } from "../components/ButtonIcons";
 import { CompanyAvatar } from "../components/CompanyAvatar";
 import { Modal } from "../components/Modal";
 import { ActiveStatusToggle } from "../components/ActiveStatusToggle";
+import { Input } from "@/components/ui/input";
 import {
   PremiumDataTable,
   TableBody,
@@ -26,14 +30,16 @@ import {
 import { useI18n } from "../context/I18nContext";
 import type { ServiceType, ServiceTypeStats } from "../types";
 import { formatDateWithWeekday, formatMoney } from "../utils/format";
-import { Button } from "@/components/ui/button";
+import { Button, MotionButton, motionTap } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 interface ServiceTypeDetailModalProps {
   item: ServiceType | null;
   open: boolean;
+  canManage?: boolean;
   onClose: () => void;
   onSetActive: (item: ServiceType, active: boolean) => void;
+  onRename: (item: ServiceType, name: string) => Promise<void>;
   onDelete: (id: number) => void;
 }
 
@@ -71,14 +77,19 @@ function StatTile({
 export function ServiceTypeDetailModal({
   item,
   open,
+  canManage = true,
   onClose,
   onSetActive,
+  onRename,
   onDelete,
 }: ServiceTypeDetailModalProps) {
   const { t } = useI18n();
   const [stats, setStats] = useState<ServiceTypeStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
+  const [savingName, setSavingName] = useState(false);
   const statsCacheRef = useRef<Map<number, ServiceTypeStats>>(new Map());
   const activeItemIdRef = useRef<number | null>(null);
 
@@ -89,6 +100,7 @@ export function ServiceTypeDetailModal({
     }
 
     activeItemIdRef.current = item.id;
+    setEditingName(false);
     const cached = statsCacheRef.current.get(item.id);
     if (cached) {
       setStats(cached);
@@ -124,17 +136,102 @@ export function ServiceTypeDetailModal({
   const displayStats =
     stats && stats.service_type_id === item.id ? stats : null;
 
+  const startRename = () => {
+    setNameDraft(item.name);
+    setEditingName(true);
+  };
+
+  const cancelRename = () => {
+    setEditingName(false);
+    setError("");
+  };
+
+  const saveRename = async () => {
+    const next = nameDraft.trim();
+    if (!next || next === item.name) {
+      setEditingName(false);
+      return;
+    }
+    setSavingName(true);
+    setError("");
+    try {
+      await onRename(item, next);
+      setEditingName(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("common.error"));
+    } finally {
+      setSavingName(false);
+    }
+  };
+
   return (
     <Modal title={t("services.detailTitle")} open={open} onClose={onClose} wide>
       <div className="flex flex-col gap-6">
         <div className="flex items-start justify-between gap-4 rounded-xl border border-border/70 bg-muted/30 p-4">
           <div className="flex items-center gap-3">
             <CompanyAvatar name={item.name} size="md" className="rounded-xl text-sm" />
-            <div>
-              <h3 className="text-lg font-semibold tracking-tight text-foreground">{item.name}</h3>
+            <div className="min-w-0">
+              {editingName ? (
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    autoFocus
+                    value={nameDraft}
+                    disabled={savingName}
+                    onChange={(e) => setNameDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void saveRename();
+                      } else if (e.key === "Escape") {
+                        cancelRename();
+                      }
+                    }}
+                    className="h-8 w-48"
+                  />
+                  <MotionButton
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="size-8 shrink-0 p-0"
+                    disabled={savingName}
+                    onClick={() => void saveRename()}
+                  >
+                    <CheckIcon className="size-4" />
+                  </MotionButton>
+                  <MotionButton
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="size-8 shrink-0 p-0"
+                    disabled={savingName}
+                    onClick={cancelRename}
+                  >
+                    <XIcon className="size-4" />
+                  </MotionButton>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <h3 className="truncate text-lg font-semibold tracking-tight text-foreground">
+                    {item.name}
+                  </h3>
+                  {canManage && (
+                    <MotionButton
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="size-7 shrink-0 p-0 text-muted-foreground"
+                      onClick={startRename}
+                      {...motionTap}
+                    >
+                      <PencilIcon className="size-3.5" />
+                    </MotionButton>
+                  )}
+                </div>
+              )}
               <div className="mt-1.5">
                 <ActiveStatusToggle
                   active={item.is_active}
+                  disabled={!canManage}
                   onActiveChange={(active) => onSetActive(item, active)}
                 />
               </div>
@@ -241,15 +338,17 @@ export function ServiceTypeDetailModal({
           <Button type="button" variant="outline" onClick={onClose}>
             {t("common.close")}
           </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={() => onDelete(item.id)}
-            disabled={displayStats ? displayStats.usage_count > 0 : item.usage_count > 0}
-          >
-            <DeleteIconBtn />
-            {t("common.delete")}
-          </Button>
+          {canManage && (
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => onDelete(item.id)}
+              disabled={displayStats ? displayStats.usage_count > 0 : item.usage_count > 0}
+            >
+              <DeleteIconBtn />
+              {t("common.delete")}
+            </Button>
+          )}
         </div>
       </div>
     </Modal>

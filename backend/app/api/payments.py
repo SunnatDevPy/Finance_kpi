@@ -1,14 +1,14 @@
 from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import get_current_user, require_admin
 from app.database import get_db
 from app.models import AuditAction, Client, Contract, Payment, User
 from app.schemas.pagination import Page
-from app.schemas.payment import PaymentCreate, PaymentListRead, PaymentRead
+from app.schemas.payment import PaymentCreate, PaymentListRead, PaymentRead, PaymentsPage
 from app.services.audit import record_audit
 from app.services.helpers import get_contract_or_404, get_payment_or_404
 
@@ -25,10 +25,11 @@ def _payment_to_list_read(payment: Payment) -> PaymentListRead:
         created_at=payment.created_at,
         company_name=payment.contract.client.company_name,
         client_id=payment.contract.client_id,
+        contract_number=payment.contract.contract_number,
     )
 
 
-@router.get("", response_model=Page[PaymentListRead])
+@router.get("", response_model=PaymentsPage)
 def list_payments(
     db: Session = Depends(get_db),
     contract_id: int | None = Query(default=None),
@@ -37,7 +38,7 @@ def list_payments(
     search: str | None = Query(default=None, min_length=1),
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=20, ge=1, le=200),
-) -> Page[PaymentListRead]:
+) -> PaymentsPage:
     filters = [Payment.deleted_at.is_(None), Contract.deleted_at.is_(None)]
     if contract_id is not None:
         filters.append(Payment.contract_id == contract_id)
@@ -47,15 +48,21 @@ def list_payments(
         filters.append(Payment.paid_at <= date_to)
     if search:
         pattern = f"%{search}%"
-        filters.append(Client.company_name.ilike(pattern))
+        filters.append(
+            or_(
+                Client.company_name.ilike(pattern),
+                Client.phone.ilike(pattern),
+                Contract.contract_number.ilike(pattern),
+            )
+        )
 
     count_stmt = (
-        select(func.count(Payment.id))
+        select(func.count(Payment.id), func.coalesce(func.sum(Payment.amount), 0))
         .join(Payment.contract)
         .join(Contract.client)
         .where(*filters)
     )
-    total = db.scalar(count_stmt) or 0
+    total, total_amount = db.execute(count_stmt).one()
 
     stmt = (
         select(Payment)
@@ -67,23 +74,48 @@ def list_payments(
     )
 
     payments = list(db.scalars(stmt.offset(skip).limit(limit)).all())
-    return Page(
+    return PaymentsPage(
         items=[_payment_to_list_read(payment) for payment in payments],
-        total=total,
+        total=total or 0,
         skip=skip,
         limit=limit,
+        total_amount=total_amount or 0,
     )
 
 
-@router.get("/trash", response_model=list[PaymentRead], dependencies=[Depends(require_admin)])
-def list_deleted_payments(db: Session = Depends(get_db)) -> list[Payment]:
-    stmt = (
-        select(Payment)
-        .where(Payment.deleted_at.is_not(None))
-        .order_by(Payment.deleted_at.desc())
-        .limit(200)
-    )
-    return list(db.scalars(stmt).all())
+@router.get("/trash", response_model=Page[PaymentRead], dependencies=[Depends(require_admin)])
+def list_deleted_payments(
+    db: Session = Depends(get_db),
+    search: str | None = Query(default=None, min_length=1),
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=200),
+) -> Page[PaymentRead]:
+    filters = [Payment.deleted_at.is_not(None)]
+    join_contract = False
+    if search:
+        join_contract = True
+        pattern = f"%{search}%"
+        filters.append(
+            or_(
+                Payment.note.ilike(pattern),
+                Contract.contract_number.ilike(pattern),
+                Client.company_name.ilike(pattern),
+            )
+        )
+
+    count_stmt = select(func.count(Payment.id)).where(*filters)
+    stmt = select(Payment).where(*filters).order_by(Payment.deleted_at.desc())
+    if join_contract:
+        count_stmt = count_stmt.join(Contract, Payment.contract_id == Contract.id).join(
+            Client, Contract.client_id == Client.id
+        )
+        stmt = stmt.join(Contract, Payment.contract_id == Contract.id).join(
+            Client, Contract.client_id == Client.id
+        )
+
+    total = db.scalar(count_stmt) or 0
+    items = list(db.scalars(stmt.offset(skip).limit(limit)).all())
+    return Page(items=items, total=total, skip=skip, limit=limit)
 
 
 @router.post("", response_model=PaymentRead, status_code=status.HTTP_201_CREATED)
@@ -113,7 +145,11 @@ def get_payment(payment_id: int, db: Session = Depends(get_db)) -> Payment:
     return get_payment_or_404(db, payment_id)
 
 
-@router.delete("/{payment_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{payment_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_admin)],
+)
 def delete_payment(
     payment_id: int,
     db: Session = Depends(get_db),

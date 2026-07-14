@@ -232,3 +232,135 @@ def build_act_pdf(contract: Contract, company: dict[str, str]) -> BytesIO:
         doc_number_prefix="AKT-",
         intro_text=intro,
     )
+
+
+_STATUS_LABELS = {
+    "yangi": "Yangi",
+    "davom_etmoqda": "Davom etmoqda",
+    "tugadi": "Tugadi",
+    "toxtatildi": "To'xtatildi",
+}
+
+
+def _contract_meta_table(contract: Contract, styles: dict, font_regular: str, font_bold: str) -> Table:
+    period = f"{contract.start_date.strftime('%d.%m.%Y')} — {contract.end_date.strftime('%d.%m.%Y')}"
+    status = _STATUS_LABELS.get(
+        contract.status.value if hasattr(contract.status, "value") else str(contract.status),
+        str(contract.status),
+    )
+    rows = [
+        ["Shartnoma raqami", contract.contract_number or str(contract.id)],
+        ["Muddat", period],
+        ["Holat", status],
+        ["Jami summa", f"{_money(contract.total_amount)} so'm"],
+        ["To'langan", f"{_money(contract.paid_amount)} so'm"],
+        ["Qarz", f"{_money(contract.debt_amount)} so'm"],
+    ]
+    if contract.invoice_number:
+        rows.insert(1, ["ESF raqami", contract.invoice_number])
+
+    table = Table(rows, colWidths=[45 * mm, 125 * mm])
+    table.setStyle(
+        TableStyle(
+            [
+                ("FONTNAME", (0, 0), (0, -1), font_bold),
+                ("FONTNAME", (1, 0), (1, -1), font_regular),
+                ("FONTSIZE", (0, 0), (-1, -1), 9.5),
+                ("TEXTCOLOR", (0, 0), (0, -1), colors.HexColor("#475569")),
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+                ("INNERGRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#e2e8f0")),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ]
+        )
+    )
+    return table
+
+
+def build_contract_pdf(contract: Contract, company: dict[str, str]) -> BytesIO:
+    """Xizmat ko'rsatish shartnomasi — rasmiy PDF."""
+    styles, font_regular, font_bold = _styles()
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        title="Shartnoma",
+        leftMargin=18 * mm,
+        rightMargin=18 * mm,
+        topMargin=16 * mm,
+        bottomMargin=16 * mm,
+    )
+
+    doc_number = contract.contract_number or str(contract.id)
+    today = date.today().strftime("%d.%m.%Y")
+    executor = company.get("company_name") or "Ijrochi"
+    client_name = contract.client.company_name
+
+    intro = (
+        f"<b>{executor}</b> (keyingi o'rinda — <b>Ijrochi</b>) va "
+        f"<b>{client_name}</b> (keyingi o'rinda — <b>Buyurtmachi</b>) "
+        "quyidagi shartlarga kelishdilar:"
+    )
+
+    elements = [
+        Paragraph("XIZMAT KO'RSATISH SHARTNOMASI", styles["title"]),
+        Paragraph(
+            f"№ {doc_number} &nbsp;&nbsp;|&nbsp;&nbsp; Sana: {today}",
+            styles["subtitle"],
+        ),
+        Spacer(1, 12),
+        Table(
+            [[_company_block(company, styles), _client_block(contract, styles)]],
+            colWidths=[85 * mm, 85 * mm],
+        ),
+        Spacer(1, 12),
+        Paragraph(intro, styles["body"]),
+        Spacer(1, 10),
+        _contract_meta_table(contract, styles, font_regular, font_bold),
+        Spacer(1, 12),
+        Paragraph("<b>1. Xizmatlar ro'yxati va narxlari</b>", styles["heading"]),
+        Spacer(1, 6),
+        _line_items_table(contract, font_regular, font_bold, styles),
+        Spacer(1, 10),
+        Paragraph(
+            "<b>2. To'lov shartlari</b><br/>"
+            "Buyurtmachi ushbu shartnomada ko'rsatilgan xizmatlar uchun to'lovlarni "
+            "kelishilgan muddat va miqdorda amalga oshiradi.",
+            styles["body"],
+        ),
+        Spacer(1, 8),
+    ]
+
+    if contract.notes:
+        elements.extend(
+            [
+                Paragraph(
+                    f"<b>3. Qo'shimcha shartlar</b><br/>{contract.notes}",
+                    styles["body"],
+                ),
+                Spacer(1, 8),
+            ]
+        )
+
+    elements.extend(
+        [
+            Paragraph(
+                "Tomonlar ushbu shartnoma shartlariga rozilik bildiradilar va hujjat imzolangan "
+                "kundan boshlab kuchga kiradi.",
+                styles["body"],
+            ),
+            Spacer(1, 24),
+            _signature_block(company, contract, styles),
+            Spacer(1, 14),
+            Paragraph(
+                f"Hujjat tizim tomonidan avtomatik shakllantirilgan — {datetime.now().strftime('%d.%m.%Y %H:%M')}",
+                styles["small"],
+            ),
+        ]
+    )
+
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer

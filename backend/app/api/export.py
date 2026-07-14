@@ -36,6 +36,7 @@ def export_data(
     file_format: FileFormat = Query(alias="format"),
     date_from: date | None = Query(default=None),
     date_to: date | None = Query(default=None),
+    ids: str | None = Query(default=None, description="Vergul bilan ajratilgan ID'lar — bulk eksport uchun"),
     db: Session = Depends(get_db),
 ) -> StreamingResponse:
     if date_from is not None and date_to is not None and date_to < date_from:
@@ -44,14 +45,24 @@ def export_data(
             detail="Tugash sanasi boshlanish sanasidan oldin bo'lishi mumkin emas",
         )
 
+    id_list: list[int] | None = None
+    if ids:
+        try:
+            id_list = [int(part) for part in ids.split(",") if part.strip()]
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="ids parametri noto'g'ri formatda",
+            )
+
     if resource == "clients":
         rows = fetch_clients_rows(db)
         headers = CLIENT_HEADERS
     elif resource == "contracts":
-        rows = fetch_contracts_rows(db, date_from=date_from, date_to=date_to)
+        rows = fetch_contracts_rows(db, date_from=date_from, date_to=date_to, ids=id_list)
         headers = CONTRACT_HEADERS
     elif resource == "payments":
-        rows = fetch_payments_rows(db, date_from=date_from, date_to=date_to)
+        rows = fetch_payments_rows(db, date_from=date_from, date_to=date_to, ids=id_list)
         headers = PAYMENT_HEADERS
     elif resource == "expenses":
         rows = fetch_expenses_rows(db, date_from=date_from, date_to=date_to)

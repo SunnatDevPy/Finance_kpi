@@ -19,6 +19,17 @@ def test_download_act_pdf(client, auth_headers, sample_contract):
     assert response.content.startswith(b"%PDF")
 
 
+def test_download_contract_pdf(client, auth_headers, sample_contract):
+    response = client.get(
+        f"/api/v1/contracts/{sample_contract.id}/documents/contract",
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/pdf"
+    assert response.content.startswith(b"%PDF")
+    assert len(response.content) > 500
+
+
 def test_download_document_unknown_type_rejected(client, auth_headers, sample_contract):
     response = client.get(
         f"/api/v1/contracts/{sample_contract.id}/documents/unknown",

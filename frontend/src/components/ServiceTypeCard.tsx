@@ -19,6 +19,7 @@ interface ServiceTypeCardProps {
     timesUsed: (count: number) => string;
     delete: string;
   };
+  canManage?: boolean;
   onOpen: (item: ServiceType) => void;
   onToggleMenu: (id: number) => void;
   onSetActive: (item: ServiceType, active: boolean) => void;
@@ -30,6 +31,7 @@ export const ServiceTypeCard = memo(function ServiceTypeCard({
   menuOpen,
   menuRef,
   labels,
+  canManage = true,
   onOpen,
   onToggleMenu,
   onSetActive,
@@ -64,6 +66,7 @@ export const ServiceTypeCard = memo(function ServiceTypeCard({
               <div className="mt-1.5">
                 <ActiveStatusToggle
                   active={item.is_active}
+                  disabled={!canManage}
                   onActiveChange={(active) => onSetActive(item, active)}
                 />
               </div>
@@ -94,6 +97,7 @@ export const ServiceTypeCard = memo(function ServiceTypeCard({
         <p className="text-xs text-muted-foreground">{labels.viewStats}</p>
       </div>
 
+      {canManage && (
       <div ref={menuOpen ? menuRef : undefined} className="absolute right-3 top-3 z-20">
         <MotionButton
           type="button"
@@ -143,6 +147,7 @@ export const ServiceTypeCard = memo(function ServiceTypeCard({
           )}
         </AnimatePresence>
       </div>
+      )}
     </motion.article>
   );
 });

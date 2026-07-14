@@ -2,26 +2,29 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangleIcon,
+  ArchiveIcon,
   CheckCircle2Icon,
-  ClipboardCheckIcon,
   CopyIcon,
   DownloadIcon,
+  FileTextIcon,
   FileUpIcon,
   PencilIcon,
   PlusIcon,
-  ReceiptIcon,
   Trash2Icon,
   UploadCloudIcon,
   XCircleIcon,
 } from "lucide-react";
 import { api } from "../api/client";
-import { ContractStatusBadge } from "../components/ContractStatusBadge";
+import { ContractStatusPicker } from "../components/ContractStatusPicker";
 import { CancelIcon, DeleteIconBtn, LoadingIconBtn, RemoveIconBtn, SaveIconBtn } from "../components/ButtonIcons";
+import { BulkActionBar } from "../components/BulkActionBar";
 import { DateRangePicker } from "../components/DateRangePicker";
 import { ExportButtons } from "../components/ExportButtons";
 import { Modal } from "../components/Modal";
 import { PageError } from "../components/PageError";
 import { Pagination } from "../components/Pagination";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useRowSelection } from "../hooks/useRowSelection";
 import {
   MotionTableRow,
   PremiumDataTable,
@@ -32,6 +35,7 @@ import {
   TableCellCompany,
   TableCellDate,
   TableCellMoney,
+  TableCellMuted,
   TableHead,
   TableHeader,
   TableRow,
@@ -49,8 +53,11 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { MotionButton, motionTap } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FloatingLabelDatePicker } from "@/components/ui/date-picker";
-import { FloatingLabelInput, FloatingLabelMoneyInput, FloatingLabelTextarea } from "@/components/ui/floating-label-input";
+import { FloatingLabelInput, FloatingLabelMoneyInput, FloatingLabelTextarea, floatedLabel, labelPeer, restingLabel } from "@/components/ui/floating-label-input";
+import { FloatingLabelStatusSelect } from "@/components/FloatingLabelStatusSelect";
+import { CONTRACT_WORKFLOW_STATUSES, contractRowTint, DEFAULT_CONTRACT_WORKFLOW_STATUS } from "@/data/contractWorkflow";
+import type { ContractWorkflowStatus } from "@/data/contractWorkflow";
+import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -63,10 +70,26 @@ import {
 } from "@/components/ui/select";
 import type { Client, Contract, ContractFormLineItem, ContractImportResult, ServiceType } from "../types";
 import { useI18n } from "../context/I18nContext";
+import { useAuth } from "../context/AuthContext";
 import { useListLoading } from "../hooks/useListLoading";
 import { useSubmitGuard } from "../hooks/useSubmitGuard";
 import { formatDate, formatMoney, formatWeekday, toNumber, toWholeAmountDigits } from "../utils/format";
 import { PageHeader, PageShell } from "../components/PageHeader";
+import { TableColumnPicker } from "../components/TableColumnPicker";
+import { usePickerColumns } from "../hooks/usePickerColumns";
+import { usePersistedState } from "../hooks/usePersistedState";
+
+const CONTRACT_OPTIONAL_COLUMNS = [
+  { id: "period", labelKey: "contracts.period", defaultVisible: true },
+  { id: "total", labelKey: "common.total", defaultVisible: true },
+  { id: "paid", labelKey: "common.paid", defaultVisible: true },
+  { id: "debt", labelKey: "common.debt", defaultVisible: true },
+  { id: "services", labelKey: "contracts.services", defaultVisible: true },
+  { id: "invoice", labelKey: "contracts.invoiceNumber", defaultVisible: true },
+  { id: "state", labelKey: "contracts.state", defaultVisible: true },
+] as const;
+
+type ContractOptionalColumn = (typeof CONTRACT_OPTIONAL_COLUMNS)[number]["id"];
 
 const formReveal = {
   hidden: { opacity: 0 },
@@ -87,21 +110,29 @@ const formSectionReveal = {
 
 export function ContractsPage() {
   const { t } = useI18n();
+  const { isAdmin } = useAuth();
+  const { isVisible, setColumnVisible, visibleCount, items: columnPickerItems } =
+    usePickerColumns("wtma.contracts.tableColumns", CONTRACT_OPTIONAL_COLUMNS, t);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Contract | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [bulkArchiveConfirm, setBulkArchiveConfirm] = useState(false);
+  const [bulkArchiving, setBulkArchiving] = useState(false);
+  const [statusUpdatingId, setStatusUpdatingId] = useState<number | null>(null);
   const [error, setError] = useState("");
   const { loading, start, finish } = useListLoading();
   const { submitting, guard } = useSubmitGuard();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [total, setTotal] = useState(0);
-  const [exportDateFrom, setExportDateFrom] = useState("");
-  const [exportDateTo, setExportDateTo] = useState("");
-  const [search, setSearch] = useState("");
+  const [exportDateFrom, setExportDateFrom] = usePersistedState("wtma.contracts.dateFrom", "");
+  const [exportDateTo, setExportDateTo] = usePersistedState("wtma.contracts.dateTo", "");
+  const [search, setSearch] = usePersistedState("wtma.contracts.search", "");
+  const [statusFilter, setStatusFilter] = usePersistedState("wtma.contracts.statusFilter", "all");
+  const selection = useRowSelection(contracts.map((c) => c.id));
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importBusy, setImportBusy] = useState(false);
@@ -117,6 +148,7 @@ export function ContractsPage() {
     client_id: "",
     start_date: "",
     end_date: "",
+    status: DEFAULT_CONTRACT_WORKFLOW_STATUS as ContractWorkflowStatus,
     notes: "",
     contract_number: "",
     invoice_number: "",
@@ -130,6 +162,9 @@ export function ContractsPage() {
         skip: (page - 1) * pageSize,
         limit: pageSize,
         search: search || undefined,
+        dateFrom: exportDateFrom || undefined,
+        dateTo: exportDateTo || undefined,
+        status: statusFilter === "all" ? undefined : (statusFilter as ContractWorkflowStatus),
       }),
       api.clients.list({ limit: 200 }),
       api.serviceTypes.list(true),
@@ -154,12 +189,12 @@ export function ContractsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search]);
+  }, [search, exportDateFrom, exportDateTo, statusFilter]);
 
   useEffect(() => {
     const timer = window.setTimeout(load, 300);
     return () => window.clearTimeout(timer);
-  }, [page, pageSize, search]);
+  }, [page, pageSize, search, exportDateFrom, exportDateTo, statusFilter]);
 
   const clientName = (id: number) =>
     clients.find((c) => c.id === id)?.company_name || `#${id}`;
@@ -168,6 +203,7 @@ export function ContractsPage() {
     client_id: "",
     start_date: "",
     end_date: "",
+    status: DEFAULT_CONTRACT_WORKFLOW_STATUS,
     notes: "",
     contract_number: "",
     invoice_number: "",
@@ -188,6 +224,7 @@ export function ContractsPage() {
       client_id: String(contract.client_id),
       start_date: contract.start_date,
       end_date: contract.end_date,
+      status: contract.status,
       notes: contract.notes || "",
       contract_number: contract.contract_number || "",
       invoice_number: contract.invoice_number || "",
@@ -260,6 +297,7 @@ export function ContractsPage() {
     const payload = {
       start_date: form.start_date,
       end_date: form.end_date,
+      status: form.status,
       notes: form.notes || undefined,
       contract_number: form.contract_number || undefined,
       invoice_number: form.invoice_number || undefined,
@@ -285,10 +323,10 @@ export function ContractsPage() {
     }
   });
 
-  const handleDownloadDocument = async (contract: Contract, type: "invoice" | "act") => {
+  const handleDownloadContract = async (contract: Contract) => {
     setError("");
     try {
-      await api.contracts.downloadDocument(contract.id, type, contract.contract_number);
+      await api.contracts.downloadDocument(contract.id, "contract", contract.contract_number);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("common.error"));
     }
@@ -317,6 +355,38 @@ export function ContractsPage() {
       setContracts(snapshot);
       setTotal((prev) => prev + 1);
       setError(err instanceof Error ? err.message : t("common.error"));
+    }
+  };
+
+  const handleQuickStatusChange = async (contract: Contract, status: ContractWorkflowStatus) => {
+    const previous = contract.status;
+    setStatusUpdatingId(contract.id);
+    setError("");
+    setContracts((prev) => prev.map((c) => (c.id === contract.id ? { ...c, status } : c)));
+    try {
+      await api.contracts.update(contract.id, { status });
+    } catch (err) {
+      setContracts((prev) => prev.map((c) => (c.id === contract.id ? { ...c, status: previous } : c)));
+      setError(err instanceof Error ? err.message : t("common.error"));
+    } finally {
+      setStatusUpdatingId(null);
+    }
+  };
+
+  const handleBulkArchive = async () => {
+    const ids = selection.selectedIds;
+    if (ids.length === 0) return;
+    setBulkArchiving(true);
+    setError("");
+    try {
+      await Promise.all(ids.map((id) => api.contracts.delete(id)));
+      setBulkArchiveConfirm(false);
+      selection.clear();
+      load(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("common.error"));
+    } finally {
+      setBulkArchiving(false);
     }
   };
 
@@ -376,36 +446,78 @@ export function ContractsPage() {
 
       <PageError message={error} />
 
-      <div className="filter-bar">
-        <Input
-          className="max-w-sm flex-1"
-          placeholder={t("common.search")}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <DateRangePicker
-          from={exportDateFrom}
-          to={exportDateTo}
-          onChange={(from, to) => {
-            setExportDateFrom(from);
-            setExportDateTo(to);
-          }}
-        />
-      </div>
-
       <Card className="content-card">
-        <CardHeader>
+        <CardHeader className="pb-3">
           <CardTitle>{t("contracts.listTitle")}</CardTitle>
           <CardDescription>
             {t("common.itemsFound").replace("{count}", String(total))}
           </CardDescription>
         </CardHeader>
+        <div className="table-card-toolbar">
+          <Input
+            className="w-full min-w-[12rem] flex-1 sm:max-w-xs"
+            placeholder={t("common.search")}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <Select
+            value={statusFilter}
+            onValueChange={(v) => v && setStatusFilter(v)}
+            className="w-full sm:w-48"
+          >
+            <SelectTrigger>
+              <SelectValue placeholder={t("contracts.state")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="all">{t("contracts.allStatuses")}</SelectItem>
+                {CONTRACT_WORKFLOW_STATUSES.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {t(`contractWorkflowStatus.${s}`)}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <DateRangePicker
+            from={exportDateFrom}
+            to={exportDateTo}
+            onChange={(from, to) => {
+              setExportDateFrom(from);
+              setExportDateTo(to);
+            }}
+          />
+          <TableColumnPicker
+            columns={columnPickerItems}
+            isVisible={(id: ContractOptionalColumn) => isVisible(id)}
+            onVisibleChange={setColumnVisible}
+            className="sm:ml-auto"
+          />
+        </div>
+        <BulkActionBar
+          count={selection.count}
+          onClear={selection.clear}
+          onExport={(format) => api.export.download("contracts", format, { ids: selection.selectedIds })}
+        >
+          {isAdmin && (
+            <MotionButton
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setBulkArchiveConfirm(true)}
+              {...motionTap}
+            >
+              <ArchiveIcon data-icon="inline-start" />
+              {t("common.archive")}
+            </MotionButton>
+          )}
+        </BulkActionBar>
         <CardContent className="p-0">
           <PremiumDataTable
             loading={loading}
             empty={!loading && contracts.length === 0}
             emptyMessage={t("contracts.notFound")}
-            skeletonCols={7}
+            skeletonCols={3 + visibleCount}
             footer={
               <Pagination
                 embedded
@@ -422,22 +534,44 @@ export function ContractsPage() {
           >
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10">
+                  <Checkbox
+                    checked={selection.allPageSelected}
+                    indeterminate={selection.somePageSelected}
+                    onCheckedChange={() => selection.toggleAllOnPage()}
+                    aria-label={t("common.selectAll")}
+                  />
+                </TableHead>
                 <TableHead>{t("contracts.client")}</TableHead>
-                <TableHead>{t("contracts.period")}</TableHead>
-                <TableHead>{t("contracts.state")}</TableHead>
-                <TableHead>{t("contracts.services")}</TableHead>
-                <TableHead>{t("common.total")}</TableHead>
-                <TableHead>{t("common.debt")}</TableHead>
+                {isVisible("period") && <TableHead>{t("contracts.period")}</TableHead>}
+                {isVisible("total") && <TableHead>{t("common.total")}</TableHead>}
+                {isVisible("paid") && <TableHead>{t("common.paid")}</TableHead>}
+                {isVisible("debt") && <TableHead>{t("common.debt")}</TableHead>}
+                {isVisible("services") && <TableHead>{t("contracts.services")}</TableHead>}
+                {isVisible("invoice") && <TableHead>{t("contracts.invoiceNumber")}</TableHead>}
+                {isVisible("state") && <TableHead>{t("contracts.state")}</TableHead>}
                 <TableHead className="text-right">{t("common.actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {contracts.map((contract, index) => (
-                <MotionTableRow key={contract.id} {...rowEnter(index)}>
+                <MotionTableRow
+                  key={contract.id}
+                  className={contractRowTint(contract.status, contract.is_cancelled)}
+                  {...rowEnter(index)}
+                >
+                  <TableCell>
+                    <Checkbox
+                      checked={selection.isSelected(contract.id)}
+                      onCheckedChange={() => selection.toggle(contract.id)}
+                      aria-label={t("common.selectRow")}
+                    />
+                  </TableCell>
                   <TableCellCompany
                     to={`/clients/${contract.client_id}`}
                     name={clientName(contract.client_id)}
                   />
+                  {isVisible("period") && (
                   <TableCellDate>
                     <div className="flex min-w-[8.5rem] flex-col gap-1">
                       {contract.contract_number && (
@@ -462,23 +596,29 @@ export function ContractsPage() {
                           </span>
                         </span>
                       </div>
-                      {contract.invoice_number && (
-                        <span className="whitespace-nowrap text-[10px] text-muted-foreground">
-                          {t("contracts.invoiceNumber")}: {contract.invoice_number}
-                        </span>
-                      )}
                     </div>
                   </TableCellDate>
-                  <TableCell>
-                    {contract.is_cancelled ? (
-                      <Badge variant="secondary" className="gap-1 text-muted-foreground">
-                        <XCircleIcon className="size-3" />
-                        {t("clients.cancelled")}
-                      </Badge>
-                    ) : (
-                      <ContractStatusBadge endDate={contract.end_date} />
+                  )}
+                  {isVisible("total") && (
+                  <TableCellMoney tone="neutral">
+                    {formatMoney(contract.total_amount)}
+                  </TableCellMoney>
+                  )}
+                  {isVisible("paid") && (
+                  <TableCellMoney tone="positive">
+                    {formatMoney(contract.paid_amount)}
+                  </TableCellMoney>
+                  )}
+                  {isVisible("debt") && (
+                  <TableCellMoney tone={toNumber(contract.debt_amount) < 0 ? "positive" : "negative"}>
+                    {formatMoney(
+                      toNumber(contract.debt_amount) < 0
+                        ? Math.abs(toNumber(contract.debt_amount))
+                        : contract.debt_amount,
                     )}
-                  </TableCell>
+                  </TableCellMoney>
+                  )}
+                  {isVisible("services") && (
                   <TableCell>
                     <div className="flex max-w-[13rem] flex-wrap gap-1">
                       {contract.line_items.map((item, i) => (
@@ -492,37 +632,37 @@ export function ContractsPage() {
                       ))}
                     </div>
                   </TableCell>
-                  <TableCellMoney tone="neutral">
-                    {formatMoney(contract.total_amount)}
-                  </TableCellMoney>
-                  <TableCellMoney tone={toNumber(contract.debt_amount) < 0 ? "positive" : "negative"}>
-                    {formatMoney(
-                      toNumber(contract.debt_amount) < 0
-                        ? Math.abs(toNumber(contract.debt_amount))
-                        : contract.debt_amount,
+                  )}
+                  {isVisible("invoice") && (
+                  <TableCellMuted>{contract.invoice_number}</TableCellMuted>
+                  )}
+                  {isVisible("state") && (
+                  <TableCell>
+                    {contract.is_cancelled ? (
+                      <Badge variant="secondary" className="gap-1 text-muted-foreground">
+                        <XCircleIcon className="size-3" />
+                        {t("clients.cancelled")}
+                      </Badge>
+                    ) : (
+                      <ContractStatusPicker
+                        value={contract.status}
+                        loading={statusUpdatingId === contract.id}
+                        onChange={(status) => handleQuickStatusChange(contract, status)}
+                      />
                     )}
-                  </TableCellMoney>
+                  </TableCell>
+                  )}
                   <TableCellActions>
                     <div className="action-toolbar">
                     <MotionButton
                       variant="ghost"
                       size="icon-sm"
                       className="size-8"
-                      onClick={() => handleDownloadDocument(contract, "invoice")}
-                      title={t("contracts.downloadInvoice")}
+                      onClick={() => handleDownloadContract(contract)}
+                      title={t("contracts.downloadContract")}
                       {...motionTap}
                     >
-                      <ReceiptIcon className="size-3.5" />
-                    </MotionButton>
-                    <MotionButton
-                      variant="ghost"
-                      size="icon-sm"
-                      className="size-8"
-                      onClick={() => handleDownloadDocument(contract, "act")}
-                      title={t("contracts.downloadAct")}
-                      {...motionTap}
-                    >
-                      <ClipboardCheckIcon className="size-3.5" />
+                      <FileTextIcon className="size-3.5" />
                     </MotionButton>
                     <MotionButton
                       variant="ghost"
@@ -544,6 +684,7 @@ export function ContractsPage() {
                     >
                       <PencilIcon className="size-3.5" />
                     </MotionButton>
+                    {isAdmin && (
                     <MotionButton
                       variant="ghost"
                       size="icon-sm"
@@ -554,6 +695,7 @@ export function ContractsPage() {
                     >
                       <Trash2Icon className="size-3.5" />
                     </MotionButton>
+                    )}
                     </div>
                   </TableCellActions>
                 </MotionTableRow>
@@ -610,21 +752,32 @@ export function ContractsPage() {
               )}
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <FloatingLabelDatePicker
-                id="start_date"
-                label={t("contracts.start")}
-                required
-                value={form.start_date}
-                onChange={(value) => setForm({ ...form, start_date: value })}
-              />
-              <FloatingLabelDatePicker
-                id="end_date"
-                label={t("contracts.end")}
-                required
-                value={form.end_date}
-                min={form.start_date || undefined}
-                onChange={(value) => setForm({ ...form, end_date: value })}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_11.5rem]">
+              <div className="relative min-w-0 pt-3">
+                <DateRangePicker
+                  formField
+                  className="w-full"
+                  from={form.start_date}
+                  to={form.end_date}
+                  onChange={(start_date, end_date) =>
+                    setForm({ ...form, start_date, end_date })
+                  }
+                />
+                <label
+                  className={cn(
+                    labelPeer,
+                    form.start_date || form.end_date ? floatedLabel : restingLabel,
+                  )}
+                >
+                  {t("contracts.period")}
+                  <span className="text-brand-500"> *</span>
+                </label>
+              </div>
+              <FloatingLabelStatusSelect
+                id="contract_workflow_status"
+                label={t("contracts.state")}
+                value={form.status}
+                onValueChange={(status) => setForm({ ...form, status })}
               />
             </div>
           </motion.div>
@@ -681,29 +834,35 @@ export function ContractsPage() {
               >
               <div className="pt-2 pb-1">
               <div className="grid grid-cols-1 gap-2 rounded-xl border border-border/50 bg-background/90 p-3 shadow-sm sm:grid-cols-[minmax(0,1fr)_minmax(12.5rem,14rem)_auto] sm:items-end sm:gap-3">
-                <Select
-                  className="min-w-0"
-                  value={String(item.service_type_id)}
-                  onValueChange={(value) => {
-                    if (!value) return;
-                    const items = [...form.line_items];
-                    items[index].service_type_id = parseInt(value);
-                    setForm({ ...form, line_items: items });
-                  }}
-                >
-                  <SelectTrigger className="h-12 w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {serviceTypes.map((st) => (
-                        <SelectItem key={st.id} value={String(st.id)}>
-                          {st.name}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+                <div className="relative min-w-0 pt-3">
+                  <Select
+                    className="min-w-0"
+                    value={String(item.service_type_id)}
+                    onValueChange={(value) => {
+                      if (!value) return;
+                      const items = [...form.line_items];
+                      items[index].service_type_id = parseInt(value);
+                      setForm({ ...form, line_items: items });
+                    }}
+                  >
+                    <SelectTrigger size="form" className="peer w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {serviceTypes.map((st) => (
+                          <SelectItem key={st.id} value={String(st.id)}>
+                            {st.name}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  <label className={cn(labelPeer, floatedLabel)}>
+                    {t("clients.service")}
+                    <span className="text-brand-500"> *</span>
+                  </label>
+                </div>
                 <FloatingLabelMoneyInput
                   containerClassName="w-full min-w-0"
                   className="tabular-nums"
@@ -717,16 +876,18 @@ export function ContractsPage() {
                   }}
                 />
                 {form.line_items.length > 1 ? (
-                  <MotionButton
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    className="mb-1 shrink-0 justify-self-end text-destructive sm:justify-self-center"
-                    onClick={() => removeLineItem(index)}
-                    {...motionTap}
-                  >
-                    <RemoveIconBtn />
-                  </MotionButton>
+                  <div className="flex justify-end pt-3 sm:justify-center">
+                    <MotionButton
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="size-12 shrink-0 text-destructive"
+                      onClick={() => removeLineItem(index)}
+                      {...motionTap}
+                    >
+                      <RemoveIconBtn />
+                    </MotionButton>
+                  </div>
                 ) : (
                   <span className="hidden sm:block" aria-hidden />
                 )}
@@ -749,7 +910,7 @@ export function ContractsPage() {
 
           <motion.div
             variants={formSectionReveal}
-            className="flex justify-end gap-2 border-t border-border/60 pt-4"
+            className="flex flex-wrap justify-end gap-2 border-t border-border/60 pt-4"
           >
             <MotionButton type="button" variant="outline" onClick={closeModal} {...motionTap}>
               <CancelIcon />
@@ -804,7 +965,7 @@ export function ContractsPage() {
 
               {importError && <p className="text-sm text-destructive">{importError}</p>}
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex flex-wrap justify-end gap-2 pt-2">
                 <MotionButton type="button" variant="outline" onClick={closeImportModal} {...motionTap}>
                   <CancelIcon />
                   {t("common.cancel")}
@@ -884,7 +1045,7 @@ export function ContractsPage() {
                 </div>
               )}
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex flex-wrap justify-end gap-2 pt-2">
                 <MotionButton
                   type="button"
                   variant="outline"
@@ -924,6 +1085,30 @@ export function ContractsPage() {
             <AlertDialogAction variant="destructive" onClick={handleDelete}>
               <DeleteIconBtn />
               {t("common.delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={bulkArchiveConfirm}
+        onOpenChange={(open) => !open && setBulkArchiveConfirm(false)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("common.bulkArchiveTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("common.bulkArchiveDesc").replace("{count}", String(selection.count))}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkArchiving}>
+              <CancelIcon />
+              {t("common.cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction variant="destructive" disabled={bulkArchiving} onClick={handleBulkArchive}>
+              {bulkArchiving ? <LoadingIconBtn /> : <ArchiveIcon />}
+              {t("common.archive")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

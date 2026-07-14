@@ -2,6 +2,10 @@ import { useId, type MouseEvent, type PointerEvent } from "react";
 
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import {
+  floatedLabel,
+  labelPeer,
+} from "@/components/ui/floating-label-input";
 import { useI18n } from "@/context/I18nContext";
 import { cn } from "@/lib/utils";
 
@@ -30,16 +34,20 @@ export function ActiveStatusToggle({
   const id = useId();
   const statusLabel = active ? t("status.active") : t("status.inactive");
 
-  const stop = (event: PointerEvent<HTMLDivElement>) => {
+  const stopPointer = (event: PointerEvent<HTMLDivElement>) => {
     event.stopPropagation();
     onPointerDown?.(event);
   };
 
+  const stopClick = (event: MouseEvent<HTMLDivElement>) => {
+    event.stopPropagation();
+    onClick?.(event);
+  };
+
   if (layout === "field") {
     return (
-      <div className={cn("flex flex-col gap-2", className)} onPointerDown={stop} onClick={onClick}>
-        {label && <Label htmlFor={id}>{label}</Label>}
-        <div className="flex h-10 items-center justify-between gap-3 rounded-lg border border-border/80 bg-muted/20 px-3">
+      <div className={cn("relative pt-3", className)} onPointerDown={stopPointer} onClick={stopClick}>
+        <div className="flex h-12 items-center justify-between gap-3 rounded-lg border border-input bg-transparent px-3 shadow-sm dark:bg-input/30">
           <span
             className={cn(
               "text-sm font-medium",
@@ -56,15 +64,20 @@ export function ActiveStatusToggle({
             aria-label={label ?? statusLabel}
           />
         </div>
+        {label && (
+          <label htmlFor={id} className={cn(labelPeer, floatedLabel)}>
+            {label}
+          </label>
+        )}
       </div>
     );
   }
 
   return (
     <div
-      className={cn("flex items-center gap-2.5", className)}
-      onPointerDown={stop}
-      onClick={onClick}
+      className={cn("inline-flex w-[8.75rem] shrink-0 items-center gap-2.5", className)}
+      onPointerDown={stopPointer}
+      onClick={stopClick}
     >
       <Switch
         id={id}
@@ -72,8 +85,12 @@ export function ActiveStatusToggle({
         onCheckedChange={onActiveChange}
         disabled={disabled}
         aria-label={label ?? statusLabel}
+        className="shrink-0"
       />
-      <Label htmlFor={id} className="cursor-pointer text-sm font-medium text-foreground">
+      <Label
+        htmlFor={id}
+        className="w-[6.25rem] shrink-0 cursor-pointer text-sm font-medium text-foreground"
+      >
         {statusLabel}
       </Label>
     </div>

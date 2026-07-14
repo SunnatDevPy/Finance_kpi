@@ -59,15 +59,27 @@ def expense_summary(
     return get_expense_summary(db, date_from=date_from, date_to=date_to)
 
 
-@router.get("/trash", response_model=list[ExpenseRead], dependencies=[Depends(require_admin)])
-def list_deleted_expenses(db: Session = Depends(get_db)) -> list[Expense]:
+@router.get("/trash", response_model=Page[ExpenseRead], dependencies=[Depends(require_admin)])
+def list_deleted_expenses(
+    db: Session = Depends(get_db),
+    search: str | None = Query(default=None, min_length=1),
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=200),
+) -> Page[ExpenseRead]:
+    filters = [Expense.deleted_at.is_not(None)]
+    if search:
+        filters.append(Expense.title.ilike(f"%{search}%"))
+
+    total = db.scalar(select(func.count(Expense.id)).where(*filters)) or 0
     stmt = (
         select(Expense)
-        .where(Expense.deleted_at.is_not(None))
+        .where(*filters)
         .order_by(Expense.deleted_at.desc())
-        .limit(200)
+        .offset(skip)
+        .limit(limit)
     )
-    return list(db.scalars(stmt).all())
+    items = list(db.scalars(stmt).all())
+    return Page(items=items, total=total, skip=skip, limit=limit)
 
 
 @router.post("", response_model=ExpenseRead, status_code=status.HTTP_201_CREATED)
@@ -124,7 +136,11 @@ def update_expense(
     return expense
 
 
-@router.delete("/{expense_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{expense_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_admin)],
+)
 def delete_expense(
     expense_id: int,
     db: Session = Depends(get_db),

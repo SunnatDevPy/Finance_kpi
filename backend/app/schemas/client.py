@@ -42,8 +42,10 @@ class ClientRead(ClientBase):
     logo_url: str | None = None
     created_at: datetime
     updated_at: datetime
+    total_debt: Decimal = Decimal("0")
 
 
 class ClientCardRead(ClientRead):
     contracts: list[ContractRead]
     total_debt: Decimal
+    cancelled_amount: Decimal

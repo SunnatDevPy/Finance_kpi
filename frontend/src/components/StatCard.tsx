@@ -1,5 +1,6 @@
 import { TrendingDownIcon, TrendingUpIcon, type LucideIcon } from "lucide-react";
 import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { AnimatedNumber } from "./AnimatedNumber";
 
@@ -13,6 +14,8 @@ interface StatCardProps {
   change?: number | null;
   changeLabel?: string;
   icon?: LucideIcon;
+  /** Berilsa, karta bosiladigan qilinadi va shu yo'lga o'tkazadi. */
+  to?: string;
 }
 
 const themes = {
@@ -76,6 +79,7 @@ export function StatCard({
   change,
   changeLabel,
   icon: Icon,
+  to,
 }: StatCardProps) {
   const th = themes[accent];
   const isUp = change != null && change >= 0;
@@ -86,10 +90,16 @@ export function StatCard({
       whileHover={{ y: -4, transition: { duration: 0.2, ease: [0.16, 1, 0.3, 1] } }}
       className={cn(
         "group relative flex h-full flex-col overflow-hidden rounded-2xl border bg-gradient-to-br p-6 backdrop-blur-sm transition-shadow duration-300 hover:shadow-xl",
+        to && "cursor-pointer",
         th.card,
         th.glow,
       )}
     >
+      {to && (
+        <Link to={to} className="absolute inset-0 z-10" aria-label={title}>
+          <span className="sr-only">{title}</span>
+        </Link>
+      )}
       {/* Yuqori qator: sarlavha chapda, ikonka o'ng burchakda */}
       <div className="flex items-start justify-between gap-4">
         <p className="min-w-0 flex-1 text-sm font-medium leading-relaxed tracking-tight text-muted-foreground">

@@ -10,6 +10,7 @@ import type {
   CompanyProfile,
   Contract,
   ContractImportResult,
+  ContractWorkflowStatus,
   DashboardStats,
   DebtsSummary,
   Expense,
@@ -23,8 +24,9 @@ import type {
   IncomeCategory,
   IncomeSummary,
   LoginHistoryEntry,
+  OverdueDebt,
   Payment,
-  PaymentListItem,
+  PaymentsPaginated,
   Paginated,
   ServiceType,
   ServiceTypeStats,
@@ -55,6 +57,21 @@ export function setOnUnauthorized(handler: () => void) {
 const inFlightRequests = new Map<string, Promise<unknown>>();
 const DEDUPE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const DEDUPE_GRACE_MS = 800;
+
+export interface TrashParams {
+  search?: string;
+  skip?: number;
+  limit?: number;
+}
+
+function trashQueryString(params?: TrashParams): string {
+  const q = new URLSearchParams();
+  if (params?.search) q.set("search", params.search);
+  if (params?.skip !== undefined) q.set("skip", String(params.skip));
+  if (params?.limit !== undefined) q.set("limit", String(params.limit));
+  const qs = q.toString();
+  return qs ? `?${qs}` : "";
+}
 
 function dedupeKey(path: string, options?: RequestInit): string | null {
   const method = (options?.method ?? "GET").toUpperCase();
@@ -246,6 +263,8 @@ export const api = {
   notifications: {
     expiringContracts: (days = 30) =>
       request<ExpiringContract[]>(`/notifications/expiring-contracts?days=${days}`),
+    overdueDebts: (minDays = 0) =>
+      request<OverdueDebt[]>(`/notifications/overdue-debts?min_days=${minDays}`),
   },
 
   settings: {
@@ -269,6 +288,8 @@ export const api = {
       entityType?: AuditEntityType;
       entityId?: number;
       userId?: number;
+      dateFrom?: string;
+      dateTo?: string;
       skip?: number;
       limit?: number;
     }) => {
@@ -276,6 +297,8 @@ export const api = {
       if (params?.entityType) q.set("entity_type", params.entityType);
       if (params?.entityId !== undefined) q.set("entity_id", String(params.entityId));
       if (params?.userId !== undefined) q.set("user_id", String(params.userId));
+      if (params?.dateFrom) q.set("date_from", params.dateFrom);
+      if (params?.dateTo) q.set("date_to", params.dateTo);
       if (params?.skip !== undefined) q.set("skip", String(params.skip));
       if (params?.limit !== undefined) q.set("limit", String(params.limit));
       const qs = q.toString();
@@ -287,25 +310,34 @@ export const api = {
     download: (
       resource: "clients" | "contracts" | "payments" | "debts" | "expenses" | "incomes",
       format: "xlsx" | "pdf",
-      params?: { date_from?: string; date_to?: string },
+      params?: { date_from?: string; date_to?: string; ids?: number[] },
     ) => {
       const q = new URLSearchParams({ format });
       if (params?.date_from) q.set("date_from", params.date_from);
       if (params?.date_to) q.set("date_to", params.date_to);
+      if (params?.ids?.length) q.set("ids", params.ids.join(","));
       return download(`/export/${resource}?${q}`, `${resource}.${format}`);
     },
   },
 
   clients: {
-    list: (params?: { status?: string; search?: string; skip?: number; limit?: number }) => {
+    list: (params?: {
+      status?: string;
+      search?: string;
+      city?: string;
+      skip?: number;
+      limit?: number;
+    }) => {
       const q = new URLSearchParams();
       if (params?.status) q.set("status", params.status);
       if (params?.search) q.set("search", params.search);
+      if (params?.city) q.set("city", params.city);
       if (params?.skip !== undefined) q.set("skip", String(params.skip));
       if (params?.limit !== undefined) q.set("limit", String(params.limit));
       const qs = q.toString();
       return request<Paginated<Client>>(`/clients${qs ? `?${qs}` : ""}`);
     },
+    cities: () => request<string[]>("/clients/cities"),
     get: (id: number) => request<Client>(`/clients/${id}`),
     card: (id: number) => request<ClientCard>(`/clients/${id}/card`),
     create: (data: Partial<ClientFormData>) =>
@@ -321,10 +353,11 @@ export const api = {
     delete: (id: number) => request<void>(`/clients/${id}`, { method: "DELETE" }),
     downloadImportTemplate: () => download("/clients/import-template", "mijozlar_shabloni.xlsx"),
     import: (file: File) => uploadFile<ClientImportResult>("/clients/import", file),
-    trash: () => request<Client[]>("/clients/trash"),
+    trash: (params?: TrashParams) => request<Paginated<Client>>(`/clients/trash${trashQueryString(params)}`),
     restore: (id: number) => request<Client>(`/clients/${id}/restore`, { method: "POST" }),
     uploadLogo: (id: number, file: File) => uploadFile<Client>(`/clients/${id}/logo`, file),
     deleteLogo: (id: number) => request<Client>(`/clients/${id}/logo`, { method: "DELETE" }),
+    exportCard: (id: number) => download(`/clients/${id}/export`, `mijoz_${id}.xlsx`),
   },
 
   serviceTypes: {
@@ -345,10 +378,21 @@ export const api = {
   },
 
   contracts: {
-    list: (params?: { clientId?: number; search?: string; skip?: number; limit?: number }) => {
+    list: (params?: {
+      clientId?: number;
+      search?: string;
+      dateFrom?: string;
+      dateTo?: string;
+      status?: ContractWorkflowStatus;
+      skip?: number;
+      limit?: number;
+    }) => {
       const q = new URLSearchParams();
       if (params?.clientId) q.set("client_id", String(params.clientId));
       if (params?.search) q.set("search", params.search);
+      if (params?.dateFrom) q.set("date_from", params.dateFrom);
+      if (params?.dateTo) q.set("date_to", params.dateTo);
+      if (params?.status) q.set("status", params.status);
       if (params?.skip !== undefined) q.set("skip", String(params.skip));
       if (params?.limit !== undefined) q.set("limit", String(params.limit));
       const qs = q.toString();
@@ -363,6 +407,7 @@ export const api = {
       start_date: string;
       end_date: string;
       notes?: string;
+      status?: ContractWorkflowStatus;
       contract_number?: string;
       invoice_number?: string;
       line_items: { service_type_id: number; price: number }[];
@@ -377,6 +422,7 @@ export const api = {
         start_date?: string;
         end_date?: string;
         notes?: string;
+        status?: ContractWorkflowStatus;
         contract_number?: string;
         invoice_number?: string;
         line_items?: { service_type_id: number; price: number }[];
@@ -396,16 +442,39 @@ export const api = {
       request<Contract>(`/contracts/${contractId}/line-items/${lineItemId}/cancel`, {
         method: "PATCH",
       }),
+    updateLineItem: (
+      contractId: number,
+      lineItemId: number,
+      data: { service_type_id: number; price: number },
+    ) =>
+      request<Contract>(`/contracts/${contractId}/line-items/${lineItemId}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    history: (contractId: number, params?: { skip?: number; limit?: number }) => {
+      const q = new URLSearchParams();
+      if (params?.skip !== undefined) q.set("skip", String(params.skip));
+      if (params?.limit !== undefined) q.set("limit", String(params.limit));
+      const qs = q.toString();
+      return request<Paginated<AuditLogEntry>>(
+        `/contracts/${contractId}/history${qs ? `?${qs}` : ""}`,
+      );
+    },
     reactivateLineItem: (contractId: number, lineItemId: number) =>
       request<Contract>(`/contracts/${contractId}/line-items/${lineItemId}/reactivate`, {
         method: "PATCH",
       }),
     cancelAll: (contractId: number) =>
       request<Contract>(`/contracts/${contractId}/cancel-all`, { method: "POST" }),
-    trash: () => request<Contract[]>("/contracts/trash"),
+    confirm: (contractId: number) =>
+      request<Contract>(`/contracts/${contractId}/confirm`, { method: "POST" }),
+    complete: (contractId: number) =>
+      request<Contract>(`/contracts/${contractId}/complete`, { method: "POST" }),
+    trash: (params?: TrashParams) => request<Paginated<Contract>>(`/contracts/trash${trashQueryString(params)}`),
     restore: (id: number) => request<Contract>(`/contracts/${id}/restore`, { method: "POST" }),
-    downloadDocument: (id: number, type: "invoice" | "act", contractNumber?: string | null) => {
-      const prefix = type === "invoice" ? "schyot-faktura" : "akt";
+    downloadDocument: (id: number, type: "invoice" | "act" | "contract", contractNumber?: string | null) => {
+      const prefix =
+        type === "invoice" ? "schyot-faktura" : type === "act" ? "akt" : "shartnoma";
       return download(
         `/contracts/${id}/documents/${type}`,
         `${prefix}_${contractNumber || id}.pdf`,
@@ -430,7 +499,7 @@ export const api = {
       if (params?.skip !== undefined) q.set("skip", String(params.skip));
       if (params?.limit !== undefined) q.set("limit", String(params.limit));
       const qs = q.toString();
-      return request<Paginated<PaymentListItem>>(`/payments${qs ? `?${qs}` : ""}`);
+      return request<PaymentsPaginated>(`/payments${qs ? `?${qs}` : ""}`);
     },
     create: (data: {
       contract_id: number;
@@ -443,7 +512,7 @@ export const api = {
         body: JSON.stringify(data),
       }),
     delete: (id: number) => request<void>(`/payments/${id}`, { method: "DELETE" }),
-    trash: () => request<Payment[]>("/payments/trash"),
+    trash: (params?: TrashParams) => request<Paginated<Payment>>(`/payments/trash${trashQueryString(params)}`),
     restore: (id: number) => request<Payment>(`/payments/${id}/restore`, { method: "POST" }),
   },
 
@@ -499,7 +568,7 @@ export const api = {
         body: JSON.stringify(data),
       }),
     delete: (id: number) => request<void>(`/expenses/${id}`, { method: "DELETE" }),
-    trash: () => request<Expense[]>("/expenses/trash"),
+    trash: (params?: TrashParams) => request<Paginated<Expense>>(`/expenses/trash${trashQueryString(params)}`),
     restore: (id: number) => request<Expense>(`/expenses/${id}/restore`, { method: "POST" }),
   },
 
@@ -555,7 +624,7 @@ export const api = {
         body: JSON.stringify(data),
       }),
     delete: (id: number) => request<void>(`/incomes/${id}`, { method: "DELETE" }),
-    trash: () => request<Income[]>("/incomes/trash"),
+    trash: (params?: TrashParams) => request<Paginated<Income>>(`/incomes/trash${trashQueryString(params)}`),
     restore: (id: number) => request<Income>(`/incomes/${id}/restore`, { method: "POST" }),
   },
 

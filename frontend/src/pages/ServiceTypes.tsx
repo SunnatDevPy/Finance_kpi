@@ -24,6 +24,7 @@ import { StatCard } from "../components/StatCard";
 import { useListLoading } from "../hooks/useListLoading";
 import { useSubmitGuard } from "../hooks/useSubmitGuard";
 import { useI18n } from "../context/I18nContext";
+import { useAuth } from "../context/AuthContext";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,13 +39,23 @@ import { MotionButton, motionTap } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FloatingLabelInput } from "@/components/ui/floating-label-input";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { ServiceType } from "../types";
 import { formatCompactMoney } from "../utils/format";
 
 export function ServiceTypesPage() {
   const { t } = useI18n();
+  const { isAdmin } = useAuth();
   const [items, setItems] = useState<ServiceType[]>([]);
   const [search, setSearch] = useState("");
+  const [activeFilter, setActiveFilter] = useState("all");
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [createActive, setCreateActive] = useState(true);
   const [detailItem, setDetailItem] = useState<ServiceType | null>(null);
@@ -98,9 +109,13 @@ export function ServiceTypesPage() {
 
   const filteredItems = useMemo(() => {
     const query = search.trim().toLowerCase();
-    if (!query) return items;
-    return items.filter((item) => item.name.toLowerCase().includes(query));
-  }, [items, search]);
+    return items.filter((item) => {
+      if (query && !item.name.toLowerCase().includes(query)) return false;
+      if (activeFilter === "active" && !item.is_active) return false;
+      if (activeFilter === "inactive" && item.is_active) return false;
+      return true;
+    });
+  }, [items, search, activeFilter]);
 
   const handleCreate = guard(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -136,6 +151,14 @@ export function ServiceTypesPage() {
     }
   }, [items, t]);
 
+  const handleRename = useCallback(async (item: ServiceType, name: string) => {
+    const updated = await api.serviceTypes.update(item.id, { name });
+    setItems((prev) =>
+      prev.map((row) => (row.id === item.id ? updated : row)).sort((a, b) => a.name.localeCompare(b.name)),
+    );
+    setDetailItem((prev) => (prev?.id === item.id ? updated : prev));
+  }, []);
+
   const handleDelete = async () => {
     if (!deleteId) return;
     const id = deleteId;
@@ -169,22 +192,15 @@ export function ServiceTypesPage() {
   return (
     <PageShell>
       <PageHeader title={t("services.title")} subtitle={t("services.subtitle")}>
-        <MotionButton type="button" onClick={() => setCreateModalOpen(true)} {...motionTap}>
-          <PlusIcon data-icon="inline-start" />
-          {t("services.new")}
-        </MotionButton>
+        {isAdmin && (
+          <MotionButton type="button" onClick={() => setCreateModalOpen(true)} {...motionTap}>
+            <PlusIcon data-icon="inline-start" />
+            {t("services.new")}
+          </MotionButton>
+        )}
       </PageHeader>
 
       <PageError message={error} />
-
-      <div className="filter-bar">
-        <Input
-          className="max-w-sm flex-1"
-          placeholder={t("common.search")}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
 
       <StaggerContainer className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StaggerItem>
@@ -222,9 +238,33 @@ export function ServiceTypesPage() {
       </StaggerContainer>
 
       <Card className="content-card">
-        <CardHeader className="border-b">
+        <CardHeader className="border-b pb-3">
           <CardTitle>{t("services.listTitle")}</CardTitle>
         </CardHeader>
+        <div className="table-card-toolbar">
+          <Input
+            className="w-full min-w-[12rem] flex-1 sm:max-w-xs"
+            placeholder={t("common.search")}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <Select
+            value={activeFilter}
+            onValueChange={(v) => v && setActiveFilter(v)}
+            className="w-full sm:w-48"
+          >
+            <SelectTrigger>
+              <SelectValue placeholder={t("clients.state")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="all">{t("services.allStatus")}</SelectItem>
+                <SelectItem value="active">{t("status.active")}</SelectItem>
+                <SelectItem value="inactive">{t("status.inactive")}</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </div>
         <CardContent className="pt-6">
           {loading ? (
             <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
@@ -239,6 +279,7 @@ export function ServiceTypesPage() {
                     menuOpen={menuOpenId === item.id}
                     menuRef={menuOpenId === item.id ? menuRef : undefined}
                     labels={cardLabels}
+                    canManage={isAdmin}
                     onOpen={openDetail}
                     onToggleMenu={handleToggleMenu}
                     onSetActive={setServiceTypeActive}
@@ -254,8 +295,10 @@ export function ServiceTypesPage() {
       <ServiceTypeDetailModal
         item={detailItem}
         open={detailItem !== null}
+        canManage={isAdmin}
         onClose={() => setDetailItem(null)}
         onSetActive={setServiceTypeActive}
+        onRename={handleRename}
         onDelete={(id) => {
           setDeleteId(id);
         }}
@@ -276,7 +319,7 @@ export function ServiceTypesPage() {
             active={createActive}
             onActiveChange={setCreateActive}
           />
-          <div className="flex justify-end gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
             <MotionButton type="button" variant="outline" onClick={() => setCreateModalOpen(false)} {...motionTap}>
               <CancelIcon />
               {t("common.cancel")}

@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { AdminRoute, ProtectedRoute } from "./components/ProtectedRoute";
 import { Layout } from "./components/Layout";
 import { PageLoader } from "./components/PageLoader";
@@ -8,6 +9,7 @@ import { I18nProvider } from "./context/I18nContext";
 import { PreferencesProvider } from "./context/PreferencesContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { markRouteReady } from "./lib/appReady";
+import { lazyWithRetry, markAppHealthy } from "./lib/runtimeRecovery";
 
 /** Suspense qamrovi ichida joylashgan — shu sabab uning effekti faqat
  * haqiqiy sahifa (lazy chunk) yuklanib, fallback (`PageLoader`) haqiqiy
@@ -17,30 +19,31 @@ import { markRouteReady } from "./lib/appReady";
 function RouteReady({ children }: { children: ReactNode }) {
   useEffect(() => {
     markRouteReady();
+    markAppHealthy();
   }, []);
   return <>{children}</>;
 }
 
-const AuditLogPage = lazy(() => import("./pages/AuditLog").then((m) => ({ default: m.AuditLogPage })));
-const ClientCardPage = lazy(() => import("./pages/ClientCard").then((m) => ({ default: m.ClientCardPage })));
-const ClientsPage = lazy(() => import("./pages/Clients").then((m) => ({ default: m.ClientsPage })));
-const ContractsPage = lazy(() => import("./pages/Contracts").then((m) => ({ default: m.ContractsPage })));
-const DashboardPage = lazy(() => import("./pages/Dashboard").then((m) => ({ default: m.DashboardPage })));
-const DebtsPage = lazy(() => import("./pages/Debts").then((m) => ({ default: m.DebtsPage })));
-const EmployeesPage = lazy(() => import("./pages/Employees").then((m) => ({ default: m.EmployeesPage })));
-const ExpensesPage = lazy(() => import("./pages/Expenses").then((m) => ({ default: m.ExpensesPage })));
-const FinancePage = lazy(() => import("./pages/Finance").then((m) => ({ default: m.FinancePage })));
-const LoginPage = lazy(() => import("./pages/Login").then((m) => ({ default: m.LoginPage })));
-const PaymentsPage = lazy(() => import("./pages/Payments").then((m) => ({ default: m.PaymentsPage })));
-const ProfilePage = lazy(() => import("./pages/Profile").then((m) => ({ default: m.ProfilePage })));
-const ServiceTypesPage = lazy(() => import("./pages/ServiceTypes").then((m) => ({ default: m.ServiceTypesPage })));
-const TrashPage = lazy(() => import("./pages/Trash").then((m) => ({ default: m.TrashPage })));
+const AuditLogPage = lazy(lazyWithRetry(() => import("./pages/AuditLog").then((m) => ({ default: m.AuditLogPage }))));
+const ClientCardPage = lazy(lazyWithRetry(() => import("./pages/ClientCard").then((m) => ({ default: m.ClientCardPage }))));
+const ClientsPage = lazy(lazyWithRetry(() => import("./pages/Clients").then((m) => ({ default: m.ClientsPage }))));
+const ContractsPage = lazy(lazyWithRetry(() => import("./pages/Contracts").then((m) => ({ default: m.ContractsPage }))));
+const DashboardPage = lazy(lazyWithRetry(() => import("./pages/Dashboard").then((m) => ({ default: m.DashboardPage }))));
+const DebtsPage = lazy(lazyWithRetry(() => import("./pages/Debts").then((m) => ({ default: m.DebtsPage }))));
+const EmployeesPage = lazy(lazyWithRetry(() => import("./pages/Employees").then((m) => ({ default: m.EmployeesPage }))));
+const FinancePage = lazy(lazyWithRetry(() => import("./pages/Finance").then((m) => ({ default: m.FinancePage }))));
+const LoginPage = lazy(lazyWithRetry(() => import("./pages/Login").then((m) => ({ default: m.LoginPage }))));
+const PaymentsPage = lazy(lazyWithRetry(() => import("./pages/Payments").then((m) => ({ default: m.PaymentsPage }))));
+const ProfilePage = lazy(lazyWithRetry(() => import("./pages/Profile").then((m) => ({ default: m.ProfilePage }))));
+const ServiceTypesPage = lazy(lazyWithRetry(() => import("./pages/ServiceTypes").then((m) => ({ default: m.ServiceTypesPage }))));
+const TrashPage = lazy(lazyWithRetry(() => import("./pages/Trash").then((m) => ({ default: m.TrashPage }))));
 
 export default function App() {
   return (
     <ThemeProvider>
       <PreferencesProvider>
         <I18nProvider>
+        <AppErrorBoundary>
         <BrowserRouter>
           <AuthProvider>
             <Suspense fallback={<PageLoader />}>
@@ -54,7 +57,7 @@ export default function App() {
                       <Route path="clients/:id" element={<ClientCardPage />} />
                       <Route path="contracts" element={<ContractsPage />} />
                       <Route path="payments" element={<PaymentsPage />} />
-                      <Route path="expenses" element={<ExpensesPage />} />
+                      <Route path="expenses" element={<Navigate to="/finance" replace />} />
                       <Route path="finance" element={<FinancePage />} />
                       <Route path="debts" element={<DebtsPage />} />
                       <Route path="service-types" element={<ServiceTypesPage />} />
@@ -72,6 +75,7 @@ export default function App() {
             </Suspense>
           </AuthProvider>
         </BrowserRouter>
+        </AppErrorBoundary>
         </I18nProvider>
       </PreferencesProvider>
     </ThemeProvider>

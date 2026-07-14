@@ -1,17 +1,33 @@
+import { DEFAULT_COUNTRY } from "@/data/geoRegions";
+import { JS_DAY_TO_WEEKDAY_KEY, type WeekdayKey, parseISODate } from "@/lib/dateRange";
+
 let formatLocale = "uz-UZ";
+let weekdayResolver: ((key: WeekdayKey) => string) | null = null;
 
 export function setFormatLocale(locale: "uz" | "ru") {
   formatLocale = locale === "ru" ? "ru-RU" : "uz-UZ";
 }
 
+/** I18n orqali hafta kunlari (Payshanba, shanba, …) — brauzer Mon/Sat o'rniga. */
+export function setWeekdayResolver(resolver: (key: WeekdayKey) => string) {
+  weekdayResolver = resolver;
+}
+
+function capitalizeWord(value: string): string {
+  if (!value) return value;
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
 export function formatMoney(value: string | number): string {
   const num = typeof value === "string" ? parseFloat(value) : value;
   const suffix = formatLocale.startsWith("ru") ? " сум" : " so'm";
+  if (!Number.isFinite(num)) return `—${suffix}`;
   return new Intl.NumberFormat(formatLocale).format(num) + suffix;
 }
 
 export function formatCompactMoney(value: string | number): string {
   const num = typeof value === "string" ? parseFloat(value) : value;
+  if (!Number.isFinite(num)) return "—";
   if (num >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(1)} mlrd`;
   if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)} mln`;
   if (num >= 1_000) return `${(num / 1_000).toFixed(0)} ming`;
@@ -39,19 +55,39 @@ export function toWholeAmountDigits(value: string | number): string {
   return String(Math.round(num));
 }
 
+/** DD.MM.YYYY — brauzer formatiga bog'liq emas */
 export function formatDate(value: string): string {
-  return new Date(value).toLocaleDateString(formatLocale);
+  const date = parseISODate(value);
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+  return `${day}.${month}.${year}`;
 }
 
-/** Berilgan sananing hafta kuni nomini (masalan, "Payshanba") joriy tilda qaytaradi. */
-export function formatWeekday(value: string, style: "long" | "short" = "long"): string {
-  const weekday = new Date(value).toLocaleDateString(formatLocale, { weekday: style });
-  return weekday.charAt(0).toUpperCase() + weekday.slice(1);
+/** Hafta kuni: i18n (Payshanba) yoki brauzer fallback */
+export function formatWeekday(value: string, _style: "long" | "short" = "long"): string {
+  const date = parseISODate(value);
+  const key = JS_DAY_TO_WEEKDAY_KEY[date.getDay()];
+  if (weekdayResolver) {
+    return capitalizeWord(weekdayResolver(key));
+  }
+  const weekday = date.toLocaleDateString(formatLocale, { weekday: "long" });
+  return capitalizeWord(weekday);
 }
 
-/** Sana + hafta kunini birga qaytaradi, masalan "06.07.2026, Payshanba". */
-export function formatDateWithWeekday(value: string, style: "long" | "short" = "long"): string {
-  return `${formatDate(value)}, ${formatWeekday(value, style)}`;
+/** Masalan: "13.07.2026, Payshanba" */
+export function formatDateWithWeekday(value: string, _style: "long" | "short" = "long"): string {
+  return `${formatDate(value)}, ${formatWeekday(value)}`;
+}
+
+/** Masalan: "13.07.2026, Payshanba 12:55" */
+export function formatDateTimeWithWeekday(value: string): string {
+  const date = parseISODate(value);
+  const time = date.toLocaleTimeString(formatLocale, {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return `${formatDate(value)}, ${formatWeekday(value)} ${time}`;
 }
 
 export function statusLabel(status: string, t?: (k: string) => string): string {
@@ -71,7 +107,7 @@ export function emptyClientForm() {
     contact_person: "",
     phone: "",
     website: "",
-    country: "",
+    country: DEFAULT_COUNTRY,
     city: "",
     activity_type: "",
     status: "faol" as const,

@@ -10,6 +10,7 @@ from app.models import (
     ClientStatus,
     Contract,
     ContractLineItem,
+    ContractWorkflowStatus,
     Expense,
     ExpenseCategory,
     Income,
@@ -19,6 +20,7 @@ from app.models import (
 from app.schemas.dashboard import (
     ChartPoint,
     ClientCountStats,
+    ContractWorkflowStats,
     DashboardCharts,
     DashboardStats,
     NamedAmount,
@@ -28,6 +30,7 @@ from app.schemas.dashboard import (
 )
 
 from app.services.app_settings import get_monthly_plan
+from app.services.cancelled_stats import sum_cancelled_line_items
 
 MONTH_LABELS = [
     "Yan",
@@ -287,6 +290,19 @@ def get_dashboard_stats(
         else 0.0
     )
 
+    cancelled_amount = sum_cancelled_line_items(db)
+    period_cancelled_amount = sum_cancelled_line_items(
+        db,
+        period_start=period_start,
+        period_end=period_end,
+    )
+    cancelled_contracts_count = db.scalar(
+        select(func.count(Contract.id)).where(
+            Contract.deleted_at.is_(None),
+            Contract.status == ContractWorkflowStatus.TOXTATILDI,
+        )
+    ) or 0
+
     total_contracts = db.scalar(
         select(func.count(Contract.id)).where(Contract.deleted_at.is_(None))
     ) or 0
@@ -305,6 +321,22 @@ def get_dashboard_stats(
             func.count(case((Client.status == ClientStatus.NOFAOL, 1))),
         ).where(Client.deleted_at.is_(None))
     ).one()
+
+    contract_status_rows = db.execute(
+        select(Contract.status, func.count(Contract.id))
+        .where(Contract.deleted_at.is_(None))
+        .group_by(Contract.status)
+    ).all()
+    contract_status_counts = {status: 0 for status in ContractWorkflowStatus}
+    for status, count in contract_status_rows:
+        contract_status_counts[status] = count
+    contracts_stats = ContractWorkflowStats(
+        total=sum(contract_status_counts.values()),
+        yangi=contract_status_counts[ContractWorkflowStatus.YANGI],
+        davom_etmoqda=contract_status_counts[ContractWorkflowStatus.DAVOM_ETMOQDA],
+        tugadi=contract_status_counts[ContractWorkflowStatus.TUGADI],
+        toxtatildi=contract_status_counts[ContractWorkflowStatus.TOXTATILDI],
+    )
 
     payment_by_month = {
         f"{int(year):04d}-{int(month):02d}": amount
@@ -508,6 +540,7 @@ def get_dashboard_stats(
         debt_vs_paid=[
             NamedAmount(name="To'langan", amount=total_paid),
             NamedAmount(name="Qarzdorlik", amount=total_debt if total_debt > 0 else Decimal("0")),
+            NamedAmount(name="Bekor qilingan", amount=cancelled_amount),
         ],
         expenses_by_category=[
             NamedAmount(name=EXPENSE_CATEGORY_LABELS.get(row[0], str(row[0])), amount=row[1])
@@ -526,11 +559,15 @@ def get_dashboard_stats(
         collection_rate=collection_rate,
         total_contracts=total_contracts,
         active_contracts=active_contracts,
+        cancelled_amount=cancelled_amount,
+        period_cancelled_amount=period_cancelled_amount,
+        cancelled_contracts_count=cancelled_contracts_count,
         clients=ClientCountStats(
             total=client_counts[0],
             faol=client_counts[1],
             nofaol=client_counts[2],
         ),
+        contracts=contracts_stats,
         top_clients=top_clients,
         charts=charts,
         period_start=period_start,

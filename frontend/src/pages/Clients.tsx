@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangleIcon,
   CheckCircle2Icon,
   DownloadIcon,
+  FileTextIcon,
   FileUpIcon,
   PencilIcon,
   PlusIcon,
@@ -11,7 +13,14 @@ import {
   XCircleIcon,
 } from "lucide-react";
 import { api } from "../api/client";
+import { AutofillHoneypots } from "../components/AutofillHoneypots";
 import { ClientLogoUploader } from "../components/ClientLogoUploader";
+import {
+  ContractFormFields,
+  emptyContractForm,
+  type ContractFormState,
+} from "../components/ContractFormFields";
+import { CountryCityFields } from "../components/CountryCityFields";
 import { ExportButtons } from "../components/ExportButtons";
 import { CancelIcon, DeleteIconBtn, LoadingIconBtn, SaveIconBtn } from "../components/ButtonIcons";
 import { Modal } from "../components/Modal";
@@ -25,6 +34,7 @@ import {
   TableCell,
   TableCellActions,
   TableCellCompany,
+  TableCellMoney,
   TableCellMuted,
   TableHead,
   TableHeader,
@@ -42,7 +52,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { MotionButton, motionTap } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FloatingLabelInput, FloatingLabelTextarea } from "@/components/ui/floating-label-input";
+import { FloatingLabelInput, FloatingLabelPhoneInput, FloatingLabelTextarea } from "@/components/ui/floating-label-input";
+import { parsePhoneNational, toPhoneE164 } from "@/hooks/usePhoneInput";
+import { resolveCountryValue, resolveRegionValue } from "@/data/geoRegions";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -53,19 +65,54 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import type { Client, ClientFormData, ClientImportResult } from "../types";
+import type { Client, ClientFormData, ClientImportResult, ServiceType } from "../types";
 import { useI18n } from "../context/I18nContext";
-import { emptyClientForm } from "../utils/format";
+import { emptyClientForm, formatMoney, toNumber } from "../utils/format";
 import { PageHeader, PageShell } from "../components/PageHeader";
 import { ActiveStatusToggle } from "../components/ActiveStatusToggle";
+import { TableColumnPicker } from "../components/TableColumnPicker";
+import { useTableColumns } from "../hooks/useTableColumns";
 import { useListLoading } from "../hooks/useListLoading";
 import { useSubmitGuard } from "../hooks/useSubmitGuard";
 
+const CLIENT_OPTIONAL_COLUMNS = [
+  { id: "contact", defaultVisible: true },
+  { id: "phone", defaultVisible: true },
+  { id: "city", defaultVisible: true },
+  { id: "debt", defaultVisible: true },
+  { id: "state", defaultVisible: true },
+] as const;
+
+type ClientOptionalColumn = (typeof CLIENT_OPTIONAL_COLUMNS)[number]["id"];
+
 export function ClientsPage() {
   const { t } = useI18n();
+  const { isVisible, setColumnVisible, visibleCount } = useTableColumns(
+    "wtma.clients.tableColumns",
+    CLIENT_OPTIONAL_COLUMNS,
+  );
+  const columnPickerItems = useMemo(
+    () =>
+      CLIENT_OPTIONAL_COLUMNS.map((column) => ({
+        id: column.id,
+        label:
+          column.id === "contact"
+            ? t("clients.contact")
+            : column.id === "phone"
+              ? t("clients.phone")
+              : column.id === "city"
+                ? t("clients.city")
+                : column.id === "debt"
+                  ? t("common.debt")
+                  : t("clients.state"),
+      })),
+    [t],
+  );
   const [clients, setClients] = useState<Client[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [cityFilter, setCityFilter] = useState("all");
+  const [cities, setCities] = useState<string[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Client | null>(null);
   const [form, setForm] = useState<ClientFormData>(emptyClientForm());
@@ -82,6 +129,36 @@ export function ClientsPage() {
   const [importResult, setImportResult] = useState<ClientImportResult | null>(null);
   const [importError, setImportError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [addContract, setAddContract] = useState(false);
+  const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
+  const [contractForm, setContractForm] = useState<ContractFormState>(() =>
+    emptyContractForm([]),
+  );
+
+  const closeClientModal = () => {
+    setModalOpen(false);
+    setAddContract(false);
+  };
+
+  const loadServiceTypes = useCallback(() => {
+    api.serviceTypes
+      .list(true)
+      .then((types) => {
+        setServiceTypes(types);
+        setContractForm(emptyContractForm(types));
+      })
+      .catch(() => {
+        setServiceTypes([]);
+        setContractForm(emptyContractForm([]));
+      });
+  }, []);
+
+  const refreshCities = useCallback(() => {
+    api.clients
+      .cities()
+      .then(setCities)
+      .catch(() => setCities([]));
+  }, []);
 
   const load = useCallback(
     (silent = true) => {
@@ -90,6 +167,7 @@ export function ClientsPage() {
         .list({
           search: search || undefined,
           status: statusFilter === "all" ? undefined : statusFilter,
+          city: cityFilter === "all" ? undefined : cityFilter,
           skip: (page - 1) * pageSize,
           limit: pageSize,
         })
@@ -100,12 +178,16 @@ export function ClientsPage() {
         .catch((e) => setError(e.message))
         .finally(() => finish());
     },
-    [search, statusFilter, page, pageSize, start, finish],
+    [search, statusFilter, cityFilter, page, pageSize, start, finish],
   );
 
   useEffect(() => {
+    refreshCities();
+  }, [refreshCities]);
+
+  useEffect(() => {
     setPage(1);
-  }, [search, statusFilter]);
+  }, [search, statusFilter, cityFilter]);
 
   useEffect(() => {
     const timer = setTimeout(() => load(), 300);
@@ -115,18 +197,24 @@ export function ClientsPage() {
   const openCreate = () => {
     setEditing(null);
     setForm(emptyClientForm());
+    setAddContract(false);
+    loadServiceTypes();
     setModalOpen(true);
   };
 
   const openEdit = (client: Client) => {
     setEditing(client);
+    setAddContract(false);
     setForm({
       company_name: client.company_name,
       contact_person: client.contact_person || "",
-      phone: client.phone || "",
+      phone: parsePhoneNational(client.phone || ""),
       website: client.website || "",
-      country: client.country || "",
-      city: client.city || "",
+      country: resolveCountryValue(client.country || ""),
+      city: resolveRegionValue(
+        resolveCountryValue(client.country || ""),
+        client.city || "",
+      ),
       activity_type: client.activity_type || "",
       status: client.status,
       notes: client.notes || "",
@@ -141,7 +229,7 @@ export function ClientsPage() {
       const payload = {
         ...form,
         contact_person: form.contact_person || undefined,
-        phone: form.phone || undefined,
+        phone: form.phone ? toPhoneE164(form.phone) : undefined,
         website: form.website || undefined,
         country: form.country || undefined,
         city: form.city || undefined,
@@ -152,14 +240,68 @@ export function ClientsPage() {
         const updated = await api.clients.update(editing.id, payload);
         setClients((prev) => prev.map((c) => (c.id === editing.id ? updated : c)));
       } else {
-        await api.clients.create(payload);
+        if (addContract) {
+          if (!contractForm.start_date || !contractForm.end_date) {
+            setError(t("clients.selectDateError"));
+            return;
+          }
+          if (contractForm.line_items.some((item) => !item.price)) {
+            setError(t("common.error"));
+            return;
+          }
+        }
+
+        const created = await api.clients.create(payload);
+
+        if (addContract) {
+          const nextData = await api.contracts.nextNumber(created.id);
+          await api.contracts.create({
+            client_id: created.id,
+            start_date: contractForm.start_date,
+            end_date: contractForm.end_date,
+            status: contractForm.status,
+            notes: contractForm.notes || undefined,
+            contract_number: contractForm.contract_number || nextData.next_number,
+            invoice_number: contractForm.invoice_number || undefined,
+            line_items: contractForm.line_items.map((item) => ({
+              service_type_id: item.service_type_id,
+              price: parseFloat(item.price),
+            })),
+          });
+        }
+
         load(true);
+        refreshCities();
       }
-      setModalOpen(false);
+      closeClientModal();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("common.error"));
     }
   });
+
+  const updateContractForm = (patch: Partial<ContractFormState>) => {
+    setContractForm((prev) => ({ ...prev, ...patch }));
+  };
+
+  const addContractLineItem = () => {
+    setContractForm((prev) => ({
+      ...prev,
+      line_items: [
+        ...prev.line_items,
+        { service_type_id: serviceTypes[0]?.id || 0, price: "" },
+      ],
+    }));
+  };
+
+  const removeContractLineItem = (index: number) => {
+    setContractForm((prev) => {
+      if (prev.line_items.length <= 1) return prev;
+      return {
+        ...prev,
+        line_items: prev.line_items.filter((_, i) => i !== index),
+      };
+    });
+  };
 
   const updateClientStatus = async (client: Client, active: boolean) => {
     const nextStatus = active ? "faol" : "nofaol";
@@ -221,7 +363,10 @@ export function ClientsPage() {
     try {
       const result = await api.clients.import(importFile);
       setImportResult(result);
-      if (result.created > 0) load();
+      if (result.created > 0) {
+        load();
+        refreshCities();
+      }
     } catch (err) {
       setImportError(err instanceof Error ? err.message : t("common.error"));
     } finally {
@@ -243,42 +388,74 @@ export function ClientsPage() {
         </MotionButton>
       </PageHeader>
 
-      <div className="filter-bar">
-        <Input
-          className="max-w-sm flex-1"
-          placeholder={t("common.search")}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <Select value={statusFilter} onValueChange={(v) => v && setStatusFilter(v)} className="w-full sm:w-56">
-          <SelectTrigger>
-            <SelectValue placeholder={t("clients.state")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectItem value="all">{t("clients.allStatus")}</SelectItem>
-              <SelectItem value="faol">{t("status.faol")}</SelectItem>
-              <SelectItem value="nofaol">{t("status.nofaol")}</SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-      </div>
-
       <PageError message={error} />
 
       <Card className="content-card">
-        <CardHeader>
-          <CardTitle>{t("clients.listTitle")}</CardTitle>
-          <CardDescription>
-            {t("common.itemsFound").replace("{count}", String(total))}
-          </CardDescription>
+        <CardHeader className="pb-3">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <CardTitle>{t("clients.listTitle")}</CardTitle>
+              <CardDescription>
+                {t("common.itemsFound").replace("{count}", String(total))}
+              </CardDescription>
+            </div>
+          </div>
         </CardHeader>
+        <div className="table-card-toolbar">
+          <Input
+            className="w-full min-w-[12rem] flex-1 sm:max-w-xs"
+            placeholder={t("common.search")}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <Select
+            value={cityFilter}
+            onValueChange={(v) => v && setCityFilter(v)}
+            className="w-full sm:w-52"
+          >
+            <SelectTrigger>
+              <SelectValue placeholder={t("clients.city")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="all">{t("clients.allCities")}</SelectItem>
+                {cities.map((city) => (
+                  <SelectItem key={city} value={city}>
+                    {city}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <Select
+            value={statusFilter}
+            onValueChange={(v) => v && setStatusFilter(v)}
+            className="w-full sm:w-48"
+          >
+            <SelectTrigger>
+              <SelectValue placeholder={t("clients.state")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="all">{t("clients.allStatus")}</SelectItem>
+                <SelectItem value="faol">{t("status.faol")}</SelectItem>
+                <SelectItem value="nofaol">{t("status.nofaol")}</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <TableColumnPicker
+            columns={columnPickerItems}
+            isVisible={(id: ClientOptionalColumn) => isVisible(id)}
+            onVisibleChange={setColumnVisible}
+            className="sm:ml-auto"
+          />
+        </div>
         <CardContent className="p-0">
           <PremiumDataTable
             loading={loading}
             empty={!loading && clients.length === 0}
             emptyMessage={t("clients.notFound")}
-            skeletonCols={6}
+            skeletonCols={2 + visibleCount}
             footer={
               <Pagination
                 embedded
@@ -296,11 +473,14 @@ export function ClientsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>{t("clients.company")}</TableHead>
-                <TableHead>{t("clients.contact")}</TableHead>
-                <TableHead>{t("clients.phone")}</TableHead>
-                <TableHead>{t("clients.city")}</TableHead>
-                <TableHead>{t("clients.state")}</TableHead>
-                <TableHead className="text-right">{t("common.actions")}</TableHead>
+                {isVisible("contact") && <TableHead>{t("clients.contact")}</TableHead>}
+                {isVisible("phone") && <TableHead>{t("clients.phone")}</TableHead>}
+                {isVisible("city") && <TableHead>{t("clients.city")}</TableHead>}
+                {isVisible("debt") && <TableHead>{t("common.debt")}</TableHead>}
+                {isVisible("state") && (
+                  <TableHead className="w-[8.75rem]">{t("clients.state")}</TableHead>
+                )}
+                <TableHead className="w-[5.5rem] text-right">{t("common.actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -311,30 +491,70 @@ export function ClientsPage() {
                     name={client.company_name}
                     logoUrl={client.logo_url}
                   />
-                  <TableCellMuted>{client.contact_person}</TableCellMuted>
-                  <TableCellMuted>{client.phone}</TableCellMuted>
-                  <TableCellMuted>{client.city}</TableCellMuted>
-                  <TableCell>
-                    <ActiveStatusToggle
-                      active={client.status === "faol"}
-                      onActiveChange={(active) => void updateClientStatus(client, active)}
-                    />
-                  </TableCell>
-                  <TableCellActions>
-                    <MotionButton variant="ghost" size="sm" onClick={() => openEdit(client)} {...motionTap}>
-                      <PencilIcon data-icon="inline-start" />
-                      {t("common.edit")}
-                    </MotionButton>
-                    <MotionButton
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() => setDeleteId(client.id)}
-                      {...motionTap}
-                    >
-                      <Trash2Icon data-icon="inline-start" />
-                      {t("common.delete")}
-                    </MotionButton>
+                  {isVisible("contact") && (
+                    <TableCellMuted>{client.contact_person}</TableCellMuted>
+                  )}
+                  {isVisible("phone") && <TableCellMuted>{client.phone}</TableCellMuted>}
+                  {isVisible("city") && <TableCellMuted>{client.city}</TableCellMuted>}
+                  {isVisible("debt") && (
+                    <TableCell>
+                      {(() => {
+                        const debt = toNumber(client.total_debt);
+                        if (debt === 0) {
+                          return <TableCellMuted className="p-0">—</TableCellMuted>;
+                        }
+                        return (
+                          <div className="flex items-center gap-2">
+                            <TableCellMoney
+                              tone={debt < 0 ? "positive" : "negative"}
+                              className="p-0"
+                            >
+                              {formatMoney(Math.abs(debt))}
+                            </TableCellMoney>
+                            {debt < 0 && (
+                              <Badge
+                                variant="secondary"
+                                className="text-emerald-600 dark:text-emerald-400"
+                              >
+                                {t("clients.overpaid")}
+                              </Badge>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </TableCell>
+                  )}
+                  {isVisible("state") && (
+                    <TableCell className="w-[8.75rem]">
+                      <ActiveStatusToggle
+                        active={client.status === "faol"}
+                        onActiveChange={(active) => void updateClientStatus(client, active)}
+                      />
+                    </TableCell>
+                  )}
+                  <TableCellActions className="w-[5.5rem]">
+                    <div className="action-toolbar">
+                      <MotionButton
+                        variant="ghost"
+                        size="icon-sm"
+                        className="size-8"
+                        onClick={() => openEdit(client)}
+                        title={t("common.edit")}
+                        {...motionTap}
+                      >
+                        <PencilIcon className="size-3.5" />
+                      </MotionButton>
+                      <MotionButton
+                        variant="ghost"
+                        size="icon-sm"
+                        className="size-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() => setDeleteId(client.id)}
+                        title={t("common.delete")}
+                        {...motionTap}
+                      >
+                        <Trash2Icon className="size-3.5" />
+                      </MotionButton>
+                    </div>
                   </TableCellActions>
                 </MotionTableRow>
               ))}
@@ -346,13 +566,15 @@ export function ClientsPage() {
       <Modal
         title={editing ? t("clients.edit") : t("clients.new")}
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={closeClientModal}
         wide
       >
         <form
           onSubmit={handleSubmit}
-          className="grid grid-cols-1 gap-4 md:grid-cols-2"
+          autoComplete="off"
+          className="relative grid grid-cols-1 gap-4 md:grid-cols-2"
         >
+          <AutofillHoneypots />
           {editing && (
             <div className="md:col-span-2">
               <ClientLogoUploader
@@ -373,16 +595,17 @@ export function ClientsPage() {
             onChange={(e) => setForm({ ...form, company_name: e.target.value })}
           />
           <FloatingLabelInput
-            id="contact_person"
+            guardAutofill
+            name="wtma_client_contact"
             label={t("clients.contact")}
             value={form.contact_person}
             onChange={(e) => setForm({ ...form, contact_person: e.target.value })}
           />
-          <FloatingLabelInput
+          <FloatingLabelPhoneInput
             id="phone"
             label={t("clients.phone")}
             value={form.phone}
-            onChange={(e) => setForm({ ...form, phone: e.target.value })}
+            onValueChange={(phone) => setForm({ ...form, phone })}
           />
           <FloatingLabelInput
             id="website"
@@ -391,31 +614,29 @@ export function ClientsPage() {
             onChange={(e) => setForm({ ...form, website: e.target.value })}
           />
           <FloatingLabelInput
-            id="country"
-            label={t("clients.country")}
-            value={form.country}
-            onChange={(e) => setForm({ ...form, country: e.target.value })}
-          />
-          <FloatingLabelInput
-            id="city"
-            label={t("clients.city")}
-            value={form.city}
-            onChange={(e) => setForm({ ...form, city: e.target.value })}
-          />
-          <FloatingLabelInput
             id="activity_type"
             label={t("clients.activity")}
             value={form.activity_type}
             onChange={(e) => setForm({ ...form, activity_type: e.target.value })}
           />
-          <ActiveStatusToggle
-            layout="field"
-            label={t("clients.state")}
-            active={form.status === "faol"}
-            onActiveChange={(active) =>
-              setForm({ ...form, status: active ? "faol" : "nofaol" })
+          <CountryCityFields
+            country={form.country}
+            city={form.city}
+            onCountryChange={(country) =>
+              setForm((prev) => ({ ...prev, country }))
             }
+            onCityChange={(city) => setForm((prev) => ({ ...prev, city }))}
           />
+          {editing && (
+            <ActiveStatusToggle
+              layout="field"
+              label={t("clients.state")}
+              active={form.status === "faol"}
+              onActiveChange={(active) =>
+                setForm({ ...form, status: active ? "faol" : "nofaol" })
+              }
+            />
+          )}
           <FloatingLabelTextarea
             id="notes"
             label={t("clients.notes")}
@@ -424,14 +645,66 @@ export function ClientsPage() {
             value={form.notes}
             onChange={(e) => setForm({ ...form, notes: e.target.value })}
           />
-          <div className="flex justify-end gap-2 pt-2 md:col-span-2">
-            <MotionButton type="button" variant="outline" onClick={() => setModalOpen(false)} {...motionTap}>
+
+          {!editing && (
+            <div className="flex flex-col gap-3 md:col-span-2">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-4">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">
+                    {addContract ? t("clients.contractSection") : t("clients.addContract")}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {t("clients.addContractHint")}
+                  </p>
+                </div>
+                <MotionButton
+                  type="button"
+                  variant={addContract ? "secondary" : "outline"}
+                  onClick={() => setAddContract((prev) => !prev)}
+                  {...motionTap}
+                >
+                  <FileTextIcon data-icon="inline-start" />
+                  {addContract ? t("clients.removeContract") : t("clients.addContract")}
+                </MotionButton>
+              </div>
+
+              <AnimatePresence initial={false}>
+                {addContract && (
+                  <motion.div
+                    key="client-contract-fields"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+                    className="overflow-hidden"
+                  >
+                    <div className="rounded-xl border border-border/60 bg-muted/15 p-4">
+                      <ContractFormFields
+                        form={contractForm}
+                        onChange={updateContractForm}
+                        serviceTypes={serviceTypes}
+                        onAddLineItem={addContractLineItem}
+                        onRemoveLineItem={removeContractLineItem}
+                      />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+
+          <div className="flex flex-wrap justify-end gap-2 pt-2 md:col-span-2">
+            <MotionButton type="button" variant="outline" onClick={closeClientModal} {...motionTap}>
               <CancelIcon />
               {t("common.cancel")}
             </MotionButton>
             <MotionButton type="submit" disabled={submitting} {...motionTap}>
               {submitting ? <LoadingIconBtn /> : <SaveIconBtn />}
-              {submitting ? t("common.saving") : t("common.save")}
+              {submitting
+                ? t("common.saving")
+                : !editing && addContract
+                  ? t("clients.saveWithContract")
+                  : t("common.save")}
             </MotionButton>
           </div>
         </form>
@@ -478,7 +751,7 @@ export function ClientsPage() {
 
               {importError && <p className="text-sm text-destructive">{importError}</p>}
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex flex-wrap justify-end gap-2 pt-2">
                 <MotionButton type="button" variant="outline" onClick={closeImportModal} {...motionTap}>
                   <CancelIcon />
                   {t("common.cancel")}
@@ -548,7 +821,7 @@ export function ClientsPage() {
                 </div>
               )}
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex flex-wrap justify-end gap-2 pt-2">
                 <MotionButton
                   type="button"
                   variant="outline"

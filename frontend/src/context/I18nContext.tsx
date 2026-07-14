@@ -9,7 +9,8 @@ import {
 } from "react";
 import { ru } from "../i18n/locales/ru";
 import { uz, type TranslationDict } from "../i18n/locales/uz";
-import { setFormatLocale } from "../utils/format";
+import { setFormatLocale, setWeekdayResolver } from "../utils/format";
+import type { WeekdayKey } from "../lib/dateRange";
 
 export type Locale = "uz" | "ru";
 
@@ -50,6 +51,13 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.documentElement.lang = locale;
     setFormatLocale(locale);
+    setWeekdayResolver((key: WeekdayKey) => {
+      const name = getNested(
+        dictionaries[locale] as unknown as Record<string, unknown>,
+        `dateRange.weekdayFull.${key}`,
+      );
+      return name ?? key;
+    });
   }, [locale]);
 
   const t = useCallback(

@@ -9,6 +9,10 @@ interface AuthContextValue {
   logout: () => void;
   isAdmin: boolean;
   refreshUser: () => Promise<void>;
+  /** Sessiya (token) muddati tugab, foydalanuvchi majburan chiqarilganini bildiradi
+   * — manual "Chiqish" tugmasidan farqli, Login sahifasi buni ko'rib ogohlantirish chiqaradi. */
+  sessionExpired: boolean;
+  clearSessionExpired: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -18,12 +22,30 @@ const TOKEN_KEY = "finance_token";
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
-  const logout = useCallback(() => {
+  const clearSession = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
     setAuthToken(null);
     setUser(null);
   }, []);
+
+  const logout = useCallback(() => {
+    setSessionExpired(false);
+    clearSession();
+  }, [clearSession]);
+
+  const handleUnauthorized = useCallback(() => {
+    // Foydalanuvchi allaqachon chiqib ketgan bo'lsa (masalan hali login ekranida),
+    // qayta-qayta ogohlantirish ko'rsatmaymiz.
+    setUser((current) => {
+      if (current) setSessionExpired(true);
+      return null;
+    });
+    clearSession();
+  }, [clearSession]);
+
+  const clearSessionExpired = useCallback(() => setSessionExpired(false), []);
 
   const refreshUser = useCallback(async () => {
     const token = localStorage.getItem(TOKEN_KEY);
@@ -38,11 +60,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    setOnUnauthorized(logout);
+    setOnUnauthorized(handleUnauthorized);
     refreshUser()
-      .catch(() => logout())
+      .catch(() => clearSession())
       .finally(() => setLoading(false));
-  }, [refreshUser, logout]);
+  }, [refreshUser, clearSession, handleUnauthorized]);
 
   const login = useCallback(
     async (username: string, password: string) => {
@@ -51,6 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthToken(access_token);
       const me = await api.auth.me();
       setUser(me);
+      setSessionExpired(false);
     },
     [],
   );
@@ -63,8 +86,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout,
       isAdmin: user?.role === "admin",
       refreshUser,
+      sessionExpired,
+      clearSessionExpired,
     }),
-    [user, loading, login, logout, refreshUser],
+    [user, loading, login, logout, refreshUser, sessionExpired, clearSessionExpired],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,4 +1,9 @@
 export type ClientStatus = "faol" | "nofaol";
+export type ContractWorkflowStatus =
+  | "yangi"
+  | "davom_etmoqda"
+  | "tugadi"
+  | "toxtatildi";
 export type UserRole = "admin" | "menejer";
 
 export interface CompanyProfile {
@@ -57,6 +62,7 @@ export interface Client {
   logo_url: string | null;
   created_at: string;
   updated_at: string;
+  total_debt: string;
 }
 
 export interface ServiceType {
@@ -104,6 +110,7 @@ export interface Contract {
   client_id: number;
   start_date: string;
   end_date: string;
+  status: ContractWorkflowStatus;
   notes: string | null;
   contract_number: string | null;
   invoice_number: string | null;
@@ -128,11 +135,17 @@ export interface Payment {
 export interface PaymentListItem extends Payment {
   company_name: string;
   client_id: number;
+  contract_number: string | null;
+}
+
+export interface PaymentsPaginated extends Paginated<PaymentListItem> {
+  total_amount: string;
 }
 
 export interface ClientCard extends Client {
   contracts: Contract[];
   total_debt: string;
+  cancelled_amount: string;
 }
 
 export interface ChartPoint {
@@ -175,7 +188,17 @@ export interface DashboardStats {
   collection_rate: number;
   total_contracts: number;
   active_contracts: number;
+  cancelled_amount: string;
+  period_cancelled_amount: string;
+  cancelled_contracts_count: number;
   clients: { total: number; faol: number; nofaol: number };
+  contracts: {
+    total: number;
+    yangi: number;
+    davom_etmoqda: number;
+    tugadi: number;
+    toxtatildi: number;
+  };
   top_clients: {
     client_id: number;
     company_name: string;
@@ -255,6 +278,7 @@ export interface ContractImportResult {
 
 export interface DebtContractItem {
   contract_id: number;
+  contract_number: string | null;
   start_date: string;
   end_date: string;
   total_amount: string;
@@ -276,6 +300,7 @@ export interface DebtsSummary {
   total_debt: string;
   total_overpaid: string;
   debtor_count: number;
+  cancelled_amount: string;
 }
 
 export interface ExpiringContract {
@@ -288,8 +313,17 @@ export interface ExpiringContract {
   debt_amount: string;
 }
 
+export interface OverdueDebt {
+  contract_id: number;
+  client_id: number;
+  company_name: string;
+  end_date: string;
+  days_overdue: number;
+  debt_amount: string;
+}
+
 export type AuditAction = "create" | "update" | "delete" | "restore";
-export type AuditEntityType = "client" | "contract" | "payment" | "expense" | "income";
+export type AuditEntityType = "client" | "contract" | "payment" | "expense" | "income" | "user";
 
 export type ExpenseCategory =
   | "salary"

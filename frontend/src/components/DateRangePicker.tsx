@@ -26,13 +26,15 @@ interface DateRangePickerProps {
   className?: string;
   /** Qorong'u banner/hero fonida ishlatish uchun */
   onDark?: boolean;
+  /** Modal/form inputlari bilan bir xil balandlik va kenglik */
+  formField?: boolean;
 }
 
 const PRESETS: DateRangePreset[] = ["today", "yesterday", "week", "month", "year"];
 
 const WEEKDAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 
-export function DateRangePicker({ from, to, onChange, onClear, className, onDark = false }: DateRangePickerProps) {
+export function DateRangePicker({ from, to, onChange, onClear, className, onDark = false, formField = false }: DateRangePickerProps) {
   const { t } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -106,10 +108,30 @@ export function DateRangePicker({ from, to, onChange, onClear, className, onDark
   const draftFromDate = draftFrom ? parseISODate(draftFrom) : null;
   const draftToDate = draftTo ? parseISODate(draftTo) : null;
   const rangeEnd = draftToDate ?? (draftFromDate && hoverDate ? hoverDate : null);
+  const selectionStep: "start" | "end" | "done" = !draftFrom
+    ? "start"
+    : draftTo
+      ? "done"
+      : "end";
+
+  const stepMessage =
+    selectionStep === "start"
+      ? t("dateRange.stepStart")
+      : selectionStep === "end"
+        ? t("dateRange.stepEnd")
+        : t("dateRange.stepDone");
 
   const applyRange = (nextFrom: string, nextTo: string) => {
     onChange(nextFrom, nextTo);
     setOpen(false);
+  };
+
+  const resetDraftSelection = () => {
+    setDraftFrom("");
+    setDraftTo("");
+    setHoverDate(null);
+    setNavMode("days");
+    setViewMonth(startOfMonth(new Date()));
   };
 
   const handleDayClick = (day: Date) => {
@@ -117,6 +139,7 @@ export function DateRangePicker({ from, to, onChange, onClear, className, onDark
     if (!draftFrom || (draftFrom && draftTo)) {
       setDraftFrom(iso);
       setDraftTo("");
+      setHoverDate(null);
       return;
     }
     const start = parseISODate(draftFrom);
@@ -126,6 +149,7 @@ export function DateRangePicker({ from, to, onChange, onClear, className, onDark
     } else {
       setDraftTo(iso);
     }
+    setHoverDate(null);
   };
 
   const handlePreset = (preset: DateRangePreset) => {
@@ -137,49 +161,76 @@ export function DateRangePicker({ from, to, onChange, onClear, className, onDark
 
   const handleApply = () => {
     if (draftFrom && draftTo) applyRange(draftFrom, draftTo);
-    else if (draftFrom) applyRange(draftFrom, draftFrom);
   };
 
-  const handleClear = () => {
-    setDraftFrom("");
-    setDraftTo("");
+  const handlePopoverClear = () => {
+    resetDraftSelection();
+  };
+
+  const handleTriggerClear = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    resetDraftSelection();
     onChange("", "");
     onClear?.();
-    setOpen(false);
   };
 
   const days = getMonthGrid(viewMonth);
+  const showInlineContent = !formField || Boolean(displayLabel);
 
   return (
     <div ref={containerRef} className={cn("relative", className)}>
       <div
         className={cn(
-          "group flex h-10 min-w-[280px] items-center overflow-hidden rounded-xl border shadow-sm backdrop-blur-sm transition-all duration-200 sm:min-w-[320px]",
-          onDark
-            ? "border-white/20 bg-white/10 hover:border-white/40 hover:bg-white/22 hover:shadow-[0_0_24px_rgba(255,255,255,0.12)]"
-            : "border-border/70 bg-background/80 hover:border-primary/30 hover:bg-muted/60 hover:shadow-md",
+          "group flex items-center overflow-hidden border shadow-sm backdrop-blur-sm transition-all duration-200",
+          formField
+            ? "h-12 w-full min-w-0 rounded-lg border border-input bg-transparent shadow-sm dark:bg-input/30"
+            : "h-10 min-w-[280px] rounded-xl sm:min-w-[320px]",
+          formField
+            ? ""
+            : onDark
+              ? "border-white/20 bg-white/10 hover:border-white/40 hover:bg-white/22 hover:shadow-[0_0_24px_rgba(255,255,255,0.12)]"
+              : "border-border/70 bg-background/80 hover:border-primary/30 hover:bg-muted/60 hover:shadow-md",
         )}
       >
         <button
           type="button"
           onClick={() => setOpen((value) => !value)}
           className={cn(
-            "flex min-w-0 flex-1 items-center gap-2 px-3 text-left text-sm font-normal transition-colors",
+            "flex min-w-0 flex-1 items-center text-left text-sm font-normal transition-colors",
+            formField ? "h-full gap-2 px-3" : "gap-2 px-3",
             onDark
               ? "text-white/75 group-hover:text-white"
               : "text-foreground",
-            !displayLabel && (onDark ? "text-white/50 group-hover:text-white/80" : "text-muted-foreground"),
+            !displayLabel && !formField && (onDark ? "text-white/50 group-hover:text-white/80" : "text-muted-foreground"),
           )}
           aria-expanded={open}
           aria-haspopup="dialog"
+          aria-label={formField ? t("contracts.period") : undefined}
         >
-          <CalendarRangeIcon
+          {!formField && showInlineContent && (
+            <CalendarRangeIcon
+              className={cn(
+                "size-4 shrink-0 transition-colors",
+                onDark ? "text-white/55 group-hover:text-white" : "text-muted-foreground group-hover:text-foreground",
+              )}
+            />
+          )}
+          {formField && displayLabel && (
+            <CalendarRangeIcon
+              className={cn(
+                "size-4 shrink-0 transition-colors",
+                onDark ? "text-white/55 group-hover:text-white" : "text-muted-foreground group-hover:text-foreground",
+              )}
+            />
+          )}
+          <span
             className={cn(
-              "size-4 shrink-0 transition-colors",
-              onDark ? "text-white/55 group-hover:text-white" : "text-muted-foreground group-hover:text-foreground",
+              "min-w-0 flex-1 truncate",
+              formField && !displayLabel && "sr-only",
             )}
-          />
-          <span className="truncate">{displayLabel || t("dateRange.placeholder")}</span>
+          >
+            {displayLabel || (formField ? "" : t("dateRange.placeholder"))}
+          </span>
         </button>
         {(from || to) && (
           <button
@@ -190,7 +241,7 @@ export function DateRangePicker({ from, to, onChange, onClear, className, onDark
                 ? "border-white/15 text-white/55 group-hover:border-white/30 group-hover:text-white"
                 : "border-border/50 text-muted-foreground group-hover:text-foreground",
             )}
-            onClick={handleClear}
+            onClick={handleTriggerClear}
             aria-label={t("dateRange.clear")}
           >
             <XIcon className="size-3.5" />
@@ -234,6 +285,26 @@ export function DateRangePicker({ from, to, onChange, onClear, className, onDark
 
               {/* Calendar */}
               <div className="flex-1 p-3">
+                <div
+                  className={cn(
+                    "mb-3 rounded-xl border px-3 py-2.5 text-sm transition-colors",
+                    selectionStep === "end"
+                      ? "border-primary/30 bg-primary/5 text-foreground"
+                      : selectionStep === "done"
+                        ? "border-emerald-300/50 bg-emerald-500/8 text-foreground"
+                        : "border-border/60 bg-muted/30 text-muted-foreground",
+                  )}
+                  role="status"
+                  aria-live="polite"
+                >
+                  <p className="font-medium">{stepMessage}</p>
+                  {selectionStep === "end" && draftFrom && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {formatRangeLabelWithWeekday(draftFrom, draftFrom, getWeekdayName, " — ")}
+                    </p>
+                  )}
+                </div>
+
                 <CalendarMonthNav
                   viewMonth={viewMonth}
                   onViewMonthChange={setViewMonth}
@@ -303,13 +374,13 @@ export function DateRangePicker({ from, to, onChange, onClear, className, onDark
                         : t("dateRange.selectStart")}
                   </p>
                   <div className="flex shrink-0 justify-end gap-1.5">
-                    <Button type="button" variant="ghost" size="sm" onClick={handleClear}>
+                    <Button type="button" variant="ghost" size="sm" onClick={handlePopoverClear}>
                       {t("dateRange.clear")}
                     </Button>
                     <MotionButton
                       type="button"
                       size="sm"
-                      disabled={!draftFrom}
+                      disabled={!draftFrom || !draftTo}
                       onClick={handleApply}
                       {...motionTap}
                     >

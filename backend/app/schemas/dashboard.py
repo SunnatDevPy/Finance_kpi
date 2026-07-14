@@ -10,6 +10,14 @@ class ClientCountStats(BaseModel):
     nofaol: int
 
 
+class ContractWorkflowStats(BaseModel):
+    total: int
+    yangi: int
+    davom_etmoqda: int
+    tugadi: int
+    toxtatildi: int
+
+
 class TopClientItem(BaseModel):
     client_id: int
     company_name: str
@@ -65,7 +73,11 @@ class DashboardStats(BaseModel):
     collection_rate: float
     total_contracts: int
     active_contracts: int
+    cancelled_amount: Decimal
+    period_cancelled_amount: Decimal
+    cancelled_contracts_count: int
     clients: ClientCountStats
+    contracts: ContractWorkflowStats
     top_clients: list[TopClientItem]
     charts: DashboardCharts
     period_start: date

@@ -4,6 +4,11 @@ def test_dashboard_stats(client, auth_headers, app_settings, sample_contract):
     data = response.json()
     assert "total_debt" in data
     assert "monthly_revenue" in data
+    assert "cancelled_amount" in data
+    assert "period_cancelled_amount" in data
+    assert "cancelled_contracts_count" in data
+    assert "contracts" in data
+    assert data["contracts"]["total"] == 1
     assert "clients" in data
     assert data["total_contracts"] == 1
     assert "charts" in data

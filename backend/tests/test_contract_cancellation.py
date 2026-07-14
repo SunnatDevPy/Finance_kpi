@@ -104,8 +104,55 @@ def test_cancel_all_line_items_marks_contract_cancelled(
     assert response.status_code == 200
     data = response.json()
     assert data["is_cancelled"] is True
+    assert data["status"] == "toxtatildi"
     assert float(data["total_amount"]) == 0.0
     assert all(item["is_cancelled"] for item in data["line_items"])
+
+
+def test_cancel_last_line_item_rejected(client, auth_headers, sample_contract):
+    line_item = sample_contract.line_items[0]
+    response = client.patch(
+        f"/api/v1/contracts/{sample_contract.id}/line-items/{line_item.id}/cancel",
+        headers=auth_headers,
+    )
+    assert response.status_code == 400
+
+
+def test_update_line_item(client, auth_headers, sample_contract):
+    line_item = sample_contract.line_items[0]
+    response = client.patch(
+        f"/api/v1/contracts/{sample_contract.id}/line-items/{line_item.id}",
+        headers=auth_headers,
+        json={"price": "2500000.00", "service_type_id": line_item.service_type_id},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert float(data["total_amount"]) == 2_500_000.0
+    updated = next(item for item in data["line_items"] if item["id"] == line_item.id)
+    assert float(updated["price"]) == 2_500_000.0
+
+    second_service = client.post(
+        "/api/v1/service-types",
+        headers=auth_headers,
+        json={"name": "Branding", "is_active": True},
+    ).json()
+    change_service = client.patch(
+        f"/api/v1/contracts/{sample_contract.id}/line-items/{line_item.id}",
+        headers=auth_headers,
+        json={"price": "2500000.00", "service_type_id": second_service["id"]},
+    )
+    assert change_service.status_code == 200
+    renamed = next(
+        item for item in change_service.json()["line_items"] if item["id"] == line_item.id
+    )
+    assert renamed["service_type_name"] == "Branding"
+
+    history = client.get(
+        f"/api/v1/contracts/{sample_contract.id}/history",
+        headers=auth_headers,
+    )
+    assert history.status_code == 200
+    assert history.json()["total"] >= 1
 
 
 def test_zero_amount_payment_rejected(client, auth_headers, sample_contract):
@@ -115,3 +162,46 @@ def test_zero_amount_payment_rejected(client, auth_headers, sample_contract):
         json={"contract_id": sample_contract.id, "amount": "0.00", "paid_at": "2026-02-01"},
     )
     assert response.status_code == 422
+
+
+def test_confirm_contract(client, auth_headers, sample_contract):
+    assert sample_contract.status.value == "yangi"
+    response = client.post(
+        f"/api/v1/contracts/{sample_contract.id}/confirm",
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["status"] == "davom_etmoqda"
+
+
+def test_complete_contract_requires_confirm(client, auth_headers, sample_contract):
+    response = client.post(
+        f"/api/v1/contracts/{sample_contract.id}/complete",
+        headers=auth_headers,
+    )
+    assert response.status_code == 400
+
+    client.post(f"/api/v1/contracts/{sample_contract.id}/confirm", headers=auth_headers)
+    complete = client.post(
+        f"/api/v1/contracts/{sample_contract.id}/complete",
+        headers=auth_headers,
+    )
+    assert complete.status_code == 200
+    assert complete.json()["status"] == "tugadi"
+
+
+def test_cancelled_amount_in_dashboard(
+    client, auth_headers, sample_client, sample_service_type, app_settings
+):
+    contract = _create_two_service_contract(client, auth_headers, sample_client, sample_service_type)
+    video_item = next(item for item in contract["line_items"] if item["service_type_name"] == "Video")
+    client.patch(
+        f"/api/v1/contracts/{contract['id']}/line-items/{video_item['id']}/cancel",
+        headers=auth_headers,
+    )
+
+    dashboard = client.get("/api/v1/dashboard", headers=auth_headers)
+    assert dashboard.status_code == 200
+    data = dashboard.json()
+    assert float(data["cancelled_amount"]) == 500_000.0
+    assert "period_cancelled_amount" in data

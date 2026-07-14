@@ -3,6 +3,8 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.schemas.pagination import Page
+
 
 class PaymentBase(BaseModel):
     amount: Decimal = Field(decimal_places=2, max_digits=18)
@@ -32,3 +34,10 @@ class PaymentRead(PaymentBase):
 class PaymentListRead(PaymentRead):
     company_name: str
     client_id: int
+    contract_number: str | None = None
+
+
+class PaymentsPage(Page[PaymentListRead]):
+    """Payments list page with the filtered dataset's total amount (not just the current page)."""
+
+    total_amount: Decimal = Decimal("0")

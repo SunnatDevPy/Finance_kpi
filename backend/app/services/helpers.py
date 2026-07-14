@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.models import Client, Contract, ContractLineItem, Expense, Income, Payment, ServiceType
 from app.schemas.contract import ContractLineItemRead, ContractRead
+from app.services.cancelled_stats import contracts_cancelled_amount
 
 
 def get_client_or_404(db: Session, client_id: int) -> Client:
@@ -114,6 +115,7 @@ def contract_to_read(contract: Contract) -> ContractRead:
         notes=contract.notes,
         contract_number=contract.contract_number,
         invoice_number=contract.invoice_number,
+        status=contract.status,
         line_items=[
             ContractLineItemRead(
                 id=item.id,
@@ -136,3 +138,7 @@ def contract_to_read(contract: Contract) -> ContractRead:
 
 def client_total_debt(contracts: list[Contract]) -> Decimal:
     return sum((contract.debt_amount for contract in contracts), Decimal("0"))
+
+
+def client_cancelled_amount(contracts: list[Contract]) -> Decimal:
+    return contracts_cancelled_amount(contracts)

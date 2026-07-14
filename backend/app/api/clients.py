@@ -13,7 +13,16 @@ from app.schemas.client_import import ClientImportResult
 from app.schemas.pagination import Page
 from app.services.audit import diff_fields, record_audit
 from app.services.client_import import build_client_import_template, import_clients_from_xlsx
-from app.services.helpers import client_total_debt, contract_to_read, get_client_or_404
+from app.services.export_data import (
+    CLIENT_CARD_CONTRACT_HEADERS,
+    CLIENT_CARD_PAYMENT_HEADERS,
+    CLIENT_CARD_PROFILE_HEADERS,
+    fetch_client_card_profile_rows,
+    fetch_client_contracts_rows,
+    fetch_client_payments_rows,
+)
+from app.services.export_files import build_client_card_xlsx
+from app.services.helpers import client_cancelled_amount, client_total_debt, contract_to_read, get_client_or_404
 from app.services.uploads import ALLOWED_LOGO_CONTENT_TYPES, MAX_LOGO_BYTES, delete_client_logo, save_client_logo
 
 router = APIRouter(prefix="/clients", dependencies=[Depends(get_current_user)])
@@ -41,12 +50,15 @@ def list_clients(
     db: Session = Depends(get_db),
     status_filter: ClientStatus | None = Query(default=None, alias="status"),
     search: str | None = Query(default=None, min_length=1),
+    city: str | None = Query(default=None, min_length=1),
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=20, ge=1, le=200),
 ) -> Page[ClientRead]:
     filters = [Client.deleted_at.is_(None)]
     if status_filter is not None:
         filters.append(Client.status == status_filter)
+    if city:
+        filters.append(Client.city == city)
     if search:
         pattern = f"%{search}%"
         filters.append(
@@ -61,21 +73,66 @@ def list_clients(
     count_stmt = select(func.count(Client.id)).where(*filters)
     total = db.scalar(count_stmt) or 0
 
-    stmt = select(Client).where(*filters).order_by(Client.company_name)
-    items = list(db.scalars(stmt.offset(skip).limit(limit)).all())
+    stmt = (
+        select(Client)
+        .options(
+            selectinload(Client.contracts).selectinload(Contract.line_items),
+            selectinload(Client.contracts).selectinload(Contract.payments),
+        )
+        .where(*filters)
+        .order_by(Client.company_name)
+    )
+    clients = list(db.scalars(stmt.offset(skip).limit(limit)).all())
+    items = [
+        ClientRead(
+            **ClientRead.model_validate(client).model_dump(exclude={"total_debt"}),
+            total_debt=client_total_debt(
+                [c for c in client.contracts if c.deleted_at is None]
+            ),
+        )
+        for client in clients
+    ]
 
     return Page(items=items, total=total, skip=skip, limit=limit)
 
 
-@router.get("/trash", response_model=list[ClientRead], dependencies=[Depends(require_admin)])
-def list_deleted_clients(db: Session = Depends(get_db)) -> list[Client]:
+@router.get("/cities", response_model=list[str])
+def list_client_cities(db: Session = Depends(get_db)) -> list[str]:
     stmt = (
-        select(Client)
-        .where(Client.deleted_at.is_not(None))
-        .order_by(Client.deleted_at.desc())
-        .limit(200)
+        select(Client.city)
+        .where(
+            Client.deleted_at.is_(None),
+            Client.city.is_not(None),
+            Client.city != "",
+        )
+        .distinct()
+        .order_by(Client.city)
     )
     return list(db.scalars(stmt).all())
+
+
+@router.get("/trash", response_model=Page[ClientRead], dependencies=[Depends(require_admin)])
+def list_deleted_clients(
+    db: Session = Depends(get_db),
+    search: str | None = Query(default=None, min_length=1),
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=200),
+) -> Page[ClientRead]:
+    filters = [Client.deleted_at.is_not(None)]
+    if search:
+        pattern = f"%{search}%"
+        filters.append(or_(Client.company_name.ilike(pattern), Client.phone.ilike(pattern)))
+
+    total = db.scalar(select(func.count(Client.id)).where(*filters)) or 0
+    stmt = (
+        select(Client)
+        .where(*filters)
+        .order_by(Client.deleted_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    items = list(db.scalars(stmt).all())
+    return Page(items=items, total=total, skip=skip, limit=limit)
 
 
 @router.post("", response_model=ClientRead, status_code=status.HTTP_201_CREATED)
@@ -139,9 +196,39 @@ def get_client_card(client_id: int, db: Session = Depends(get_db)) -> ClientCard
     active_contracts = [c for c in client.contracts if c.deleted_at is None]
     contracts = [contract_to_read(contract) for contract in active_contracts]
     return ClientCardRead(
-        **ClientRead.model_validate(client).model_dump(),
+        **ClientRead.model_validate(client).model_dump(exclude={"total_debt"}),
         contracts=contracts,
         total_debt=client_total_debt(active_contracts),
+        cancelled_amount=client_cancelled_amount(active_contracts),
+    )
+
+
+@router.get("/{client_id}/export")
+def export_client_card(client_id: int, db: Session = Depends(get_db)) -> StreamingResponse:
+    client = get_client_or_404(db, client_id)
+    profile_rows = fetch_client_card_profile_rows(client)
+    contract_rows = fetch_client_contracts_rows(db, client_id)
+    payment_rows = fetch_client_payments_rows(db, client_id)
+    if not profile_rows and not contract_rows and not payment_rows:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Eksport qilish uchun ma'lumot topilmadi",
+        )
+
+    buffer = build_client_card_xlsx(
+        client.company_name,
+        [
+            ("Mijoz", CLIENT_CARD_PROFILE_HEADERS, profile_rows),
+            ("Shartnomalar", CLIENT_CARD_CONTRACT_HEADERS, contract_rows),
+            ("To'lovlar", CLIENT_CARD_PAYMENT_HEADERS, payment_rows),
+        ],
+    )
+    safe_name = "".join(ch if ch.isalnum() or ch in ("-", "_") else "_" for ch in client.company_name)
+    filename = f"mijoz_{safe_name or client_id}.xlsx"
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
@@ -234,7 +321,11 @@ def remove_client_logo(
     return client
 
 
-@router.delete("/{client_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{client_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_admin)],
+)
 def delete_client(
     client_id: int,
     db: Session = Depends(get_db),

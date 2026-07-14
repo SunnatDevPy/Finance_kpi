@@ -43,6 +43,16 @@
     background-color: color-mix(in oklch, var(--card) 82%, transparent);
     border-color: color-mix(in oklch, var(--border) 65%, transparent);
   }
+  .table-card-toolbar {
+    @apply mx-4 mb-5 mt-1 flex flex-wrap items-center gap-3 rounded-xl border px-4 py-4 sm:mx-6;
+    border-color: color-mix(in oklch, var(--border) 72%, transparent);
+    background-color: color-mix(in oklch, var(--muted) 52%, var(--card));
+    box-shadow: inset 0 1px 0 color-mix(in oklch, white 35%, transparent);
+  }
+  html.dark .table-card-toolbar {
+    background-color: color-mix(in oklch, var(--muted) 38%, var(--card));
+    box-shadow: inset 0 1px 0 color-mix(in oklch, white 6%, transparent);
+  }
   .toolbar-cluster {
     @apply flex flex-wrap items-center gap-2.5 sm:gap-3;
   }
@@ -65,10 +75,37 @@
   .service-tag {
     @apply inline-flex h-6 max-w-full items-center justify-center truncate rounded-md bg-brand-600 px-2.5 text-[10.5px] font-semibold tracking-tight text-white shadow-sm;
   }
+  .contract-workflow-badge {
+    @apply inline-flex h-6 shrink-0 items-center rounded-md border px-2.5 text-[11px] font-semibold tracking-tight shadow-sm;
+  }
+  .contract-workflow-badge--yangi {
+    @apply border-amber-300/90 bg-amber-100 text-amber-900 dark:border-amber-800/70 dark:bg-amber-950/70 dark:text-amber-200;
+  }
+  .contract-workflow-badge--davom_etmoqda {
+    @apply border-emerald-300/90 bg-emerald-100 text-emerald-900 dark:border-emerald-800/70 dark:bg-emerald-950/70 dark:text-emerald-200;
+  }
+  .contract-workflow-badge--tugadi {
+    @apply border-sky-300/90 bg-sky-100 text-sky-900 dark:border-sky-800/70 dark:bg-sky-950/70 dark:text-sky-200;
+  }
+  .contract-workflow-badge--toxtatildi {
+    @apply border-red-300/90 bg-red-100 text-red-900 dark:border-red-800/70 dark:bg-red-950/70 dark:text-red-200;
+  }
   .action-toolbar {
     @apply inline-flex items-center gap-0.5 rounded-lg border p-0.5 shadow-sm;
     border-color: color-mix(in oklch, var(--border) 50%, transparent);
     background-color: color-mix(in oklch, var(--muted) 30%, transparent);
+  }
+  .link-surface {
+    @apply inline-block rounded-md px-1.5 py-0.5 no-underline transition-colors duration-150;
+  }
+  .link-surface:hover {
+    background-color: color-mix(in oklch, var(--muted) 70%, transparent);
+  }
+  .text-btn-surface {
+    @apply rounded-md px-2 py-1 transition-colors duration-150;
+  }
+  .text-btn-surface:hover {
+    background-color: color-mix(in oklch, var(--muted) 70%, transparent);
   }
   .glass-panel {
     @apply rounded-2xl border border-border shadow-lg backdrop-blur-xl;
@@ -652,5 +689,20 @@
   }
   h1, h2, h3, h4 {
     @apply font-semibold tracking-tight;
+  }
+  a {
+    @apply no-underline;
+  }
+  [data-slot="dialog-description"] a,
+  [data-slot="alert-dialog-description"] a,
+  [data-slot="alert-title"] a,
+  [data-slot="alert-description"] a {
+    @apply rounded-md px-1 py-0.5 no-underline transition-colors duration-150 hover:text-foreground;
+  }
+  [data-slot="dialog-description"] a:hover,
+  [data-slot="alert-dialog-description"] a:hover,
+  [data-slot="alert-title"] a:hover,
+  [data-slot="alert-description"] a:hover {
+    background-color: color-mix(in oklch, var(--muted) 70%, transparent);
   }
 }

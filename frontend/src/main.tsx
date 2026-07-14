@@ -3,6 +3,9 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
 import { forceReveal, markFontsReady } from "./lib/appReady";
+import { initRuntimeRecovery } from "./lib/runtimeRecovery";
+
+initRuntimeRecovery();
 
 const rootEl = document.getElementById("root")!;
 

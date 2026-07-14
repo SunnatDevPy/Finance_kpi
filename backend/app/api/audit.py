@@ -1,3 +1,5 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
@@ -24,6 +26,8 @@ def get_audit_log(
     entity_type: str | None = Query(default=None),
     entity_id: int | None = Query(default=None),
     user_id: int | None = Query(default=None),
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
 ) -> AuditLogPage:
@@ -32,6 +36,8 @@ def get_audit_log(
         entity_type=entity_type,
         entity_id=entity_id,
         user_id=user_id,
+        date_from=date_from,
+        date_to=date_to,
         skip=skip,
         limit=limit,
     )

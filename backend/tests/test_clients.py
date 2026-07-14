@@ -14,6 +14,7 @@ def test_create_and_list_client(client, auth_headers):
             "company_name": "Test Corp",
             "contact_person": "Ali",
             "phone": "+998901234567",
+            "city": "Toshkent",
             "status": "faol",
         },
     )
@@ -26,6 +27,26 @@ def test_create_and_list_client(client, auth_headers):
     assert listing.status_code == 200
     assert listing.json()["total"] == 1
     assert listing.json()["items"][0]["company_name"] == "Test Corp"
+
+    cities = client.get("/api/v1/clients/cities", headers=auth_headers)
+    assert cities.status_code == 200
+    assert "Toshkent" in cities.json()
+
+    filtered = client.get(
+        "/api/v1/clients",
+        headers=auth_headers,
+        params={"city": "Toshkent"},
+    )
+    assert filtered.status_code == 200
+    assert filtered.json()["total"] == 1
+
+    empty = client.get(
+        "/api/v1/clients",
+        headers=auth_headers,
+        params={"city": "Samarqand"},
+    )
+    assert empty.status_code == 200
+    assert empty.json()["total"] == 0
 
 
 _PNG_1X1 = bytes.fromhex(

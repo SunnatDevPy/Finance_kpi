@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Client, ClientStatus, Contract, ContractLineItem, Payment, ServiceType
 from app.schemas.contract_import import ContractImportDuplicate, ContractImportError, ContractImportResult
+from app.services.contract_status import infer_contract_workflow_status
 
 TEMPLATE_HEADERS = [
     "Kompaniya / Компания*",
@@ -295,6 +296,7 @@ def import_contracts_from_xlsx(db: Session, content: bytes) -> ContractImportRes
             notes="Excel import orqali qo'shilgan",
             line_items=[ContractLineItem(service_type=service_type, price=amount)],
         )
+        contract.status = infer_contract_workflow_status(contract)
         if paid_amount > 0:
             contract.payments.append(
                 Payment(amount=paid_amount, paid_at=contract_date, note="Excel import orqali")
