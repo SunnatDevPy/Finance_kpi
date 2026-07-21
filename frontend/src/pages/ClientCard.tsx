@@ -93,6 +93,35 @@ function contractWasModified(contract: Contract): boolean {
   );
 }
 
+const SERVICE_ITEM_STYLES = [
+  {
+    row: "border-l-2 border-l-brand-500/80 bg-brand-500/[0.06] dark:bg-brand-500/10",
+    label: "bg-brand-500/12 text-brand-800 dark:bg-brand-500/20 dark:text-brand-100",
+  },
+  {
+    row: "border-l-2 border-l-sky-500/80 bg-sky-500/[0.06] dark:bg-sky-500/10",
+    label: "bg-sky-500/12 text-sky-900 dark:bg-sky-500/20 dark:text-sky-100",
+  },
+  {
+    row: "border-l-2 border-l-violet-500/80 bg-violet-500/[0.06] dark:bg-violet-500/10",
+    label: "bg-violet-500/12 text-violet-900 dark:bg-violet-500/20 dark:text-violet-100",
+  },
+  {
+    row: "border-l-2 border-l-amber-500/80 bg-amber-500/[0.06] dark:bg-amber-500/10",
+    label: "bg-amber-500/12 text-amber-900 dark:bg-amber-500/20 dark:text-amber-100",
+  },
+] as const;
+
+function serviceItemStyle(index: number, cancelled: boolean) {
+  if (cancelled) {
+    return {
+      row: "border-l-2 border-l-border/50 bg-muted/25",
+      label: "bg-muted text-muted-foreground",
+    };
+  }
+  return SERVICE_ITEM_STYLES[index % SERVICE_ITEM_STYLES.length];
+}
+
 function auditActionLabel(action: AuditLogEntry["action"], t: (key: string) => string): string {
   const keys: Record<AuditLogEntry["action"], string> = {
     create: "auditLog.actionCreate",
@@ -520,6 +549,19 @@ export function ClientCardPage() {
     );
   }
 
+  const contractById = new Map(card.contracts.map((contract) => [contract.id, contract]));
+  const sortedPayments = [...payments].sort((a, b) => b.paid_at.localeCompare(a.paid_at));
+
+  const openPaymentModal = (contractId: number, debtAmount?: string) => {
+    setPayModal(contractId);
+    setPayType("income");
+    setPayForm({
+      amount: debtAmount && toNumber(debtAmount) > 0 ? toWholeAmountDigits(debtAmount) : "",
+      paid_at: new Date().toISOString().split("T")[0],
+      note: "",
+    });
+  };
+
   return (
     <PageShell>
       <nav className="-mb-2 flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground" aria-label="Breadcrumb">
@@ -572,217 +614,253 @@ export function ClientCardPage() {
       </StaggerContainer>
 
       <Card className="content-card">
-        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 border-b">
+        <CardHeader className="border-b py-3">
+          <CardTitle className="text-base">{t("clients.paymentHistory")}</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <PremiumDataTable
+            empty={sortedPayments.length === 0}
+            emptyMessage={t("clients.noPayments")}
+            skeletonCols={4}
+          >
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t("common.date")}</TableHead>
+                <TableHead>{t("common.contract")}</TableHead>
+                <TableHead>{t("common.amount")}</TableHead>
+                <TableHead>{t("common.note")}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sortedPayments.map((p, index) => {
+                const linkedContract = contractById.get(p.contract_id);
+                return (
+                  <MotionTableRow key={p.id} {...rowEnter(index)}>
+                    <TableCellDate>{formatDateWithWeekday(p.paid_at)}</TableCellDate>
+                    <TableCellMuted>
+                      {linkedContract?.contract_number
+                        ? `№${linkedContract.contract_number}`
+                        : `#${p.contract_id}`}
+                    </TableCellMuted>
+                    <TableCellMoney tone={toNumber(p.amount) < 0 ? "negative" : "positive"}>
+                      {formatMoney(p.amount)}
+                    </TableCellMoney>
+                    <TableCellMuted>{p.note}</TableCellMuted>
+                  </MotionTableRow>
+                );
+              })}
+            </TableBody>
+          </PremiumDataTable>
+        </CardContent>
+      </Card>
+
+      <Card className="content-card">
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 border-b py-3">
           <div>
             <CardTitle className="text-base">{t("common.contracts")}</CardTitle>
-            <CardDescription>{t("clients.contractsDesc")}</CardDescription>
+            <CardDescription className="text-xs">{t("clients.contractsDesc")}</CardDescription>
           </div>
-          <MotionButton onClick={() => void openContractModal()} {...motionTap}>
+          <MotionButton size="sm" onClick={() => void openContractModal()} {...motionTap}>
             <PlusIcon data-icon="inline-start" />
             {t("clients.newContract")}
           </MotionButton>
         </CardHeader>
-        <CardContent className="pt-5">
+        <CardContent className="pt-3">
           {card.contracts.length === 0 ? (
-            <div className="flex flex-col items-center gap-4 py-10">
+            <div className="flex flex-col items-center gap-3 py-8">
               <p className="text-sm text-muted-foreground">{t("clients.noContracts")}</p>
-              <MotionButton variant="outline" onClick={() => void openContractModal()} {...motionTap}>
+              <MotionButton size="sm" variant="outline" onClick={() => void openContractModal()} {...motionTap}>
                 <PlusIcon data-icon="inline-start" />
                 {t("clients.newContract")}
               </MotionButton>
             </div>
           ) : (
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
               {card.contracts.map((contract) => {
                 const activeItems = activeLineItemCount(contract);
                 const canRemoveService = activeItems > 1;
+                const debt = toNumber(contract.debt_amount);
                 return (
                 <div
                   key={contract.id}
-                  className="overflow-hidden rounded-xl border border-border/70 bg-card shadow-sm"
+                  className="overflow-hidden rounded-lg border border-border/60 bg-card"
                 >
-                  <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/60 bg-muted/20 px-4 py-4">
-                    <div className="flex flex-col gap-1.5">
+                  <div className="flex flex-wrap items-center gap-2 border-b border-border/40 bg-muted/15 px-3 py-2">
+                    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
                       {contractWasModified(contract) && (
                         <button
                           type="button"
                           onClick={() => void openContractHistory(contract.id)}
-                          className="link-surface flex w-fit items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                          className="link-surface flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground"
                         >
-                          <ClockIcon className="size-3.5 shrink-0" />
+                          <ClockIcon className="size-3 shrink-0" />
                           {t("clients.modified")}
                         </button>
                       )}
-                      <div className="flex flex-wrap items-center gap-2">
-                        {contract.contract_number && (
-                          <span className="text-sm font-semibold text-primary/80">
-                            №{contract.contract_number}
-                          </span>
-                        )}
-                        <p className="font-semibold text-foreground">
-                          {formatDateWithWeekday(contract.start_date, "short")} — {formatDateWithWeekday(contract.end_date, "short")}
-                        </p>
-                        {contract.is_cancelled ? (
-                          <Badge variant="secondary" className="gap-1 text-muted-foreground">
-                            <XCircleIcon className="size-3" />
-                            {t("clients.cancelled")}
-                          </Badge>
-                        ) : (
-                          <ContractStatusBadge status={contract.status} />
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {t("common.id")}: {contract.id}
-                        {contract.invoice_number && (
-                          <> · {t("contracts.invoiceNumber")}: {contract.invoice_number}</>
-                        )}
-                      </p>
+                      {contract.contract_number && (
+                        <span className="text-xs font-semibold text-primary/90">
+                          №{contract.contract_number}
+                        </span>
+                      )}
+                      <span className="text-xs font-medium text-foreground">
+                        {formatDateWithWeekday(contract.start_date, "short")} —{" "}
+                        {formatDateWithWeekday(contract.end_date, "short")}
+                      </span>
+                      {contract.is_cancelled ? (
+                        <Badge variant="secondary" className="h-5 gap-1 px-1.5 text-[10px] text-muted-foreground">
+                          <XCircleIcon className="size-2.5" />
+                          {t("clients.cancelled")}
+                        </Badge>
+                      ) : (
+                        <ContractStatusBadge status={contract.status} />
+                      )}
+                      <span className="text-[11px] text-muted-foreground">
+                        {t("common.total")}:{" "}
+                        <span className="font-medium text-foreground">{formatMoney(contract.total_amount)}</span>
+                        {" · "}
+                        {t("common.paid")}:{" "}
+                        <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                          {formatMoney(contract.paid_amount)}
+                        </span>
+                        {" · "}
+                        {debt < 0 ? t("clients.overpaid") : t("common.debt")}:{" "}
+                        <span
+                          className={cn(
+                            "font-medium",
+                            debt < 0
+                              ? "text-emerald-600 dark:text-emerald-400"
+                              : debt > 0
+                                ? "text-red-600 dark:text-red-400"
+                                : "text-foreground",
+                          )}
+                        >
+                          {formatMoney(debt < 0 ? Math.abs(debt) : contract.debt_amount)}
+                        </span>
+                      </span>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="action-toolbar shrink-0">
                       <MotionButton
                         size="icon-sm"
                         variant="ghost"
+                        className="size-7"
                         title={t("contracts.downloadContract")}
                         onClick={() => handleDownloadContract(contract.id, contract.contract_number)}
                         {...motionTap}
                       >
-                        <FileTextIcon data-icon="inline-start" />
+                        <FileTextIcon className="size-3.5" />
                       </MotionButton>
-                      <MotionButton
-                        size="sm"
-                        className="bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700"
-                        onClick={() => {
-                          setPayModal(contract.id);
-                          setPayType("income");
-                          setPayForm({
-                            amount: "",
-                            paid_at: new Date().toISOString().split("T")[0],
-                            note: "",
-                          });
-                        }}
-                        {...motionTap}
-                      >
-                        <BanknoteIcon data-icon="inline-start" />
-                        {t("clients.payment")}
-                      </MotionButton>
+                      {debt > 0 && (
+                        <MotionButton
+                          size="icon-sm"
+                          variant="ghost"
+                          className="size-7 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 dark:text-emerald-400"
+                          title={t("clients.payment")}
+                          onClick={() => openPaymentModal(contract.id, contract.debt_amount)}
+                          {...motionTap}
+                        >
+                          <BanknoteIcon className="size-3.5" />
+                        </MotionButton>
+                      )}
                       {!contract.is_cancelled && contract.status === "yangi" && (
                         <MotionButton
-                          size="sm"
-                          variant="outline"
-                          className="border-primary/40 text-primary hover:bg-primary/10"
+                          size="icon-sm"
+                          variant="ghost"
+                          className="size-7 text-primary hover:bg-primary/10"
+                          title={t("clients.confirmContract")}
                           onClick={() => void handleConfirmContract(contract.id)}
                           {...motionTap}
                         >
-                          <CheckCircle2Icon data-icon="inline-start" />
-                          {t("clients.confirmContract")}
+                          <CheckCircle2Icon className="size-3.5" />
                         </MotionButton>
                       )}
                       {!contract.is_cancelled && contract.status === "davom_etmoqda" && (
                         <MotionButton
-                          size="sm"
-                          variant="outline"
-                          className="border-blue-500/40 text-blue-600 hover:bg-blue-500/10 dark:text-blue-400"
+                          size="icon-sm"
+                          variant="ghost"
+                          className="size-7 text-orange-600 hover:bg-orange-500/10 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300"
+                          title={t("clients.completeContract")}
                           onClick={() => void handleCompleteContract(contract.id)}
                           {...motionTap}
                         >
-                          <FlagIcon data-icon="inline-start" />
-                          {t("clients.completeContract")}
+                          <FlagIcon className="size-3.5" />
                         </MotionButton>
                       )}
                       {!contract.is_cancelled && (
                         <MotionButton
-                          size="sm"
-                          variant="outline"
-                          className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          size="icon-sm"
+                          variant="ghost"
+                          className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          title={t("clients.cancelContract")}
                           onClick={() => setCancelContractTarget(contract.id)}
                           {...motionTap}
                         >
-                          <XCircleIcon data-icon="inline-start" />
-                          {t("clients.cancelContract")}
+                          <XCircleIcon className="size-3.5" />
                         </MotionButton>
                       )}
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 gap-3 border-b border-border/40 px-4 py-3 text-sm sm:grid-cols-3">
-                    <div>
-                      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        {t("common.total")}
-                      </span>
-                      <p className="mt-0.5 font-semibold tabular-nums">{formatMoney(contract.total_amount)}</p>
-                    </div>
-                    <div>
-                      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        {t("common.paid")}
-                      </span>
-                      <p className="mt-0.5 font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
-                        {formatMoney(contract.paid_amount)}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        {toNumber(contract.debt_amount) < 0 ? t("clients.overpaid") : t("common.debt")}
-                      </span>
-                      <p
-                        className={cn(
-                          "mt-0.5 font-semibold tabular-nums",
-                          toNumber(contract.debt_amount) < 0
-                            ? "text-emerald-600 dark:text-emerald-400"
-                            : "text-red-600 dark:text-red-400",
-                        )}
-                      >
-                        {formatMoney(
-                          toNumber(contract.debt_amount) < 0
-                            ? Math.abs(toNumber(contract.debt_amount))
-                            : contract.debt_amount,
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="p-3">
-                    <PremiumDataTable skeletonCols={3} skeletonRows={3}>
+                  <div className="px-2 py-1.5">
+                    <PremiumDataTable skeletonCols={3} skeletonRows={2} className="text-xs">
                       <TableHeader>
                         <TableRow>
-                          <TableHead>{t("clients.service")}</TableHead>
-                          <TableHead className="text-right">{t("common.price")}</TableHead>
-                          <TableHead className="text-right">{t("common.actions")}</TableHead>
+                          <TableHead className="h-8 py-1">{t("clients.service")}</TableHead>
+                          <TableHead className="h-8 py-1 text-right">{t("common.price")}</TableHead>
+                          <TableHead className="h-8 w-16 py-1 text-right">{t("common.actions")}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {contract.line_items.map((item, index) => (
-                          <MotionTableRow key={item.id} {...rowEnter(index)}>
+                        {contract.line_items.map((item, index) => {
+                          const accent = serviceItemStyle(index, item.is_cancelled);
+                          return (
+                          <MotionTableRow
+                            key={item.id}
+                            {...rowEnter(index)}
+                            className={cn("h-9", accent.row)}
+                          >
                             <TableCellPrimary
-                              className={cn(item.is_cancelled && "text-muted-foreground line-through")}
+                              className={cn("py-1.5 text-xs", item.is_cancelled && "line-through opacity-70")}
                             >
-                              {item.service_type_name}
+                              <span
+                                className={cn(
+                                  "inline-flex max-w-full items-center rounded-md px-2 py-0.5 text-[11px] font-medium",
+                                  accent.label,
+                                )}
+                              >
+                                {item.service_type_name}
+                              </span>
                               {item.is_cancelled && (
-                                <Badge variant="secondary" className="ml-2 align-middle text-[10px]">
+                                <Badge variant="secondary" className="ml-1.5 align-middle text-[9px]">
                                   {t("clients.cancelled")}
                                 </Badge>
                               )}
                             </TableCellPrimary>
                             <TableCellMoney
                               tone="neutral"
-                              className={cn("text-right", item.is_cancelled && "text-muted-foreground line-through")}
+                              className={cn(
+                                "py-1.5 text-right text-xs font-semibold",
+                                item.is_cancelled && "text-muted-foreground line-through opacity-70",
+                              )}
                             >
                               {formatMoney(item.price)}
                             </TableCellMoney>
-                            <TableCell className="text-right">
+                            <TableCell className="py-1.5 text-right">
                               {item.is_cancelled ? (
                                 <MotionButton
                                   variant="ghost"
                                   size="icon-sm"
+                                  className="size-7"
                                   title={t("clients.reactivateLineItem")}
                                   onClick={() => handleReactivateLineItem(contract.id, item.id)}
                                   {...motionTap}
                                 >
-                                  <RotateCcwIcon className="size-4" />
+                                  <RotateCcwIcon className="size-3.5" />
                                 </MotionButton>
                               ) : (
                                 <div className="action-toolbar ml-auto w-fit">
                                   <MotionButton
                                     variant="ghost"
                                     size="icon-sm"
-                                    className="size-8"
+                                    className="size-7"
                                     title={t("clients.editService")}
                                     onClick={() =>
                                       openEditLineItem(
@@ -799,7 +877,7 @@ export function ClientCardPage() {
                                   <MotionButton
                                     variant="ghost"
                                     size="icon-sm"
-                                    className="size-8 text-destructive hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
+                                    className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
                                     title={
                                       canRemoveService
                                         ? t("clients.cancelLineItem")
@@ -820,7 +898,8 @@ export function ClientCardPage() {
                               )}
                             </TableCell>
                           </MotionTableRow>
-                        ))}
+                          );
+                        })}
                       </TableBody>
                     </PremiumDataTable>
                   </div>
@@ -831,38 +910,6 @@ export function ClientCardPage() {
           )}
         </CardContent>
       </Card>
-
-      {payments.length > 0 && (
-        <Card className="content-card">
-          <CardHeader className="border-b">
-            <CardTitle className="text-base">{t("clients.paymentHistory")}</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <PremiumDataTable skeletonCols={4}>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("common.date")}</TableHead>
-                  <TableHead>{t("common.contract")}</TableHead>
-                  <TableHead>{t("common.amount")}</TableHead>
-                  <TableHead>{t("common.note")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {payments.map((p, index) => (
-                  <MotionTableRow key={p.id} {...rowEnter(index)}>
-                    <TableCellDate>{formatDateWithWeekday(p.paid_at)}</TableCellDate>
-                    <TableCellMuted>#{p.contract_id}</TableCellMuted>
-                    <TableCellMoney tone={toNumber(p.amount) < 0 ? "negative" : "positive"}>
-                      {formatMoney(p.amount)}
-                    </TableCellMoney>
-                    <TableCellMuted>{p.note}</TableCellMuted>
-                  </MotionTableRow>
-                ))}
-              </TableBody>
-            </PremiumDataTable>
-          </CardContent>
-        </Card>
-      )}
 
       <Modal
         title={t("clients.newContract")}

@@ -199,6 +199,7 @@ export const uz = {
     contractsCount: "Kontraktlar soni",
     basicInfo: "Asosiy ma'lumotlar",
     paymentHistory: "To'lovlar tarixi",
+    noPayments: "To'lovlar hali qayd etilmagan",
     addPayment: "To'lov qo'shish",
     saveAndAddAnother: "Saqlash va yana qo'shish",
     noContracts: "Kontraktlar yo'q",

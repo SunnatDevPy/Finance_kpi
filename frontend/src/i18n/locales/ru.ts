@@ -201,6 +201,7 @@ export const ru: TranslationDict = {
     contractsCount: "Количество контрактов",
     basicInfo: "Основная информация",
     paymentHistory: "История платежей",
+    noPayments: "Платежи ещё не зарегистрированы",
     addPayment: "Добавить платёж",
     saveAndAddAnother: "Сохранить и добавить ещё",
     noContracts: "Нет контрактов",
