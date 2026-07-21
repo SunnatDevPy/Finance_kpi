@@ -1,28 +1,29 @@
 # Production reverse proxy — HTTPS terminatsiyasi.
 #
-# Caddy `DOMAIN` manziliga qarab avtomatik ravishda Let's Encrypt orqali
-# TLS sertifikat oladi va HTTP (80) so'rovlarini avtomatik HTTPS (443)ga
-# yo'naltiradi — qo'shimcha sozlash shart emas.
-#
-# Haqiqiy domenda ishlatish uchun DNS A yozuvi shu server IP manziliga
-# yo'naltirilgan bo'lishi SHART (Let's Encrypt buni tekshiradi).
-#
-# `DOMAIN` sozlanmagan/localhost bo'lsa, Caddy o'zining ICHKI (self-signed)
-# sertifikat organi orqali ishlaydi — bu faqat lokal sinov uchun, brauzer
-# "ishonchsiz sertifikat" haqida ogohlantiradi (kutilgan holat).
+# Caddy har bir domen uchun avtomatik Let's Encrypt sertifikat oladi.
+# DNS A yozuvlari shu server IP manziliga yo'naltirilgan bo'lishi SHART.
 {
 	email {$ACME_EMAIL:internal@example.com}
 }
 
-{$DOMAIN:localhost} {
+# WTMA Finance panel
+{$DOMAIN:wtma.okaposai.uz} {
 	encode gzip
-
-	# Frontend (statik fayllar + /api/* proksi) — nginx orqali xizmat qiladi,
-	# barcha yo'nalish mantig'i allaqachon frontend/nginx.conf'da bor.
 	reverse_proxy web:80
 
-	# Xavfsizlik sarlavhalari — HTTPS orqali kirilganda brauzerga
-	# HSTS bilan doim shifrlangan ulanishni majburlash.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+}
+
+# WTMA Marketing landing
+{$LANDING_DOMAIN:landing.okaposai.uz} {
+	encode gzip
+	reverse_proxy wtma-landing-web:80
+
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options "nosniff"

@@ -15,6 +15,8 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    networks:
+      - wtma
 
   api:
     build: ./backend
@@ -35,6 +37,8 @@ services:
              python -m app.seed &&
              exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2"
     restart: unless-stopped
+    networks:
+      - wtma
 
   web:
     build:
@@ -45,18 +49,18 @@ services:
     depends_on:
       - api
     restart: unless-stopped
+    networks:
+      - wtma
 
-  # HTTPS reverse proxy — DOMAIN uchun Let's Encrypt sertifikatini avtomatik
-  # oladi/yangilaydi va HTTP (80) so'rovlarini HTTPS (443)ga yo'naltiradi.
-  # Faqat shu servis hostning 80/443 portlariga ulanadi, `web` esa endi
-  # tashqariga to'g'ridan-to'g'ri ochiq emas (ichki tarmoq orqaligina).
+  # HTTPS reverse proxy — Let's Encrypt + 80/443 portlar.
   caddy:
     image: caddy:2-alpine
     ports:
       - "${HTTP_PORT:-80}:80"
       - "${HTTPS_PORT:-443}:443"
     environment:
-      DOMAIN: ${DOMAIN:-localhost}
+      DOMAIN: ${DOMAIN:-wtma.okaposai.uz}
+      LANDING_DOMAIN: ${LANDING_DOMAIN:-landing.okaposai.uz}
       ACME_EMAIL: ${ACME_EMAIL:-internal@example.com}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
@@ -65,9 +69,15 @@ services:
     depends_on:
       - web
     restart: unless-stopped
+    networks:
+      - wtma
 
 volumes:
   postgres_data:
   uploads_data:
   caddy_data:
   caddy_config:
+
+networks:
+  wtma:
+    name: wtma

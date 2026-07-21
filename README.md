@@ -489,7 +489,11 @@ npm run test:e2e:ui    # interaktiv
 
 ## Production'ga chiqarish
 
+Serverda loyiha `/var/www/finance` papkasida joylashadi:
+
 ```bash
+git clone https://github.com/SunnatDevPy/Finance_kpi.git /var/www/finance
+cd /var/www/finance
 cp .env.prod.example .env.prod
 # JWT_SECRET, POSTGRES_PASSWORD, ADMIN_PASSWORD — kuchli qiymatlar!
 
@@ -504,9 +508,10 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
 | Uploads | lokal volume | `uploads_data` volume |
 
 **HTTPS sozlash:**
-1. DNS A yozuvi server IP ga
-2. `.env.prod`: `DOMAIN=finance.example.com`, `ACME_EMAIL=...`
+1. DNS A yozuvi server IP ga (`wtma.okaposai.uz` va `landing.okaposai.uz`)
+2. `.env.prod`: `DOMAIN=wtma.okaposai.uz`, `LANDING_DOMAIN=landing.okaposai.uz`, `ACME_EMAIL=...`
 3. `docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build`
+4. Landing loyihasini `/var/www/landing_wtma` ga yuklab, `docker compose -f docker-compose.prod.yml up -d --build`
 
 `DOMAIN=localhost` — faqat lokal sinov (self-signed).
 
