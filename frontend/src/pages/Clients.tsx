@@ -510,7 +510,7 @@ export function ClientsPage() {
                 {isVisible("contact") && <TableHead>{t("clients.contact")}</TableHead>}
                 {isVisible("phone") && <TableHead>{t("clients.phone")}</TableHead>}
                 {isVisible("city") && <TableHead>{t("clients.city")}</TableHead>}
-                {isVisible("debt") && <TableHead>{t("common.debt")}</TableHead>}
+                {isVisible("debt") && <TableHead>{t("nav.finance")}</TableHead>}
                 {isVisible("state") && (
                   <TableHead className="w-[8.75rem]">{t("clients.state")}</TableHead>
                 )}
