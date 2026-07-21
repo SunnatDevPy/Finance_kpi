@@ -18,6 +18,7 @@ import {
 import { api } from "../api/client";
 import { CancelIcon, LoadingIconBtn, SaveIconBtn } from "../components/ButtonIcons";
 import { ClientCardOverview } from "../components/ClientCardOverview";
+import { QuickPaymentModal, type QuickPaymentTarget } from "../components/QuickPaymentModal";
 import { ClientLogoUploader } from "@/components/ClientLogoUploader";
 import { CountryCityFields } from "../components/CountryCityFields";
 import {
@@ -59,7 +60,6 @@ import { useI18n } from "../context/I18nContext";
 import { useSubmitGuard } from "../hooks/useSubmitGuard";
 import { Button, MotionButton, motionTap } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FloatingLabelDatePicker } from "@/components/ui/date-picker";
 import { FloatingLabelInput, FloatingLabelMoneyInput, FloatingLabelPhoneInput, FloatingLabelTextarea } from "@/components/ui/floating-label-input";
 import {
   Select,
@@ -78,6 +78,7 @@ import {
   emptyClientForm,
   formatDateTimeWithWeekday,
   formatDateWithWeekday,
+  formatAmount,
   formatMoney,
   toNumber,
   toWholeAmountDigits,
@@ -138,9 +139,7 @@ export function ClientCardPage() {
   const [card, setCard] = useState<ClientCard | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [error, setError] = useState("");
-  const [payModal, setPayModal] = useState<number | null>(null);
-  const [payForm, setPayForm] = useState({ amount: "", paid_at: "", note: "" });
-  const [payType, setPayType] = useState<"income" | "refund">("income");
+  const [paymentTarget, setPaymentTarget] = useState<QuickPaymentTarget | null>(null);
   const [cancelItemTarget, setCancelItemTarget] = useState<{
     contractId: number;
     lineItemId: number;
@@ -168,7 +167,6 @@ export function ClientCardPage() {
   const [editForm, setEditForm] = useState<ClientFormData>(emptyClientForm());
   const [exportBusy, setExportBusy] = useState(false);
   const [busy, setBusy] = useState(false);
-  const { submitting: payingSubmitting, guard: guardPayment } = useSubmitGuard();
   const { submitting: contractSubmitting, guard: guardContract } = useSubmitGuard();
   const { submitting: editPriceSubmitting, guard: guardEditPrice } = useSubmitGuard();
   const { submitting: editClientSubmitting, guard: guardEditClient } = useSubmitGuard();
@@ -374,37 +372,6 @@ export function ClientCardPage() {
     }
   };
 
-  const handlePayment = guardPayment(async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!payModal) return;
-    const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
-    const keepOpen = submitter?.dataset.keepOpen === "true";
-    setError("");
-    if (!payForm.paid_at) {
-      setError(t("clients.selectDateError"));
-      return;
-    }
-    try {
-      const magnitude = Math.abs(parseFloat(payForm.amount));
-      await api.payments.create({
-        contract_id: payModal,
-        amount: payType === "refund" ? -magnitude : magnitude,
-        paid_at: payForm.paid_at,
-        note: payForm.note || undefined,
-      });
-      if (keepOpen) {
-        setPayForm((prev) => ({ ...prev, amount: "", note: "" }));
-      } else {
-        setPayModal(null);
-        setPayForm({ amount: "", paid_at: "", note: "" });
-        setPayType("income");
-      }
-      load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t("common.error"));
-    }
-  });
-
   const handleDownloadContract = async (contractId: number, contractNumber: string | null) => {
     setError("");
     try {
@@ -551,16 +518,6 @@ export function ClientCardPage() {
 
   const contractById = new Map(card.contracts.map((contract) => [contract.id, contract]));
   const sortedPayments = [...payments].sort((a, b) => b.paid_at.localeCompare(a.paid_at));
-
-  const openPaymentModal = (contractId: number, debtAmount?: string) => {
-    setPayModal(contractId);
-    setPayType("income");
-    setPayForm({
-      amount: debtAmount && toNumber(debtAmount) > 0 ? toWholeAmountDigits(debtAmount) : "",
-      paid_at: new Date().toISOString().split("T")[0],
-      note: "",
-    });
-  };
 
   return (
     <PageShell>
@@ -715,15 +672,15 @@ export function ClientCardPage() {
                         <ContractStatusBadge status={contract.status} />
                       )}
                       <span className="text-[11px] text-muted-foreground">
-                        {t("common.total")}:{" "}
-                        <span className="font-medium text-foreground">{formatMoney(contract.total_amount)}</span>
+                        {t("clients.totalAmount")}:{" "}
+                        <span className="font-medium text-foreground">{formatAmount(contract.total_amount)}</span>
                         {" · "}
-                        {t("common.paid")}:{" "}
+                        {t("clients.received")}:{" "}
                         <span className="font-medium text-emerald-600 dark:text-emerald-400">
-                          {formatMoney(contract.paid_amount)}
+                          {formatAmount(contract.paid_amount)}
                         </span>
                         {" · "}
-                        {debt < 0 ? t("clients.overpaid") : t("common.debt")}:{" "}
+                        {debt < 0 ? t("clients.overpaid") : t("clients.debtShort")}:{" "}
                         <span
                           className={cn(
                             "font-medium",
@@ -734,7 +691,7 @@ export function ClientCardPage() {
                                 : "text-foreground",
                           )}
                         >
-                          {formatMoney(debt < 0 ? Math.abs(debt) : contract.debt_amount)}
+                          {formatAmount(debt < 0 ? Math.abs(debt) : contract.debt_amount)}
                         </span>
                       </span>
                     </div>
@@ -755,7 +712,7 @@ export function ClientCardPage() {
                           variant="ghost"
                           className="size-7 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 dark:text-emerald-400"
                           title={t("clients.payment")}
-                          onClick={() => openPaymentModal(contract.id, contract.debt_amount)}
+                          onClick={() => setPaymentTarget({ kind: "contract", contract })}
                           {...motionTap}
                         >
                           <BanknoteIcon className="size-3.5" />
@@ -911,6 +868,12 @@ export function ClientCardPage() {
         </CardContent>
       </Card>
 
+      <QuickPaymentModal
+        target={paymentTarget}
+        onClose={() => setPaymentTarget(null)}
+        onSuccess={load}
+      />
+
       <Modal
         title={t("clients.newContract")}
         open={contractModalOpen}
@@ -935,71 +898,6 @@ export function ClientCardPage() {
             <MotionButton type="submit" disabled={contractSubmitting} {...motionTap}>
               {contractSubmitting ? <LoadingIconBtn /> : <SaveIconBtn />}
               {contractSubmitting ? t("common.saving") : t("common.save")}
-            </MotionButton>
-          </div>
-        </form>
-      </Modal>
-
-      <Modal
-        title={t("clients.addPayment")}
-        open={payModal !== null}
-        onClose={() => setPayModal(null)}
-      >
-        <form onSubmit={handlePayment} className="flex flex-col gap-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-2">
-              <label className="label">{t("clients.paymentType")}</label>
-              <Select value={payType} onValueChange={(value) => value && setPayType(value as "income" | "refund")}>
-                <SelectTrigger className="h-12 w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value="income">{t("clients.paymentTypeIncome")}</SelectItem>
-                    <SelectItem value="refund">{t("clients.paymentTypeRefund")}</SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
-            <FloatingLabelDatePicker
-              id="paid_at"
-              label={t("common.date")}
-              required
-              value={payForm.paid_at}
-              onChange={(value) => setPayForm({ ...payForm, paid_at: value })}
-            />
-          </div>
-          <FloatingLabelMoneyInput
-            id="amount"
-            label={t("common.amount")}
-            required
-            value={payForm.amount}
-            onValueChange={(digits) => setPayForm({ ...payForm, amount: digits })}
-          />
-          <FloatingLabelInput
-            id="note"
-            label={t("common.note")}
-            value={payForm.note}
-            onChange={(e) => setPayForm({ ...payForm, note: e.target.value })}
-          />
-          <div className="flex flex-wrap justify-end gap-2 pt-2">
-            <MotionButton type="button" variant="outline" onClick={() => setPayModal(null)} {...motionTap}>
-              <CancelIcon />
-              {t("common.cancel")}
-            </MotionButton>
-            <MotionButton
-              type="submit"
-              variant="outline"
-              data-keep-open="true"
-              disabled={payingSubmitting}
-              {...motionTap}
-            >
-              {payingSubmitting ? <LoadingIconBtn /> : <PlusIcon data-icon="inline-start" />}
-              {t("clients.saveAndAddAnother")}
-            </MotionButton>
-            <MotionButton type="submit" disabled={payingSubmitting} {...motionTap}>
-              {payingSubmitting ? <LoadingIconBtn /> : <SaveIconBtn />}
-              {payingSubmitting ? t("common.saving") : t("common.save")}
             </MotionButton>
           </div>
         </form>

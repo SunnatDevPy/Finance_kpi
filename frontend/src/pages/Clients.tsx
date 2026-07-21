@@ -37,7 +37,6 @@ import {
   TableCell,
   TableCellActions,
   TableCellCompany,
-  TableCellMoney,
   TableCellMuted,
   TableHead,
   TableHeader,
@@ -58,6 +57,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { FloatingLabelInput, FloatingLabelPhoneInput, FloatingLabelTextarea } from "@/components/ui/floating-label-input";
 import { parsePhoneNational, toPhoneE164 } from "@/hooks/usePhoneInput";
 import { resolveCountryValue, resolveRegionValue } from "@/data/geoRegions";
+import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -70,7 +70,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import type { Client, ClientFormData, ClientImportResult, ClientDebtFilter, ServiceType } from "../types";
 import { useI18n } from "../context/I18nContext";
-import { emptyClientForm, formatMoney, toNumber } from "../utils/format";
+import { emptyClientForm, formatAmount, toNumber } from "../utils/format";
 import { PageHeader, PageShell } from "../components/PageHeader";
 import { ActiveStatusToggle } from "../components/ActiveStatusToggle";
 import { TableColumnPicker } from "../components/TableColumnPicker";
@@ -108,7 +108,7 @@ export function ClientsPage() {
               : column.id === "city"
                 ? t("clients.city")
                 : column.id === "debt"
-                  ? t("common.debt")
+                  ? t("clients.financeSummary")
                   : t("clients.state"),
       })),
     [t],
@@ -534,25 +534,35 @@ export function ClientsPage() {
                     <TableCell>
                       {(() => {
                         const debt = toNumber(client.total_debt);
-                        if (debt === 0) {
-                          return <TableCellMuted className="p-0">—</TableCellMuted>;
-                        }
                         return (
-                          <div className="flex items-center gap-2">
-                            <TableCellMoney
-                              tone={debt < 0 ? "positive" : "negative"}
-                              className="p-0"
-                            >
-                              {formatMoney(Math.abs(debt))}
-                            </TableCellMoney>
-                            {debt < 0 && (
-                              <Badge
-                                variant="secondary"
-                                className="text-emerald-600 dark:text-emerald-400"
+                          <div className="flex min-w-[10.5rem] flex-col gap-0.5 text-xs">
+                            <div className="flex items-baseline justify-between gap-2">
+                              <span className="text-muted-foreground">{t("clients.totalAmount")}</span>
+                              <span className="font-medium tabular-nums">{formatAmount(client.total_amount)}</span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-2">
+                              <span className="text-muted-foreground">{t("clients.received")}</span>
+                              <span className="font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
+                                {formatAmount(client.total_paid)}
+                              </span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-2">
+                              <span className="text-muted-foreground">
+                                {debt < 0 ? t("clients.overpaid") : t("clients.debtShort")}
+                              </span>
+                              <span
+                                className={cn(
+                                  "font-medium tabular-nums",
+                                  debt < 0
+                                    ? "text-emerald-600 dark:text-emerald-400"
+                                    : debt > 0
+                                      ? "text-red-600 dark:text-red-400"
+                                      : "text-foreground",
+                                )}
                               >
-                                {t("clients.overpaid")}
-                              </Badge>
-                            )}
+                                {debt === 0 ? "—" : formatAmount(Math.abs(debt))}
+                              </span>
+                            </div>
                           </div>
                         );
                       })()}

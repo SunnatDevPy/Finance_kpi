@@ -29,7 +29,9 @@ from app.services.debt_queries import (
 )
 from app.services.helpers import (
     client_cancelled_amount,
+    client_total_amount,
     client_total_debt,
+    client_total_paid,
     contract_to_read,
     get_client_or_404,
 )
@@ -102,15 +104,19 @@ def list_clients(
         .order_by(Client.company_name)
     )
     clients = list(db.scalars(stmt.offset(skip).limit(limit)).all())
-    items = [
-        ClientRead(
-            **ClientRead.model_validate(client).model_dump(exclude={"total_debt"}),
-            total_debt=client_total_debt(
-                [c for c in client.contracts if c.deleted_at is None]
-            ),
+    items = []
+    for client in clients:
+        active_contracts = [c for c in client.contracts if c.deleted_at is None]
+        items.append(
+            ClientRead(
+                **ClientRead.model_validate(client).model_dump(
+                    exclude={"total_amount", "total_paid", "total_debt"}
+                ),
+                total_amount=client_total_amount(active_contracts),
+                total_paid=client_total_paid(active_contracts),
+                total_debt=client_total_debt(active_contracts),
+            )
         )
-        for client in clients
-    ]
 
     return Page(items=items, total=total, skip=skip, limit=limit)
 
@@ -215,8 +221,12 @@ def get_client_card(client_id: int, db: Session = Depends(get_db)) -> ClientCard
     active_contracts = [c for c in client.contracts if c.deleted_at is None]
     contracts = [contract_to_read(contract) for contract in active_contracts]
     return ClientCardRead(
-        **ClientRead.model_validate(client).model_dump(exclude={"total_debt"}),
+        **ClientRead.model_validate(client).model_dump(
+            exclude={"total_amount", "total_paid", "total_debt"}
+        ),
         contracts=contracts,
+        total_amount=client_total_amount(active_contracts),
+        total_paid=client_total_paid(active_contracts),
         total_debt=client_total_debt(active_contracts),
         cancelled_amount=client_cancelled_amount(active_contracts),
     )

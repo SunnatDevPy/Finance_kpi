@@ -65,6 +65,8 @@ export interface Client {
   created_at: string;
   updated_at: string;
   total_debt: string;
+  total_amount: string;
+  total_paid: string;
 }
 
 export interface ServiceType {

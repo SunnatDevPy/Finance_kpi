@@ -6,7 +6,7 @@ import { ActiveStatusToggle } from "@/components/ActiveStatusToggle";
 import { MotionButton, motionTap } from "@/components/ui/button";
 import { useI18n } from "@/context/I18nContext";
 import { cn } from "@/lib/utils";
-import { formatMoney, toNumber } from "@/utils/format";
+import { formatAmount, toNumber } from "@/utils/format";
 import type { Client, Contract } from "@/types";
 
 interface ClientCardOverviewProps {
@@ -128,15 +128,15 @@ export function ClientCardOverview({
 
         <OverviewCard title={t("clients.financeSummary")} icon={FileTextIcon} accent="blue">
           <div className="grid grid-cols-2 gap-5">
-            <MetricBlock label={t("clients.contractsTotal")} value={formatMoney(stats.totalAmount)} />
+            <MetricBlock label={t("clients.contractsTotal")} value={formatAmount(stats.totalAmount)} />
             <MetricBlock
               label={t("clients.totalReceived")}
-              value={formatMoney(stats.totalPaid)}
+              value={formatAmount(stats.totalPaid)}
               tone="text-emerald-600 dark:text-emerald-400"
             />
             <MetricBlock
-              label={stats.isOverpaid ? t("clients.overpaid") : t("clients.totalDebt")}
-              value={formatMoney(stats.isOverpaid ? Math.abs(stats.debt) : stats.debt)}
+              label={stats.isOverpaid ? t("clients.overpaid") : t("clients.debtShort")}
+              value={formatAmount(stats.isOverpaid ? Math.abs(stats.debt) : stats.debt)}
               tone={
                 stats.isOverpaid
                   ? "text-emerald-600 dark:text-emerald-400"
@@ -145,7 +145,7 @@ export function ClientCardOverview({
             />
             <MetricBlock
               label={t("clients.cancelledAmount")}
-              value={formatMoney(stats.cancelled)}
+              value={formatAmount(stats.cancelled)}
               tone="text-amber-600 dark:text-amber-400"
             />
             <MetricBlock

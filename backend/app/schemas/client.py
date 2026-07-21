@@ -42,6 +42,8 @@ class ClientRead(ClientBase):
     logo_url: str | None = None
     created_at: datetime
     updated_at: datetime
+    total_amount: Decimal = Decimal("0")
+    total_paid: Decimal = Decimal("0")
     total_debt: Decimal = Decimal("0")
 
 

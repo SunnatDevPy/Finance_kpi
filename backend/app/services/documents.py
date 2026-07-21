@@ -185,8 +185,8 @@ def _build_document(
         _line_items_table(contract, font_regular, font_bold, styles),
         Spacer(1, 8),
         Paragraph(
-            f"To'langan: {_money(contract.paid_amount)} so'm &nbsp;&nbsp;|&nbsp;&nbsp; "
-            f"Qarz: {_money(contract.debt_amount)} so'm",
+            f"To'langan: {_money(contract.paid_amount)} &nbsp;&nbsp;|&nbsp;&nbsp; "
+            f"Qarz: {_money(contract.debt_amount)}",
             styles["small"],
         ),
         Spacer(1, 28),
@@ -252,9 +252,9 @@ def _contract_meta_table(contract: Contract, styles: dict, font_regular: str, fo
         ["Shartnoma raqami", contract.contract_number or str(contract.id)],
         ["Muddat", period],
         ["Holat", status],
-        ["Jami summa", f"{_money(contract.total_amount)} so'm"],
-        ["To'langan", f"{_money(contract.paid_amount)} so'm"],
-        ["Qarz", f"{_money(contract.debt_amount)} so'm"],
+        ["Jami summa", _money(contract.total_amount)],
+        ["To'langan", _money(contract.paid_amount)],
+        ["Qarz", _money(contract.debt_amount)],
     ]
     if contract.invoice_number:
         rows.insert(1, ["ESF raqami", contract.invoice_number])

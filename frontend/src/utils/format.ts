@@ -19,10 +19,14 @@ function capitalizeWord(value: string): string {
 }
 
 export function formatMoney(value: string | number): string {
+  return formatAmount(value);
+}
+
+/** Raqamni formatlaydi, valyuta qo'shimchasiz (jadval ko'rinishlari uchun). */
+export function formatAmount(value: string | number): string {
   const num = typeof value === "string" ? parseFloat(value) : value;
-  const suffix = formatLocale.startsWith("ru") ? " сум" : " so'm";
-  if (!Number.isFinite(num)) return `—${suffix}`;
-  return new Intl.NumberFormat(formatLocale).format(num) + suffix;
+  if (!Number.isFinite(num)) return "—";
+  return new Intl.NumberFormat(formatLocale).format(num);
 }
 
 export function formatCompactMoney(value: string | number): string {
@@ -47,7 +51,7 @@ export function toNumber(value: string | number): number {
 /**
  * Normalizes a possibly-decimal amount (e.g. "1500000.00" from the API)
  * into a clean whole-number digit string (e.g. "1500000") suitable for
- * the space-formatted money inputs, which don't support fractional so'm.
+ * the space-formatted money inputs, which don't support fractional amounts.
  */
 export function toWholeAmountDigits(value: string | number): string {
   const num = typeof value === "string" ? parseFloat(value) : value;

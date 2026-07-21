@@ -140,5 +140,13 @@ def client_total_debt(contracts: list[Contract]) -> Decimal:
     return sum((contract.debt_amount for contract in contracts), Decimal("0"))
 
 
+def client_total_amount(contracts: list[Contract]) -> Decimal:
+    return sum((contract.total_amount for contract in contracts), Decimal("0"))
+
+
+def client_total_paid(contracts: list[Contract]) -> Decimal:
+    return sum((contract.paid_amount for contract in contracts), Decimal("0"))
+
+
 def client_cancelled_amount(contracts: list[Contract]) -> Decimal:
     return contracts_cancelled_amount(contracts)

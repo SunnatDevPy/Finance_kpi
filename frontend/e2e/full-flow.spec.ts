@@ -48,7 +48,7 @@ test.describe("Full business flow", () => {
     // 4. Verify payment appears in history
     await expect(page.getByText("E2E test payment")).toBeVisible({ timeout: 10_000 });
     await expect(
-      page.getByRole("cell", { name: "500,000 so'm", exact: true }),
+      page.getByRole("cell", { name: "500,000", exact: true }),
     ).toBeVisible();
   });
 });

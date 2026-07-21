@@ -17,7 +17,7 @@ import {
 import { useI18n } from "@/context/I18nContext";
 import { useSubmitGuard } from "@/hooks/useSubmitGuard";
 import type { Client, Contract } from "@/types";
-import { formatMoney, toNumber, toWholeAmountDigits } from "@/utils/format";
+import { formatAmount, toNumber, toWholeAmountDigits } from "@/utils/format";
 
 export type QuickPaymentTarget =
   | { kind: "client"; clientId: number }
@@ -204,7 +204,7 @@ export function QuickPaymentModal({ target, onClose, onSuccess }: QuickPaymentMo
                 {(lockContract ? contracts : debtContracts).map((contract) => (
                   <SelectItem key={contract.id} value={String(contract.id)}>
                     {contract.contract_number ? `№${contract.contract_number} — ` : ""}
-                    {formatMoney(contract.debt_amount)} {t("common.debt").toLowerCase()}
+                    {formatAmount(contract.debt_amount)} {t("clients.debtShort").toLowerCase()}
                   </SelectItem>
                 ))}
               </SelectGroup>
