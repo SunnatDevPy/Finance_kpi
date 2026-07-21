@@ -1,6 +1,8 @@
 from datetime import date
 
-from app.models import Contract, ContractWorkflowStatus
+from app.models import Contract, ContractWorkflowStatus, Payment
+
+AUTO_COMPLETION_PAYMENT_NOTE = "Shartnoma yakunlanganda avtomatik tushum"
 
 
 class ContractStatusError(Exception):
@@ -43,7 +45,25 @@ def confirm_contract(contract: Contract) -> None:
     contract.status = ContractWorkflowStatus.DAVOM_ETMOQDA
 
 
-def complete_contract(contract: Contract) -> None:
+def settle_contract_debt_on_completion(
+    contract: Contract,
+    *,
+    paid_at: date | None = None,
+) -> Payment | None:
+    """Qolgan qarzni nolga tushirish uchun avtomatik to'lov yozadi."""
+    debt = contract.debt_amount
+    if debt <= 0:
+        return None
+    payment = Payment(
+        amount=debt,
+        paid_at=paid_at or contract.end_date,
+        note=AUTO_COMPLETION_PAYMENT_NOTE,
+    )
+    contract.payments.append(payment)
+    return payment
+
+
+def complete_contract(contract: Contract) -> Payment | None:
     if contract.is_cancelled:
         raise ContractStatusError("Bekor qilingan shartnomani yakunlab bo'lmaydi")
     if contract.status == ContractWorkflowStatus.TOXTATILDI:
@@ -53,3 +73,4 @@ def complete_contract(contract: Contract) -> None:
     if contract.status != ContractWorkflowStatus.DAVOM_ETMOQDA:
         raise ContractStatusError("Avval shartnomani tasdiqlang")
     contract.status = ContractWorkflowStatus.TUGADI
+    return settle_contract_debt_on_completion(contract)

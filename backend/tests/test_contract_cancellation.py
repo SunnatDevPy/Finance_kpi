@@ -187,7 +187,55 @@ def test_complete_contract_requires_confirm(client, auth_headers, sample_contrac
         headers=auth_headers,
     )
     assert complete.status_code == 200
-    assert complete.json()["status"] == "tugadi"
+    data = complete.json()
+    assert data["status"] == "tugadi"
+    assert float(data["debt_amount"]) == 0.0
+    assert float(data["paid_amount"]) == float(data["total_amount"])
+
+
+def test_complete_contract_settles_partial_debt(client, auth_headers, sample_contract):
+    client.post(f"/api/v1/contracts/{sample_contract.id}/confirm", headers=auth_headers)
+    client.post(
+        "/api/v1/payments",
+        headers=auth_headers,
+        json={
+            "contract_id": sample_contract.id,
+            "amount": "300000.00",
+            "paid_at": "2026-02-01",
+        },
+    )
+
+    complete = client.post(
+        f"/api/v1/contracts/{sample_contract.id}/complete",
+        headers=auth_headers,
+    )
+    assert complete.status_code == 200
+    data = complete.json()
+    assert float(data["debt_amount"]) == 0.0
+    assert float(data["paid_amount"]) == 1_000_000.0
+
+    payments = client.get(
+        "/api/v1/payments",
+        headers=auth_headers,
+        params={"contract_id": sample_contract.id},
+    ).json()
+    auto_payment = next(
+        item for item in payments["items"] if item["note"] == "Shartnoma yakunlanganda avtomatik tushum"
+    )
+    assert float(auto_payment["amount"]) == 700_000.0
+
+
+def test_update_status_to_tugadi_settles_debt(client, auth_headers, sample_contract):
+    response = client.patch(
+        f"/api/v1/contracts/{sample_contract.id}",
+        headers=auth_headers,
+        json={"status": "tugadi"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "tugadi"
+    assert float(data["debt_amount"]) == 0.0
+    assert float(data["paid_amount"]) == float(data["total_amount"])
 
 
 def test_cancelled_amount_in_dashboard(

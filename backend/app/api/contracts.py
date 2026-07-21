@@ -27,6 +27,7 @@ from app.services.contract_status import (
     ContractStatusError,
     complete_contract,
     confirm_contract,
+    settle_contract_debt_on_completion,
     sync_status_after_cancellation,
     sync_status_after_reactivation,
 )
@@ -376,8 +377,15 @@ def update_contract(
         contract.contract_number = payload.contract_number or None
     if payload.invoice_number is not None:
         contract.invoice_number = payload.invoice_number or None
+    previous_status = contract.status
     if payload.status is not None:
         contract.status = payload.status
+
+    if (
+        payload.status == ContractWorkflowStatus.TUGADI
+        and previous_status != ContractWorkflowStatus.TUGADI
+    ):
+        settle_contract_debt_on_completion(contract)
 
     db.commit()
     db.refresh(contract)

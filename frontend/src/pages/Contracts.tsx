@@ -4,8 +4,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangleIcon,
   ArchiveIcon,
+  BanknoteIcon,
   CheckCircle2Icon,
-  CopyIcon,
   DownloadIcon,
   FileTextIcon,
   FileUpIcon,
@@ -22,6 +22,7 @@ import { BulkActionBar } from "../components/BulkActionBar";
 import { DateRangePicker } from "../components/DateRangePicker";
 import { ExportButtons } from "../components/ExportButtons";
 import { Modal } from "../components/Modal";
+import { QuickPaymentModal, type QuickPaymentTarget } from "../components/QuickPaymentModal";
 import { PageError } from "../components/PageError";
 import { Pagination } from "../components/Pagination";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -148,6 +149,7 @@ export function ContractsPage() {
     last: string | null;
     next: string;
   } | null>(null);
+  const [paymentTarget, setPaymentTarget] = useState<QuickPaymentTarget | null>(null);
 
   const [form, setForm] = useState({
     client_id: "",
@@ -339,16 +341,6 @@ export function ContractsPage() {
     setError("");
     try {
       await api.contracts.downloadDocument(contract.id, "contract", contract.contract_number);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t("common.error"));
-    }
-  };
-
-  const handleDuplicate = async (contract: Contract) => {
-    setError("");
-    try {
-      await api.contracts.duplicate(contract.id);
-      load(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("common.error"));
     }
@@ -664,6 +656,18 @@ export function ContractsPage() {
                   )}
                   <TableCellActions>
                     <div className="action-toolbar">
+                    {toNumber(contract.debt_amount) > 0 && (
+                      <MotionButton
+                        variant="ghost"
+                        size="icon-sm"
+                        className="size-8 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
+                        onClick={() => setPaymentTarget({ kind: "contract", contract })}
+                        title={t("clients.payment")}
+                        {...motionTap}
+                      >
+                        <BanknoteIcon className="size-3.5" />
+                      </MotionButton>
+                    )}
                     <MotionButton
                       variant="ghost"
                       size="icon-sm"
@@ -673,16 +677,6 @@ export function ContractsPage() {
                       {...motionTap}
                     >
                       <FileTextIcon className="size-3.5" />
-                    </MotionButton>
-                    <MotionButton
-                      variant="ghost"
-                      size="icon-sm"
-                      className="size-8"
-                      onClick={() => handleDuplicate(contract)}
-                      title={t("contracts.duplicate")}
-                      {...motionTap}
-                    >
-                      <CopyIcon className="size-3.5" />
                     </MotionButton>
                     <MotionButton
                       variant="ghost"
@@ -1123,6 +1117,12 @@ export function ContractsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <QuickPaymentModal
+        target={paymentTarget}
+        onClose={() => setPaymentTarget(null)}
+        onSuccess={() => load(true)}
+      />
     </PageShell>
   );
 }

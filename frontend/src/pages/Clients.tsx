@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangleIcon,
+  BanknoteIcon,
   CheckCircle2Icon,
   DownloadIcon,
   FileTextIcon,
@@ -25,6 +26,7 @@ import { CountryCityFields } from "../components/CountryCityFields";
 import { ExportButtons } from "../components/ExportButtons";
 import { CancelIcon, DeleteIconBtn, LoadingIconBtn, SaveIconBtn } from "../components/ButtonIcons";
 import { Modal } from "../components/Modal";
+import { QuickPaymentModal, type QuickPaymentTarget } from "../components/QuickPaymentModal";
 import { PageError } from "../components/PageError";
 import { Pagination } from "../components/Pagination";
 import {
@@ -141,6 +143,7 @@ export function ClientsPage() {
   const [contractForm, setContractForm] = useState<ContractFormState>(() =>
     emptyContractForm([]),
   );
+  const [paymentTarget, setPaymentTarget] = useState<QuickPaymentTarget | null>(null);
 
   const closeClientModal = () => {
     setModalOpen(false);
@@ -511,7 +514,7 @@ export function ClientsPage() {
                 {isVisible("state") && (
                   <TableHead className="w-[8.75rem]">{t("clients.state")}</TableHead>
                 )}
-                <TableHead className="w-[5.5rem] text-right">{t("common.actions")}</TableHead>
+                <TableHead className="w-[7.5rem] text-right">{t("common.actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -563,8 +566,20 @@ export function ClientsPage() {
                       />
                     </TableCell>
                   )}
-                  <TableCellActions className="w-[5.5rem]">
+                  <TableCellActions className="w-[7.5rem]">
                     <div className="action-toolbar">
+                      {toNumber(client.total_debt) > 0 && (
+                        <MotionButton
+                          variant="ghost"
+                          size="icon-sm"
+                          className="size-8 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
+                          onClick={() => setPaymentTarget({ kind: "client", clientId: client.id })}
+                          title={t("clients.payment")}
+                          {...motionTap}
+                        >
+                          <BanknoteIcon className="size-3.5" />
+                        </MotionButton>
+                      )}
                       <MotionButton
                         variant="ghost"
                         size="icon-sm"
@@ -896,6 +911,12 @@ export function ClientsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <QuickPaymentModal
+        target={paymentTarget}
+        onClose={() => setPaymentTarget(null)}
+        onSuccess={() => load(true)}
+      />
     </PageShell>
   );
 }

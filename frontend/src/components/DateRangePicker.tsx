@@ -45,6 +45,8 @@ export function DateRangePicker({ from, to, onChange, onClear, className, onDark
   const [draftTo, setDraftTo] = useState(to);
   const [hoverDate, setHoverDate] = useState<Date | null>(null);
   const [navMode, setNavMode] = useState<CalendarNavMode>("days");
+  /** Picker ochilganda mavjud muddat — faqat tahrirlash rejimida «eski sana» sifatida */
+  const [editBaseline, setEditBaseline] = useState<{ from: string; to: string } | null>(null);
 
   const getMonthName = (key: MonthKey) => t(`dateRange.months.${key}`);
 
@@ -56,14 +58,35 @@ export function DateRangePicker({ from, to, onChange, onClear, className, onDark
     return formatRangeLabelWithWeekday(from, to, getWeekdayName, " — ");
   }, [from, to, t]);
 
+  const previousRangeLabel = useMemo(() => {
+    if (!editBaseline) return "";
+    return formatRangeLabelWithWeekday(
+      editBaseline.from,
+      editBaseline.to,
+      getWeekdayName,
+      " — ",
+    );
+  }, [editBaseline, t]);
+
   useEffect(() => {
     if (open) {
-      setDraftFrom(from);
-      setDraftTo(to);
+      const editing = formField && Boolean(from && to);
+      setEditBaseline(editing ? { from, to } : null);
+      // Forma muddati tahririda yangi oralik 1-qadamdan; eski sana faqat eslatma
+      if (editing) {
+        setDraftFrom("");
+        setDraftTo("");
+      } else {
+        setDraftFrom(from);
+        setDraftTo(to);
+      }
       setViewMonth(startOfMonth(from ? parseISODate(from) : new Date()));
+      setHoverDate(null);
       setNavMode("days");
+    } else {
+      setEditBaseline(null);
     }
-  }, [open, from, to]);
+  }, [open, from, to, formField]);
 
   useEffect(() => {
     const handleClick = (event: MouseEvent) => {
@@ -114,12 +137,25 @@ export function DateRangePicker({ from, to, onChange, onClear, className, onDark
       ? "done"
       : "end";
 
-  const stepMessage =
-    selectionStep === "start"
+  const isEditingRange = Boolean(editBaseline);
+  const stepMessage = isEditingRange
+    ? selectionStep === "start"
+      ? t("dateRange.editStepStart")
+      : selectionStep === "end"
+        ? t("dateRange.editStepEnd")
+        : t("dateRange.editStepDone")
+    : selectionStep === "start"
       ? t("dateRange.stepStart")
       : selectionStep === "end"
         ? t("dateRange.stepEnd")
         : t("dateRange.stepDone");
+  const stepHint = isEditingRange
+    ? selectionStep === "start"
+      ? t("dateRange.editStepStartHint")
+      : selectionStep === "end"
+        ? t("dateRange.editStepEndHint")
+        : t("dateRange.editStepDoneHint")
+    : null;
 
   const applyRange = (nextFrom: string, nextTo: string) => {
     onChange(nextFrom, nextTo);
@@ -298,7 +334,20 @@ export function DateRangePicker({ from, to, onChange, onClear, className, onDark
                   aria-live="polite"
                 >
                   <p className="font-medium">{stepMessage}</p>
-                  {selectionStep === "end" && draftFrom && (
+                  {stepHint && (
+                    <p className="mt-0.5 text-xs text-muted-foreground">{stepHint}</p>
+                  )}
+                  {isEditingRange && previousRangeLabel && (
+                    <div className="mt-2 rounded-lg border border-border/50 bg-background/60 px-2.5 py-1.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        {t("dateRange.previousRange")}
+                      </p>
+                      <p className="mt-0.5 text-xs font-medium text-foreground">
+                        {previousRangeLabel}
+                      </p>
+                    </div>
+                  )}
+                  {!isEditingRange && selectionStep === "end" && draftFrom && (
                     <p className="mt-1 text-xs text-muted-foreground">
                       {formatRangeLabelWithWeekday(draftFrom, draftFrom, getWeekdayName, " — ")}
                     </p>
