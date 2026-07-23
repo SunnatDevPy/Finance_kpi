@@ -237,12 +237,7 @@ export function DashboardPage() {
     const byServiceSorted = [...stats.charts.revenue_by_service]
       .map((item) => ({ name: item.name, amount: toNumber(item.amount) }))
       .sort((a, b) => b.amount - a.amount);
-    const topServices = byServiceSorted.slice(0, 5);
-    const othersAmount = byServiceSorted.slice(5).reduce((sum, item) => sum + item.amount, 0);
-    const byService =
-      othersAmount > 0
-        ? [...topServices, { name: t("dashboard.charts.others"), amount: othersAmount }]
-        : topServices;
+    const byService = byServiceSorted;
     const byServiceMax = Math.max(1, ...byService.map((item) => item.amount));
 
     const clientStatus = [
