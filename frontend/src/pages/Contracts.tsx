@@ -140,6 +140,10 @@ export function ContractsPage() {
     "wtma.contracts.debtFilter",
     "all",
   );
+  const [serviceTypeFilter, setServiceTypeFilter] = usePersistedState(
+    "wtma.contracts.serviceTypeFilter",
+    "all",
+  );
   const selection = useRowSelection(contracts.map((c) => c.id));
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -174,6 +178,8 @@ export function ContractsPage() {
         dateFrom: exportDateFrom || undefined,
         dateTo: exportDateTo || undefined,
         status: statusFilter === "all" ? undefined : (statusFilter as ContractWorkflowStatus),
+        serviceTypeId:
+          serviceTypeFilter === "all" ? undefined : parseInt(serviceTypeFilter, 10),
         debtFilter: debtFilter === "all" ? undefined : debtFilter,
       }),
       api.clients.list({ limit: 200 }),
@@ -199,7 +205,7 @@ export function ContractsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, exportDateFrom, exportDateTo, statusFilter, debtFilter]);
+  }, [search, exportDateFrom, exportDateTo, statusFilter, serviceTypeFilter, debtFilter]);
 
   useEffect(() => {
     if (searchParams.get("has_debt") === "1") {
@@ -210,7 +216,7 @@ export function ContractsPage() {
   useEffect(() => {
     const timer = window.setTimeout(load, 300);
     return () => window.clearTimeout(timer);
-  }, [page, pageSize, search, exportDateFrom, exportDateTo, statusFilter, debtFilter]);
+  }, [page, pageSize, search, exportDateFrom, exportDateTo, statusFilter, serviceTypeFilter, debtFilter]);
 
   const clientName = (id: number) =>
     clients.find((c) => c.id === id)?.company_name || `#${id}`;
@@ -466,6 +472,25 @@ export function ContractsPage() {
                 {CONTRACT_WORKFLOW_STATUSES.map((s) => (
                   <SelectItem key={s} value={s}>
                     {t(`contractWorkflowStatus.${s}`)}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <Select
+            value={serviceTypeFilter}
+            onValueChange={(v) => v && setServiceTypeFilter(v)}
+            className="w-full sm:w-48"
+          >
+            <SelectTrigger>
+              <SelectValue placeholder={t("contracts.serviceTypeFilter")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="all">{t("contracts.allServiceTypes")}</SelectItem>
+                {serviceTypes.map((st) => (
+                  <SelectItem key={st.id} value={String(st.id)}>
+                    {st.name}
                   </SelectItem>
                 ))}
               </SelectGroup>

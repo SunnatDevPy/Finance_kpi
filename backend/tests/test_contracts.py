@@ -30,6 +30,58 @@ def test_list_contracts(client, auth_headers, sample_contract):
     assert data["items"][0]["id"] == sample_contract.id
 
 
+def test_list_contracts_service_type_filter(
+    client, auth_headers, sample_client, sample_service_type, db_session
+):
+    from decimal import Decimal
+
+    from app.models import Contract, ContractLineItem, ServiceType
+
+    other_service = ServiceType(name="Video", is_active=True)
+    db_session.add(other_service)
+    db_session.commit()
+    db_session.refresh(other_service)
+
+    marketing_contract = Contract(
+        client_id=sample_client.id,
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 12, 31),
+    )
+    marketing_contract.line_items = [
+        ContractLineItem(
+            service_type_id=sample_service_type.id,
+            price=Decimal("1000000.00"),
+        )
+    ]
+    video_contract = Contract(
+        client_id=sample_client.id,
+        start_date=date(2026, 2, 1),
+        end_date=date(2026, 12, 31),
+    )
+    video_contract.line_items = [
+        ContractLineItem(
+            service_type_id=other_service.id,
+            price=Decimal("500000.00"),
+        )
+    ]
+    db_session.add_all([marketing_contract, video_contract])
+    db_session.commit()
+
+    all_response = client.get("/api/v1/contracts", headers=auth_headers)
+    assert all_response.status_code == 200
+    assert all_response.json()["total"] == 2
+
+    filtered = client.get(
+        "/api/v1/contracts",
+        headers=auth_headers,
+        params={"service_type_id": sample_service_type.id},
+    )
+    assert filtered.status_code == 200
+    data = filtered.json()
+    assert data["total"] == 1
+    assert data["items"][0]["id"] == marketing_contract.id
+
+
 def test_next_contract_number_for_new_client(client, auth_headers, sample_client):
     response = client.get(
         "/api/v1/contracts/next-number",
