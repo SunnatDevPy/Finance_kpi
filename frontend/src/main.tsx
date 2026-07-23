@@ -9,7 +9,13 @@ import { initRuntimeRecovery } from "./lib/runtimeRecovery";
 initRuntimeRecovery();
 
 if (import.meta.env.PROD) {
-  registerSW({ immediate: true });
+  const updateSW = registerSW({
+    immediate: true,
+    onNeedRefresh() {
+      // Yangi versiya chiqganda eski JS chunk'lari bilan nomuvofiqlikni oldini olish.
+      void updateSW(true);
+    },
+  });
 }
 
 const rootEl = document.getElementById("root")!;
