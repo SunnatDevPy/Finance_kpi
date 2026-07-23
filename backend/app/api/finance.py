@@ -17,6 +17,7 @@ from app.schemas.finance_import import FinanceImportResult
 from app.services.app_settings import set_yearly_plan
 from app.services.finance import get_finance_ledger, get_finance_turnover, get_finance_turnover_trend
 from app.services.finance_import import build_finance_import_template, import_finance_from_xlsx
+from app.services.finance_period import FinancePeriod
 
 router = APIRouter(prefix="/finance", dependencies=[Depends(get_current_user)])
 
@@ -45,16 +46,17 @@ def finance_ledger(
 @router.get("/turnover", response_model=FinanceTurnoverRead)
 def finance_turnover(
     db: Session = Depends(get_db),
-    year: int = Query(default=date.today().year, ge=2000, le=2100),
+    year: int = Query(default=date.today().year, ge=2000, le=2035),
+    period: FinancePeriod = Query(default="full"),
 ) -> FinanceTurnoverRead:
-    return get_finance_turnover(db, year=year)
+    return get_finance_turnover(db, year=year, period=period)
 
 
 @router.get("/turnover-trend", response_model=FinanceTurnoverTrendRead)
 def finance_turnover_trend(
     db: Session = Depends(get_db),
-    year_from: int = Query(default=2020, ge=2000, le=2100),
-    year_to: int = Query(default=2026, ge=2000, le=2100),
+    year_from: int = Query(default=2020, ge=2000, le=2035),
+    year_to: int = Query(default=2035, ge=2000, le=2035),
 ) -> FinanceTurnoverTrendRead:
     return get_finance_turnover_trend(db, year_from=year_from, year_to=year_to)
 
@@ -66,7 +68,7 @@ def update_finance_turnover_plan(
     _: object = Depends(require_admin),
 ) -> FinanceTurnoverRead:
     set_yearly_plan(db, payload.year, payload.yearly_plan)
-    return get_finance_turnover(db, year=payload.year)
+    return get_finance_turnover(db, year=payload.year, period="full")
 
 
 @router.get("/import-template")

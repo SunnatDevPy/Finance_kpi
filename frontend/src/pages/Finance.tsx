@@ -7,7 +7,6 @@ import {
   CheckCircle2Icon,
   DownloadIcon,
   ExternalLinkIcon,
-  FileTextIcon,
   FileUpIcon,
   PencilIcon,
   PlusIcon,
@@ -15,7 +14,6 @@ import {
   Trash2Icon,
   TrendingUpIcon,
   UploadCloudIcon,
-  WalletIcon,
   XCircleIcon,
 } from "lucide-react";
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
@@ -89,6 +87,7 @@ import type {
   FinanceEntryType,
   FinanceImportResult,
   FinanceLedgerItem,
+  FinancePeriod,
   FinanceTurnover,
   FinanceTurnoverTrend,
   IncomeCategory,
@@ -105,7 +104,17 @@ import {
 import { cn } from "@/lib/utils";
 
 const TURNOVER_YEAR_START = 2020;
-const TURNOVER_CHART_YEAR_END = 2026;
+const TURNOVER_YEAR_END = 2035;
+const TURNOVER_PERIODS: FinancePeriod[] = ["full", "q1", "q2", "q3", "q4"];
+
+const EXPENSE_BAR_COLORS = [
+  "bg-blue-500",
+  "bg-violet-500",
+  "bg-amber-500",
+  "bg-rose-500",
+  "bg-emerald-500",
+  "bg-cyan-500",
+] as const;
 
 function moneyTooltip(value: unknown) {
   return formatMoney(String(value ?? 0));
@@ -163,14 +172,15 @@ export function FinancePage() {
     "wtma.finance.turnoverYear",
     String(new Date().getFullYear()),
   );
+  const [turnoverPeriod, setTurnoverPeriod] = usePersistedState<FinancePeriod>(
+    "wtma.finance.turnoverPeriod",
+    "full",
+  );
   const [entryType, setEntryType] = useState<FinanceEntryType | "all">("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [search, setSearch] = useState("");
   const [total, setTotal] = useState(0);
-  const [totalIncome, setTotalIncome] = useState("0");
-  const [totalExpense, setTotalExpense] = useState("0");
-  const [netBalance, setNetBalance] = useState("0");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [error, setError] = useState("");
@@ -190,71 +200,77 @@ export function FinancePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const yearOptions = useMemo(() => {
-    const end = Math.max(TURNOVER_CHART_YEAR_END, new Date().getFullYear());
     const years: number[] = [];
-    for (let year = end; year >= TURNOVER_YEAR_START; year -= 1) {
+    for (let year = TURNOVER_YEAR_END; year >= TURNOVER_YEAR_START; year -= 1) {
       years.push(year);
     }
     return years;
   }, []);
 
-  const turnoverChartConfig = useMemo(
+  const annualChartConfig = useMemo(
     () =>
       ({
-        total_inflow: {
-          label: t("finance.turnover.totalInflow"),
+        total_revenue: {
+          label: t("finance.turnover.annualRevenue"),
           color: "hsl(160 72% 38%)",
         },
         total_expense: {
           label: t("finance.turnover.totalExpense"),
           color: "hsl(0 72% 51%)",
         },
-        net_balance: {
-          label: t("finance.turnover.netBalance"),
-          color: "hsl(217 91% 60%)",
-        },
       }) satisfies ChartConfig,
     [t],
   );
 
-  const turnoverChartData = useMemo(
+  const annualChartData = useMemo(
     () =>
       (turnoverTrend?.points ?? []).map((point) => ({
         year: String(point.year),
-        total_inflow: toNumber(point.total_inflow),
+        total_revenue: toNumber(point.total_revenue),
         total_expense: toNumber(point.total_expense),
-        net_balance: toNumber(point.net_balance),
       })),
     [turnoverTrend],
   );
 
+  const expenseBreakdown = useMemo(() => {
+    const items = (turnover?.expenses_by_category ?? []).map((item) => ({
+      category: item.category,
+      amount: toNumber(item.total),
+    }));
+    const max = Math.max(1, ...items.map((item) => item.amount));
+    return { items, max };
+  }, [turnover]);
+
   const selectedYear = Number.parseInt(turnoverYear, 10) || new Date().getFullYear();
 
-  const loadTurnover = (year = selectedYear) => {
+  const loadTurnover = (year = selectedYear, period: FinancePeriod = turnoverPeriod) => {
     setTurnoverLoading(true);
     Promise.all([
-      api.finance.turnover(year),
-      api.finance.turnoverTrend(TURNOVER_YEAR_START, TURNOVER_CHART_YEAR_END),
+      api.finance.turnover(year, period),
+      api.finance.turnoverTrend(TURNOVER_YEAR_START, TURNOVER_YEAR_END),
     ])
       .then(([summary, trend]) => {
         setTurnover(summary);
         setTurnoverTrend(trend);
+        setDateFrom(summary.date_from);
+        setDateTo(summary.date_to);
       })
       .catch((e) => setError(e.message))
       .finally(() => setTurnoverLoading(false));
-  };
-
-  const applyYearFilter = (year: number) => {
-    setDateFrom(`${year}-01-01`);
-    setDateTo(`${year}-12-31`);
   };
 
   const handleYearChange = (yearValue: string) => {
     if (!yearValue) return;
     setTurnoverYear(yearValue);
     const year = Number.parseInt(yearValue, 10);
-    applyYearFilter(year);
-    loadTurnover(year);
+    loadTurnover(year, turnoverPeriod);
+  };
+
+  const handlePeriodChange = (periodValue: string) => {
+    if (!periodValue) return;
+    const period = periodValue as FinancePeriod;
+    setTurnoverPeriod(period);
+    loadTurnover(selectedYear, period);
   };
 
   const load = (silent = true) => {
@@ -271,17 +287,13 @@ export function FinancePage() {
       .then((data) => {
         setItems(data.items);
         setTotal(data.total);
-        setTotalIncome(data.total_income);
-        setTotalExpense(data.total_expense);
-        setNetBalance(data.net_balance);
       })
       .catch((e) => setError(e.message))
       .finally(() => finish());
   };
 
   useEffect(() => {
-    applyYearFilter(selectedYear);
-    loadTurnover(selectedYear);
+    loadTurnover(selectedYear, turnoverPeriod);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -429,112 +441,104 @@ export function FinancePage() {
 
       <Card className="content-card">
         <CardHeader className="border-b pb-4">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <CardTitle className="text-base">{t("finance.turnover.annualRevenue")}</CardTitle>
+          <CardDescription className="text-xs">
+            {t("finance.turnover.trendDesc")
+              .replace("{from}", String(TURNOVER_YEAR_START))
+              .replace("{to}", String(TURNOVER_YEAR_END))}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="pt-5">
+          {annualChartData.length === 0 ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">{t("common.noData")}</p>
+          ) : (
+            <ChartContainer config={annualChartConfig} className="h-[300px] w-full">
+              <LineChart data={annualChartData} margin={{ left: 8, right: 8, top: 8, bottom: 0 }}>
+                <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={8} />
+                <YAxis
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  width={72}
+                  tickFormatter={formatCompactMoney}
+                />
+                <ChartTooltip
+                  content={<ChartTooltipContent formatter={(value) => moneyTooltip(value)} />}
+                />
+                <ChartLegend content={<ChartLegendContent />} />
+                <Line
+                  type="monotone"
+                  dataKey="total_revenue"
+                  stroke="var(--color-total_revenue)"
+                  strokeWidth={2}
+                  dot={{ r: 3 }}
+                  activeDot={{ r: 5 }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="total_expense"
+                  stroke="var(--color-total_expense)"
+                  strokeWidth={2}
+                  dot={{ r: 3 }}
+                  activeDot={{ r: 5 }}
+                />
+              </LineChart>
+            </ChartContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="content-card">
+        <CardHeader className="border-b pb-4">
+          <div className="flex flex-col gap-4">
             <div>
               <CardTitle className="text-base">{t("finance.turnover.title")}</CardTitle>
               <CardDescription className="text-xs">{t("finance.turnover.subtitle")}</CardDescription>
             </div>
-            <Select value={turnoverYear} onValueChange={handleYearChange} className="w-full sm:w-36">
-              <SelectTrigger>
-                <SelectValue placeholder={t("finance.turnover.year")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {yearOptions.map((year) => (
-                    <SelectItem key={year} value={String(year)}>
-                      {year}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <Select value={turnoverYear} onValueChange={handleYearChange} className="w-full sm:w-36">
+                <SelectTrigger>
+                  <SelectValue placeholder={t("finance.turnover.year")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {yearOptions.map((year) => (
+                      <SelectItem key={year} value={String(year)}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              <Select value={turnoverPeriod} onValueChange={handlePeriodChange} className="w-full sm:w-52">
+                <SelectTrigger>
+                  <SelectValue placeholder={t("finance.turnover.period")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {TURNOVER_PERIODS.map((period) => (
+                      <SelectItem key={period} value={period}>
+                        {t(`finance.turnover.periods.${period}`)}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="flex flex-col gap-5 pt-5">
-          <div className="rounded-xl border border-border/60 bg-muted/10 p-4">
-            <p className="mb-3 text-sm font-medium text-foreground">
-              {t("finance.turnover.trendTitle")}
-            </p>
-            {turnoverChartData.length === 0 ? (
-              <p className="py-10 text-center text-sm text-muted-foreground">{t("common.noData")}</p>
-            ) : (
-              <ChartContainer config={turnoverChartConfig} className="h-[280px] w-full">
-                <LineChart data={turnoverChartData} margin={{ left: 8, right: 8, top: 8, bottom: 0 }}>
-                  <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                  <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={8} />
-                  <YAxis
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={8}
-                    width={72}
-                    tickFormatter={formatCompactMoney}
-                  />
-                  <ChartTooltip
-                    content={
-                      <ChartTooltipContent formatter={(value) => moneyTooltip(value)} />
-                    }
-                  />
-                  <ChartLegend content={<ChartLegendContent />} />
-                  <Line
-                    type="monotone"
-                    dataKey="total_inflow"
-                    stroke="var(--color-total_inflow)"
-                    strokeWidth={2}
-                    dot={{ r: 3 }}
-                    activeDot={{ r: 5 }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="total_expense"
-                    stroke="var(--color-total_expense)"
-                    strokeWidth={2}
-                    dot={{ r: 3 }}
-                    activeDot={{ r: 5 }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="net_balance"
-                    stroke="var(--color-net_balance)"
-                    strokeWidth={2}
-                    dot={{ r: 3 }}
-                    activeDot={{ r: 5 }}
-                  />
-                </LineChart>
-              </ChartContainer>
-            )}
-            <p className="mt-2 text-xs text-muted-foreground">
-              {t("finance.turnover.trendDesc")
-                .replace("{from}", String(TURNOVER_YEAR_START))
-                .replace("{to}", String(TURNOVER_CHART_YEAR_END))}
-            </p>
-          </div>
-
           <StaggerContainer
             className={cn(
-              "grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3",
+              "grid grid-cols-1 gap-4 sm:grid-cols-3",
               turnoverLoading && "opacity-60",
             )}
           >
             <StaggerItem>
               <StatCard
-                title={t("finance.turnover.clientPayments")}
-                value={formatMoney(turnover?.client_payments ?? "0")}
-                accent="blue"
-                icon={WalletIcon}
-              />
-            </StaggerItem>
-            <StaggerItem>
-              <StatCard
-                title={t("finance.turnover.otherIncome")}
-                value={formatMoney(turnover?.other_income ?? "0")}
-                accent="green"
-                icon={ArrowUpCircleIcon}
-              />
-            </StaggerItem>
-            <StaggerItem>
-              <StatCard
                 title={t("finance.turnover.totalInflow")}
-                value={formatMoney(turnover?.total_inflow ?? "0")}
+                value={formatMoney(turnover?.total_revenue ?? "0")}
                 accent="green"
                 icon={TrendingUpIcon}
               />
@@ -555,44 +559,42 @@ export function FinancePage() {
                 icon={ScaleIcon}
               />
             </StaggerItem>
-            <StaggerItem>
-              <StatCard
-                title={t("finance.turnover.contractsVolume")}
-                value={formatMoney(turnover?.contracts_volume ?? "0")}
-                accent="blue"
-                icon={FileTextIcon}
-              />
-            </StaggerItem>
           </StaggerContainer>
+
+          <div className="rounded-xl border border-border/60 bg-muted/10 p-4">
+            <p className="mb-3 text-sm font-medium text-foreground">
+              {t("finance.turnover.expenseBreakdown")}
+            </p>
+            {expenseBreakdown.items.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">{t("common.noData")}</p>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {expenseBreakdown.items.map((item, index) => (
+                  <div key={item.category} className="flex flex-col gap-1">
+                    <div className="flex items-center justify-between gap-2 text-sm">
+                      <span className="truncate font-medium text-foreground">
+                        {expenseCategoryLabel(t, item.category)}
+                      </span>
+                      <span className="shrink-0 font-semibold tabular-nums text-foreground/90">
+                        {formatCompactMoney(item.amount)}
+                      </span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                      <div
+                        className={cn(
+                          "h-full rounded-full transition-all duration-500",
+                          EXPENSE_BAR_COLORS[index % EXPENSE_BAR_COLORS.length],
+                        )}
+                        style={{ width: `${Math.max(4, (item.amount / expenseBreakdown.max) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
-
-      <StaggerContainer className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StaggerItem>
-          <StatCard
-            title={t("finance.totalIncome")}
-            value={formatMoney(totalIncome)}
-            accent="green"
-            icon={ArrowUpCircleIcon}
-          />
-        </StaggerItem>
-        <StaggerItem>
-          <StatCard
-            title={t("finance.totalExpense")}
-            value={formatMoney(totalExpense)}
-            accent="red"
-            icon={ArrowDownCircleIcon}
-          />
-        </StaggerItem>
-        <StaggerItem>
-          <StatCard
-            title={t("finance.netBalance")}
-            value={formatMoney(netBalance)}
-            accent={Number(netBalance) >= 0 ? "blue" : "amber"}
-            icon={ScaleIcon}
-          />
-        </StaggerItem>
-      </StaggerContainer>
 
       <Card className="content-card">
         <CardHeader className="pb-3">

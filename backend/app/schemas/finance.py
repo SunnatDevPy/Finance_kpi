@@ -29,31 +29,32 @@ class FinanceLedgerPage(BaseModel):
     net_balance: Decimal
 
 
+class FinanceExpenseCategoryAmount(BaseModel):
+    category: str
+    total: Decimal
+
+
 class FinanceTurnoverRead(BaseModel):
     year: int
-    yearly_plan: Decimal
-    client_payments: Decimal
-    other_income: Decimal
-    total_inflow: Decimal
+    period: str
+    date_from: date
+    date_to: date
+    total_revenue: Decimal
     total_expense: Decimal
     net_balance: Decimal
-    contracts_volume: Decimal
-    plan_percent: int | None = None
+    expenses_by_category: list[FinanceExpenseCategoryAmount]
 
 
 class FinanceTurnoverPlanUpdate(BaseModel):
-    year: int = Field(ge=2000, le=2100)
+    year: int = Field(ge=2000, le=2035)
     yearly_plan: Decimal = Field(gt=0, decimal_places=2, max_digits=18)
 
 
 class FinanceTurnoverTrendPoint(BaseModel):
     year: int
-    client_payments: Decimal
-    other_income: Decimal
-    total_inflow: Decimal
+    total_revenue: Decimal
     total_expense: Decimal
     net_balance: Decimal
-    contracts_volume: Decimal
 
 
 class FinanceTurnoverTrendRead(BaseModel):

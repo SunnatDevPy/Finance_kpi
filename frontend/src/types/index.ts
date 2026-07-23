@@ -439,26 +439,29 @@ export interface FinanceImportResult {
   errors: FinanceImportError[];
 }
 
+export type FinancePeriod = "full" | "q1" | "q2" | "q3" | "q4";
+
 export interface FinanceTurnover {
   year: number;
-  yearly_plan: string;
-  client_payments: string;
-  other_income: string;
-  total_inflow: string;
+  period: string;
+  date_from: string;
+  date_to: string;
+  total_revenue: string;
   total_expense: string;
   net_balance: string;
-  contracts_volume: string;
-  plan_percent: number | null;
+  expenses_by_category: FinanceExpenseCategoryAmount[];
+}
+
+export interface FinanceExpenseCategoryAmount {
+  category: string;
+  total: string;
 }
 
 export interface FinanceTurnoverTrendPoint {
   year: number;
-  client_payments: string;
-  other_income: string;
-  total_inflow: string;
+  total_revenue: string;
   total_expense: string;
   net_balance: string;
-  contracts_volume: string;
 }
 
 export interface FinanceTurnoverTrend {

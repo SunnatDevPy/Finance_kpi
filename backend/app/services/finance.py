@@ -4,9 +4,17 @@ from decimal import Decimal
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import Contract, ContractLineItem, Expense, Income, Payment
-from app.schemas.finance import FinanceEntryType, FinanceLedgerItem, FinanceLedgerPage, FinanceTurnoverRead, FinanceTurnoverTrendRead
-from app.services.app_settings import get_yearly_plan
+from app.models import Contract, Expense, Income, Payment
+from app.schemas.finance import (
+    FinanceEntryType,
+    FinanceExpenseCategoryAmount,
+    FinanceLedgerItem,
+    FinanceLedgerPage,
+    FinanceTurnoverRead,
+    FinanceTurnoverTrendRead,
+)
+from app.services.expenses import get_expense_summary
+from app.services.finance_period import FinancePeriod, resolve_finance_period
 
 
 def get_finance_ledger(
@@ -127,67 +135,44 @@ def get_finance_ledger(
     )
 
 
-def get_finance_turnover(db: Session, *, year: int) -> FinanceTurnoverRead:
-    year_start = date(year, 1, 1)
-    year_end = date(year, 12, 31)
+def get_finance_turnover(
+    db: Session,
+    *,
+    year: int,
+    period: FinancePeriod = "full",
+) -> FinanceTurnoverRead:
+    period_start, period_end = resolve_finance_period(year, period)
 
-    client_payments = db.scalar(
+    total_revenue = db.scalar(
         select(func.coalesce(func.sum(Payment.amount), 0))
         .select_from(Payment)
         .join(Contract, Contract.id == Payment.contract_id)
         .where(
-            Payment.paid_at >= year_start,
-            Payment.paid_at <= year_end,
+            Payment.paid_at >= period_start,
+            Payment.paid_at <= period_end,
             Payment.deleted_at.is_(None),
             Contract.deleted_at.is_(None),
         )
     ) or Decimal("0")
 
-    other_income = db.scalar(
-        select(func.coalesce(func.sum(Income.amount), 0)).where(
-            Income.income_date >= year_start,
-            Income.income_date <= year_end,
-            Income.deleted_at.is_(None),
-        )
-    ) or Decimal("0")
-
-    total_expense = db.scalar(
-        select(func.coalesce(func.sum(Expense.amount), 0)).where(
-            Expense.expense_date >= year_start,
-            Expense.expense_date <= year_end,
-            Expense.deleted_at.is_(None),
-        )
-    ) or Decimal("0")
-
-    contracts_volume = db.scalar(
-        select(func.coalesce(func.sum(ContractLineItem.price), 0))
-        .select_from(ContractLineItem)
-        .join(Contract, Contract.id == ContractLineItem.contract_id)
-        .where(
-            ContractLineItem.is_cancelled.is_(False),
-            Contract.deleted_at.is_(None),
-            Contract.start_date >= year_start,
-            Contract.start_date <= year_end,
-        )
-    ) or Decimal("0")
-
-    total_inflow = client_payments + other_income
-    net_balance = total_inflow - total_expense
-    yearly_plan = get_yearly_plan(db, year)
-    plan_percent = (
-        int(round((total_inflow / yearly_plan) * 100)) if yearly_plan > 0 else None
+    expense_summary = get_expense_summary(
+        db, date_from=period_start, date_to=period_end
     )
+    total_expense = expense_summary.total_expenses
+    net_balance = total_revenue - total_expense
 
     return FinanceTurnoverRead(
         year=year,
-        yearly_plan=yearly_plan,
-        client_payments=client_payments,
-        other_income=other_income,
-        total_inflow=total_inflow,
+        period=period,
+        date_from=period_start,
+        date_to=period_end,
+        total_revenue=total_revenue,
         total_expense=total_expense,
         net_balance=net_balance,
-        contracts_volume=contracts_volume,
-        plan_percent=plan_percent,
+        expenses_by_category=[
+            FinanceExpenseCategoryAmount(category=row.category.value, total=row.total)
+            for row in expense_summary.by_category
+        ],
     )
 
 
@@ -204,16 +189,13 @@ def get_finance_turnover_trend(
 
     points = []
     for year in range(year_from, year_to + 1):
-        turnover = get_finance_turnover(db, year=year)
+        turnover = get_finance_turnover(db, year=year, period="full")
         points.append(
             FinanceTurnoverTrendPoint(
                 year=turnover.year,
-                client_payments=turnover.client_payments,
-                other_income=turnover.other_income,
-                total_inflow=turnover.total_inflow,
+                total_revenue=turnover.total_revenue,
                 total_expense=turnover.total_expense,
                 net_balance=turnover.net_balance,
-                contracts_volume=turnover.contracts_volume,
             )
         )
 
