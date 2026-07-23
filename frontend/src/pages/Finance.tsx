@@ -106,6 +106,7 @@ import { cn } from "@/lib/utils";
 
 const TURNOVER_YEAR_START = 2020;
 const TURNOVER_YEAR_END = 2035;
+const TURNOVER_TREND_END_YEAR = new Date().getFullYear();
 const TURNOVER_YEAR_ALL = "all" as const;
 const TURNOVER_PERIODS: FinancePeriod[] = ["full", "q1", "q2", "q3", "q4"];
 
@@ -255,7 +256,7 @@ export function FinancePage() {
     setTurnoverLoading(true);
     Promise.all([
       api.finance.turnover(year, period),
-      api.finance.turnoverTrend(TURNOVER_YEAR_START, TURNOVER_YEAR_END),
+      api.finance.turnoverTrend(TURNOVER_YEAR_START, TURNOVER_TREND_END_YEAR),
     ])
       .then(([summary, trend]) => {
         setTurnover(summary);
@@ -454,7 +455,7 @@ export function FinancePage() {
           <CardDescription className="text-xs">
             {t("finance.turnover.trendDesc")
               .replace("{from}", String(TURNOVER_YEAR_START))
-              .replace("{to}", String(TURNOVER_YEAR_END))}
+              .replace("{to}", String(TURNOVER_TREND_END_YEAR))}
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-5">
