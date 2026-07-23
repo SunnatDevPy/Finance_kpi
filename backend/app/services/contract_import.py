@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Client, ClientStatus, Contract, ContractLineItem, Payment, ServiceType
 from app.schemas.contract_import import ContractImportDuplicate, ContractImportError, ContractImportResult
-from app.services.contract_status import infer_contract_workflow_status
+from app.services.contract_status import infer_contract_workflow_status, sync_status_after_payment
 
 TEMPLATE_HEADERS = [
     "Kompaniya / Компания*",
@@ -19,7 +19,7 @@ TEMPLATE_HEADERS = [
     "Shartnoma № va sana (masalan: №1 dan 23.01.2026)",
     "Summa / Сумма*",
     "To'landi / Поступление",
-    "EHR / izoh",
+    "EHF / izoh",
 ]
 
 EXAMPLE_ROW = [
@@ -28,7 +28,7 @@ EXAMPLE_ROW = [
     "№1 dan 23.01.2026",
     "50 000 000",
     "28 000 000",
-    "17EHR",
+    "17EHF",
 ]
 
 # Har bir ustunni sarlavha matnidan (o'zbek/rus, turli formatlar) avtomatik aniqlash uchun
@@ -36,12 +36,12 @@ EXAMPLE_ROW = [
 # bizning shablondan farq qilsa ham — to'g'ridan-to'g'ri yuklanaveradi.
 _HEADER_ALIASES: dict[str, list[str]] = {
     "company": ["предприяти", "компани", "kompaniya", "korxona", "клиент", "mijoz"],
-    "service": ["услуг", "xizmat", "hizmat"],
-    "contract": ["договор", "shartnoma"],
-    "amount": ["сумма", "summa"],
-    "paid": ["поступлен", "tolandi", "оплат"],
+    "service": ["услуг", "xizmat", "xizmatlar", "hizmat"],
+    "contract": ["договор", "shartnoma", "sana", "дата", "nomer"],
+    "amount": ["сумма", "summa", "jami", "total"],
+    "paid": ["поступлен", "tolandi", "tolang", "tolangan", "оплат", "toʻlangan"],
     "debt": ["долг", "qarz", "debt"],
-    "invoice": ["эсф", "esf", "ehr", "эхр", "ндс", "nds", "elektron hisob"],
+    "invoice": ["эсф", "esf", "ehr", "ehf", "эхр", "эхф", "ндс", "nds", "elektron hisob", "raqami"],
 }
 
 _REQUIRED_FIELD_LABELS: dict[str, str] = {
@@ -64,8 +64,10 @@ _CLOSED_TEXT_MARKERS = (
 
 _DATE_RE = re.compile(r"(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})")
 _NUMBER_TOKEN_RE = re.compile(r"№?\s*([^\s№]+)")
+_NUMBER_FROM_PREFIX_RE = re.compile(r"(?:№|#|Nº|nº)?\s*(\d+)", re.UNICODE)
 _NON_NUMERIC_RE = re.compile(r"[^\d.,-]")
 _HEADER_STRIP_RE = re.compile(r"[^\w\sʻʼ]", re.UNICODE)
+_HEADER_SCAN_LIMIT = 20
 
 
 def build_contract_import_template() -> BytesIO:
@@ -117,6 +119,31 @@ def _detect_columns(header_row: tuple[Any, ...]) -> dict[str, int]:
                 columns[field] = idx
                 break
     return columns
+
+
+def _score_header_row(header_row: tuple[Any, ...]) -> int:
+    columns = _detect_columns(header_row)
+    required = {"company", "service", "amount"}
+    score = len(columns)
+    if required.issubset(columns):
+        score += 10
+    return score
+
+
+def _find_header_row(ws) -> tuple[int, tuple[Any, ...]]:
+    best_row = 1
+    best_score = -1
+    best_data: tuple[Any, ...] = ()
+    for row_idx, row in enumerate(
+        ws.iter_rows(min_row=1, max_row=_HEADER_SCAN_LIMIT, values_only=True),
+        start=1,
+    ):
+        score = _score_header_row(row or ())
+        if score > best_score:
+            best_score = score
+            best_row = row_idx
+            best_data = row or ()
+    return best_row, best_data
 
 
 def _looks_closed(raw: Any) -> bool:
@@ -178,8 +205,20 @@ def _parse_contract_number_and_date(raw: Any, fallback: date) -> tuple[str | Non
 
     for word in ("dan", "от", "from", "-", ":"):
         remainder = remainder.replace(word, " ")
-    number_match = _NUMBER_TOKEN_RE.search(remainder)
-    contract_number = number_match.group(1).strip() if number_match else None
+    remainder = re.sub(r"\s+", " ", remainder).strip()
+
+    contract_number: str | None = None
+    prefix_match = _NUMBER_FROM_PREFIX_RE.search(remainder)
+    if prefix_match:
+        contract_number = prefix_match.group(1)
+    else:
+        number_match = _NUMBER_TOKEN_RE.search(remainder)
+        if number_match:
+            contract_number = number_match.group(1).strip()
+            digit_match = re.search(r"\d+", contract_number)
+            if digit_match:
+                contract_number = digit_match.group(0)
+
     return (contract_number or None), parsed_date
 
 
@@ -191,8 +230,8 @@ def import_contracts_from_xlsx(db: Session, content: bytes) -> ContractImportRes
             created_contracts=0, created_clients=0, created_service_types=0, duplicates=[], errors=[]
         )
 
-    header_row = next(ws.iter_rows(min_row=1, max_row=1, values_only=True), None)
-    columns = _detect_columns(header_row or ())
+    header_row_index, header_row = _find_header_row(ws)
+    columns = _detect_columns(header_row)
     missing = [label for field, label in _REQUIRED_FIELD_LABELS.items() if field not in columns]
     if missing:
         raise ValueError(
@@ -229,7 +268,10 @@ def import_contracts_from_xlsx(db: Session, content: bytes) -> ContractImportRes
     errors: list[ContractImportError] = []
     new_contracts: list[Contract] = []
 
-    for index, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+    for index, row in enumerate(
+        ws.iter_rows(min_row=header_row_index + 1, values_only=True),
+        start=header_row_index + 1,
+    ):
         if row is None or all(c is None or str(c).strip() == "" for c in row):
             continue
 
@@ -257,6 +299,8 @@ def import_contracts_from_xlsx(db: Session, content: bytes) -> ContractImportRes
         paid_amount = _parse_amount(cell(row, "paid"))
         if paid_amount is None:
             paid_amount = amount if _looks_closed(cell(row, "debt")) else Decimal("0")
+        elif paid_amount >= amount:
+            paid_amount = amount
 
         client_key = company_name.lower()
         client = clients_by_name.get(client_key)
@@ -301,6 +345,7 @@ def import_contracts_from_xlsx(db: Session, content: bytes) -> ContractImportRes
             contract.payments.append(
                 Payment(amount=paid_amount, paid_at=contract_date, note="Excel import orqali")
             )
+        sync_status_after_payment(contract)
 
         db.add(contract)
         new_contracts.append(contract)

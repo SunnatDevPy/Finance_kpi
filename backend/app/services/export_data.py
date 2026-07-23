@@ -216,7 +216,7 @@ CONTRACT_HEADERS = [
     "To'langan",
     "Qarz",
     "Xizmatlar",
-    "EHR",
+    "EHF",
 ]
 PAYMENT_HEADERS = ["Sana", "Kontrakt ID", "Mijoz", "Summa", "Izoh"]
 DEBT_HEADERS = ["Korxona", "Mas'ul", "Telefon", "Qarz"]
@@ -323,7 +323,7 @@ CLIENT_CARD_CONTRACT_HEADERS = [
     "To'langan",
     "Qarz",
     "Xizmatlar",
-    "EHR",
+    "EHF",
 ]
 CLIENT_CARD_PAYMENT_HEADERS = ["Sana", "Shartnoma ID", "Summa", "Izoh"]
 CLIENT_CARD_PROFILE_HEADERS = ["Maydon", "Qiymat"]

@@ -37,6 +37,18 @@ def sync_status_after_reactivation(contract: Contract, *, today: date | None = N
     contract.status = infer_contract_workflow_status(contract, today=today)
 
 
+def sync_status_after_payment(contract: Contract) -> None:
+    """Qarz qolmasa shartnomani avtomatik yakunlangan holatga o'tkazadi."""
+    if contract.is_cancelled:
+        return
+    if contract.status == ContractWorkflowStatus.TOXTATILDI:
+        return
+    if contract.total_amount <= 0:
+        return
+    if contract.debt_amount <= 0:
+        contract.status = ContractWorkflowStatus.TUGADI
+
+
 def confirm_contract(contract: Contract) -> None:
     if contract.is_cancelled:
         raise ContractStatusError("Bekor qilingan shartnomani tasdiqlab bo'lmaydi")

@@ -1,6 +1,9 @@
 from io import BytesIO
+from pathlib import Path
 
 from openpyxl import Workbook
+
+REAL_2019_WORKBOOK = Path(r"c:\Users\user\Downloads\Telegram Desktop\2019.xlsx")
 
 
 def _build_xlsx(rows: list[list]) -> bytes:
@@ -177,6 +180,86 @@ def test_import_contracts_treats_closed_status_text_as_full_payment(client, auth
     contract = next(c for c in contracts if c["contract_number"] == "9")
     assert float(contract["paid_amount"]) == 3_000_000.0
     assert float(contract["debt_amount"]) == 0.0
+
+
+def test_import_contracts_supports_2019_export_layout(client, auth_headers):
+    """WTMA eksporti: 1-qator bo'sh, 2-qatorda B–H ustunlari (Mijoz, Sana, Jami, ...)."""
+    wb = Workbook()
+    ws = wb.active
+    ws.append([None] * 8)
+    ws.append(
+        [
+            None,
+            "Mijoz",
+            "Sana",
+            "Jami",
+            "To'langan",
+            "Qarz",
+            "Xizmatlar",
+            "EHR raqami",
+        ]
+    )
+    ws.append([None, "Surkhon Teks", "№1  17.12.2019", 4_000_000, 4_000_000, None, "Katalog", None])
+    ws.append([None, "Azalium", "№2  27.12.2019", 2_225_000, 2_225_000, None, "Sayt", "EHF-002"])
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    response = _upload(client, auth_headers, buffer.read())
+    assert response.status_code == 200
+    data = response.json()
+    assert data["created_contracts"] == 2
+    assert data["created_clients"] == 2
+    assert data["errors"] == []
+
+    contracts = client.get("/api/v1/contracts", headers=auth_headers, params={"limit": 50}).json()["items"]
+    first = next(c for c in contracts if c["contract_number"] == "1")
+    assert first["start_date"] == "2019-12-17"
+    assert first["status"] == "tugadi"
+    assert float(first["paid_amount"]) == 4_000_000.0
+    second = next(c for c in contracts if c["contract_number"] == "2")
+    assert second["invoice_number"] == "EHF-002"
+    assert second["status"] == "tugadi"
+
+
+def test_import_contracts_parses_sana_with_contract_number_prefix(client, auth_headers):
+    content = _build_xlsx(
+        [
+            ["Mijoz A", "Sayt", "№15  15.08.2026", "1 000 000", "500 000", "", ""],
+            ["Mijoz B", "SMM", "№3 dan 11.01.2026", "2 000 000", "2 000 000", "", ""],
+        ]
+    )
+    response = _upload(client, auth_headers, content)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["created_contracts"] == 2
+
+    contracts = client.get("/api/v1/contracts", headers=auth_headers, params={"limit": 50}).json()["items"]
+    partial = next(c for c in contracts if c["contract_number"] == "15")
+    assert partial["start_date"] == "2026-08-15"
+    assert partial["status"] == "yangi"
+    assert float(partial["debt_amount"]) == 500_000.0
+    paid = next(c for c in contracts if c["contract_number"] == "3")
+    assert paid["start_date"] == "2026-01-11"
+    assert paid["status"] == "tugadi"
+
+
+def test_import_real_2019_workbook_when_available(client, auth_headers):
+    if not REAL_2019_WORKBOOK.is_file():
+        return
+
+    response = _upload(client, auth_headers, REAL_2019_WORKBOOK.read_bytes())
+    assert response.status_code == 200
+    data = response.json()
+    assert data["created_contracts"] == 3
+    assert data["created_clients"] == 3
+    assert data["errors"] == []
+
+    contracts = client.get("/api/v1/contracts", headers=auth_headers, params={"limit": 50}).json()["items"]
+    surkhon = next(c for c in contracts if c["contract_number"] == "1")
+    assert surkhon["start_date"] == "2019-12-17"
+    assert surkhon["status"] == "tugadi"
+    assert float(surkhon["debt_amount"]) == 0.0
 
 
 def test_import_contracts_rejects_unrecognized_headers(client, auth_headers):

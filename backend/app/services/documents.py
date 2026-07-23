@@ -257,7 +257,7 @@ def _contract_meta_table(contract: Contract, styles: dict, font_regular: str, fo
         ["Qarz", _money(contract.debt_amount)],
     ]
     if contract.invoice_number:
-        rows.insert(1, ["EHR raqami", contract.invoice_number])
+        rows.insert(1, ["EHF raqami", contract.invoice_number])
 
     table = Table(rows, colWidths=[45 * mm, 125 * mm])
     table.setStyle(

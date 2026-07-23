@@ -10,6 +10,7 @@ from app.models import AuditAction, Client, Contract, Payment, User
 from app.schemas.pagination import Page
 from app.schemas.payment import PaymentCreate, PaymentListRead, PaymentRead, PaymentsPage
 from app.services.audit import record_audit
+from app.services.contract_status import sync_status_after_payment
 from app.services.helpers import get_contract_or_404, get_payment_or_404
 
 router = APIRouter(prefix="/payments", dependencies=[Depends(get_current_user)])
@@ -124,9 +125,11 @@ def create_payment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Payment:
-    get_contract_or_404(db, payload.contract_id)
+    contract = get_contract_or_404(db, payload.contract_id)
     payment = Payment(**payload.model_dump())
+    contract.payments.append(payment)
     db.add(payment)
+    sync_status_after_payment(contract)
     db.commit()
     db.refresh(payment)
     record_audit(

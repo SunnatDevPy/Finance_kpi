@@ -15,6 +15,25 @@ def test_create_payment(client, auth_headers, sample_contract):
     assert float(data["amount"]) == 500_000.0
 
 
+def test_create_payment_auto_completes_contract_when_fully_paid(client, auth_headers, sample_contract):
+    client.post(f"/api/v1/contracts/{sample_contract.id}/confirm", headers=auth_headers)
+    response = client.post(
+        "/api/v1/payments",
+        headers=auth_headers,
+        json={
+            "contract_id": sample_contract.id,
+            "amount": "1000000.00",
+            "paid_at": "2026-03-15",
+            "note": "Full payment",
+        },
+    )
+    assert response.status_code == 201
+
+    contract = client.get(f"/api/v1/contracts/{sample_contract.id}", headers=auth_headers).json()
+    assert contract["status"] == "tugadi"
+    assert float(contract["debt_amount"]) == 0.0
+
+
 def test_list_payments(client, auth_headers, sample_contract):
     create = client.post(
         "/api/v1/payments",
