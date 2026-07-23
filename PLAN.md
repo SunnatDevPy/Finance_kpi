@@ -358,4 +358,12 @@
 
 ---
 
-*Bu fayl loyihaning yagona, yangilanib turadigan ish rejasi hisoblanadi. Yangi vazifalar shu yerga qo'shiladi, bajarilganda `[x]` bilan belgilanadi.*
+### 43. Yillik Excel shabloni (2019–2026) + avto yakunlash (2026-yil iyul)
+- [x] Import: `Mijoz`, `Sana` (№ + sana), `Jami`, `To'langan`, `Qarz`, `Xizmatlar`, `EHR/EHF raqami` — 1-qator bo'sh, 2-qatorda sarlavhalar (2019.xlsx formati)
+- [x] Sarlavha qatori avtomatik topiladi; mijoz/xizmat yo'q bo'lsa yaratiladi
+- [x] `Jami == To'langan` bo'lsa shartnoma avtomatik **tugadi** (import va to'lov qo'shishda)
+- [x] Yuklab olish shabloni va kontraktlar eksporti shu formatga moslashtirildi
+- [x] Haqiqiy `2019.xlsx` sinovdan o'tkazildi (3 shartnoma, 3 mijoz)
+
+---
+

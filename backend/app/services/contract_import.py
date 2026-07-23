@@ -14,20 +14,24 @@ from app.schemas.contract_import import ContractImportDuplicate, ContractImportE
 from app.services.contract_status import infer_contract_workflow_status, sync_status_after_payment
 
 TEMPLATE_HEADERS = [
-    "Kompaniya / Компания*",
-    "Xizmat / Услуга*",
-    "Shartnoma № va sana (masalan: №1 dan 23.01.2026)",
-    "Summa / Сумма*",
-    "To'landi / Поступление",
-    "EHF / izoh",
+    None,
+    "Mijoz",
+    "Sana",
+    "Jami",
+    "To'langan",
+    "Qarz",
+    "Xizmatlar",
+    "EHF raqami",
 ]
 
 EXAMPLE_ROW = [
+    None,
     "Namuna Korxona MChJ (bu qatorni o'chirib, o'z ma'lumotingizni kiriting)",
-    "SMM",
-    "№1 dan 23.01.2026",
+    "№1  17.12.2019",
     "50 000 000",
     "28 000 000",
+    "",
+    "SMM",
     "17EHF",
 ]
 
@@ -75,15 +79,18 @@ def build_contract_import_template() -> BytesIO:
     ws = wb.active
     ws.title = "Shartnomalar"
 
+    ws.append([None] * len(TEMPLATE_HEADERS))
     ws.append(TEMPLATE_HEADERS)
     header_fill = PatternFill(start_color="1E3A5F", end_color="1E3A5F", fill_type="solid")
-    for cell in ws[1]:
-        cell.font = Font(bold=True, color="FFFFFF")
-        cell.fill = header_fill
+    for cell in ws[2]:
+        if cell.value:
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = header_fill
 
     ws.append(EXAMPLE_ROW)
-    for cell in ws[2]:
-        cell.font = Font(italic=True, color="9CA3AF")
+    for cell in ws[3]:
+        if cell.value:
+            cell.font = Font(italic=True, color="9CA3AF")
 
     for column in ws.columns:
         max_length = max((len(str(cell.value)) for cell in column if cell.value), default=10)

@@ -294,7 +294,7 @@ export const uz = {
     contractNumberNext: "Oxirgi shartnoma: {last} → keyingi: {next}",
     invoiceNumber: "EHF raqami",
     importFromExcel: "Excel'dan import",
-    importDesc: "Eski Excel faylingizni to'g'ridan-to'g'ri yuklashingiz mumkin — ustunlar tartibi shablon bilan bir xil bo'lishi shart emas, tizim sarlavhalar nomiga qarab (Kompaniya, Xizmat, Shartnoma, Summa, To'landi, EHF) avtomatik aniqlaydi. Har bir qator alohida shartnoma sifatida qo'shiladi, mijoz mavjud bo'lmasa avtomatik yaratiladi, summasi to'lovga teng bo'lsa — avtomatik \"to'liq to'langan\" deb belgilanadi.",
+    importDesc: "2019–2026 yillik Excel shabloni bilan to'g'ridan-to'g'ri ishlaydi: Mijoz, Sana (№ va sana), Jami, To'langan, Qarz, Xizmatlar, EHR/EHF raqami. Mijoz yo'q bo'lsa yaratiladi. Jami = To'langan bo'lsa shartnoma avtomatik \"Tugadi\" holatiga o'tadi.",
     downloadTemplate: "Shablonni yuklab olish",
     chooseFile: "Faylni tanlang yoki shu yerga tashlang",
     xlsxOnly: "Faqat .xlsx format",

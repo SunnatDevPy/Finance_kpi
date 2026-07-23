@@ -33,6 +33,14 @@ def _money(value: Decimal | float | int) -> str:
     return f"{Decimal(value):,.2f}".replace(",", " ")
 
 
+def _contract_sana_label(contract: Contract) -> str:
+    contract_date = contract.start_date
+    date_text = f"{contract_date.day:02d}.{contract_date.month:02d}.{contract_date.year}"
+    if contract.contract_number:
+        return f"№{contract.contract_number}  {date_text}"
+    return date_text
+
+
 def fetch_clients_rows(db: Session) -> list[list[str]]:
     clients = list(
         db.scalars(
@@ -86,8 +94,7 @@ def fetch_contracts_rows(
         rows.append(
             [
                 contract.client.company_name,
-                contract.contract_number or "",
-                contract.start_date.isoformat(),
+                _contract_sana_label(contract),
                 _money(contract.total_amount),
                 _money(contract.paid_amount),
                 _money(contract.debt_amount),
@@ -210,13 +217,12 @@ def fetch_incomes_rows(
 CLIENT_HEADERS = ["Korxona", "Mas'ul", "Telefon", "Shahar", "Holat"]
 CONTRACT_HEADERS = [
     "Mijoz",
-    "Shartnoma №",
     "Sana",
     "Jami",
     "To'langan",
     "Qarz",
     "Xizmatlar",
-    "EHF",
+    "EHF raqami",
 ]
 PAYMENT_HEADERS = ["Sana", "Kontrakt ID", "Mijoz", "Summa", "Izoh"]
 DEBT_HEADERS = ["Korxona", "Mas'ul", "Telefon", "Qarz"]
