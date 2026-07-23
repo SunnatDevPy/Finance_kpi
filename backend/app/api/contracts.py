@@ -45,6 +45,7 @@ from app.services.helpers import (
     get_service_type_or_404,
     validate_line_items,
 )
+from app.services.purge import purge_contract
 
 router = APIRouter(prefix="/contracts", dependencies=[Depends(get_current_user)])
 
@@ -460,6 +461,19 @@ def restore_contract(
         summary=f"Shartnoma arxivdan tiklandi (#{contract.id})",
     )
     return contract_to_read(get_contract_or_404(db, contract.id))
+
+
+@router.delete(
+    "/{contract_id}/permanent",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_admin)],
+)
+def purge_contract_endpoint(
+    contract_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    purge_contract(db, contract_id, current_user)
 
 
 @router.get("/{contract_id}/history", response_model=AuditLogPage)

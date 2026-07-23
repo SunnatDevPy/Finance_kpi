@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArchiveIcon, RotateCcwIcon } from "lucide-react";
+import { ArchiveIcon, RotateCcwIcon, Trash2Icon } from "lucide-react";
 import { api } from "../api/client";
 import { PageError } from "../components/PageError";
 import { PageHeader, PageShell } from "../components/PageHeader";
@@ -64,6 +64,7 @@ export function TrashPage() {
   const [clientNames, setClientNames] = useState<Record<number, string>>({});
   const [error, setError] = useState("");
   const [restoreTarget, setRestoreTarget] = useState<{ tab: TrashTab; id: number } | null>(null);
+  const [purgeTarget, setPurgeTarget] = useState<{ tab: TrashTab; id: number } | null>(null);
   const { loading, start, finish } = useListLoading();
 
   const loadCounts = () => {
@@ -159,6 +160,59 @@ export function TrashPage() {
       { id: "incomes", label: t("trash.tabIncomes"), count: counts.incomes },
     ],
     [t, counts],
+  );
+
+  const handlePurge = async () => {
+    if (!purgeTarget) return;
+    const { tab: targetTab, id } = purgeTarget;
+    setPurgeTarget(null);
+    try {
+      if (targetTab === "clients") {
+        await api.clients.purge(id);
+        setClients((prev) => prev.filter((item) => item.id !== id));
+      } else if (targetTab === "contracts") {
+        await api.contracts.purge(id);
+        setContracts((prev) => prev.filter((item) => item.id !== id));
+      } else if (targetTab === "payments") {
+        await api.payments.purge(id);
+        setPayments((prev) => prev.filter((item) => item.id !== id));
+      } else if (targetTab === "expenses") {
+        await api.expenses.purge(id);
+        setExpenses((prev) => prev.filter((item) => item.id !== id));
+      } else {
+        await api.incomes.purge(id);
+        setIncomes((prev) => prev.filter((item) => item.id !== id));
+      }
+      setTotal((prev) => Math.max(0, prev - 1));
+      loadCounts();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("common.error"));
+    }
+  };
+
+  const renderRowActions = (targetTab: TrashTab, id: number) => (
+    <TableCellActions className="justify-end gap-2">
+      <MotionButton
+        variant="outline"
+        size="sm"
+        className="rounded-lg"
+        onClick={() => setRestoreTarget({ tab: targetTab, id })}
+        {...motionTap}
+      >
+        <RotateCcwIcon data-icon="inline-start" />
+        {t("trash.restore")}
+      </MotionButton>
+      <MotionButton
+        variant="destructive"
+        size="sm"
+        className="rounded-lg"
+        onClick={() => setPurgeTarget({ tab: targetTab, id })}
+        {...motionTap}
+      >
+        <Trash2Icon data-icon="inline-start" />
+        {t("trash.purge")}
+      </MotionButton>
+    </TableCellActions>
   );
 
   const handleRestore = async () => {
@@ -260,18 +314,7 @@ export function TrashPage() {
                     <TableCellPrimary>{item.company_name}</TableCellPrimary>
                     <TableCellMuted>{item.phone}</TableCellMuted>
                     <TableCellDate>{formatDateWithWeekday(item.updated_at)}</TableCellDate>
-                    <TableCellActions>
-                      <MotionButton
-                        variant="outline"
-                        size="sm"
-                        className="rounded-lg"
-                        onClick={() => setRestoreTarget({ tab: "clients", id: item.id })}
-                        {...motionTap}
-                      >
-                        <RotateCcwIcon data-icon="inline-start" />
-                        {t("trash.restore")}
-                      </MotionButton>
-                    </TableCellActions>
+                    {renderRowActions("clients", item.id)}
                   </MotionTableRow>
                 ))}
               </TableBody>
@@ -305,18 +348,7 @@ export function TrashPage() {
                     </TableCellMuted>
                     <TableCellMoney>{formatMoney(item.total_amount)}</TableCellMoney>
                     <TableCellDate>{formatDateWithWeekday(item.updated_at)}</TableCellDate>
-                    <TableCellActions>
-                      <MotionButton
-                        variant="outline"
-                        size="sm"
-                        className="rounded-lg"
-                        onClick={() => setRestoreTarget({ tab: "contracts", id: item.id })}
-                        {...motionTap}
-                      >
-                        <RotateCcwIcon data-icon="inline-start" />
-                        {t("trash.restore")}
-                      </MotionButton>
-                    </TableCellActions>
+                    {renderRowActions("contracts", item.id)}
                   </MotionTableRow>
                 ))}
               </TableBody>
@@ -344,18 +376,7 @@ export function TrashPage() {
                     <TableCellMuted>#{item.contract_id}</TableCellMuted>
                     <TableCellDate>{formatDateWithWeekday(item.paid_at)}</TableCellDate>
                     <TableCellMoney>{formatMoney(item.amount)}</TableCellMoney>
-                    <TableCellActions>
-                      <MotionButton
-                        variant="outline"
-                        size="sm"
-                        className="rounded-lg"
-                        onClick={() => setRestoreTarget({ tab: "payments", id: item.id })}
-                        {...motionTap}
-                      >
-                        <RotateCcwIcon data-icon="inline-start" />
-                        {t("trash.restore")}
-                      </MotionButton>
-                    </TableCellActions>
+                    {renderRowActions("payments", item.id)}
                   </MotionTableRow>
                 ))}
               </TableBody>
@@ -385,18 +406,7 @@ export function TrashPage() {
                     <TableCellMuted>{expenseCategoryLabel(t, item.category)}</TableCellMuted>
                     <TableCellPrimary>{item.title}</TableCellPrimary>
                     <TableCellMoney tone="negative">{formatMoney(item.amount)}</TableCellMoney>
-                    <TableCellActions>
-                      <MotionButton
-                        variant="outline"
-                        size="sm"
-                        className="rounded-lg"
-                        onClick={() => setRestoreTarget({ tab: "expenses", id: item.id })}
-                        {...motionTap}
-                      >
-                        <RotateCcwIcon data-icon="inline-start" />
-                        {t("trash.restore")}
-                      </MotionButton>
-                    </TableCellActions>
+                    {renderRowActions("expenses", item.id)}
                   </MotionTableRow>
                 ))}
               </TableBody>
@@ -426,18 +436,7 @@ export function TrashPage() {
                     <TableCellMuted>{incomeCategoryLabel(t, item.category)}</TableCellMuted>
                     <TableCellPrimary>{item.title}</TableCellPrimary>
                     <TableCellMoney tone="positive">{formatMoney(item.amount)}</TableCellMoney>
-                    <TableCellActions>
-                      <MotionButton
-                        variant="outline"
-                        size="sm"
-                        className="rounded-lg"
-                        onClick={() => setRestoreTarget({ tab: "incomes", id: item.id })}
-                        {...motionTap}
-                      >
-                        <RotateCcwIcon data-icon="inline-start" />
-                        {t("trash.restore")}
-                      </MotionButton>
-                    </TableCellActions>
+                    {renderRowActions("incomes", item.id)}
                   </MotionTableRow>
                 ))}
               </TableBody>
@@ -463,6 +462,23 @@ export function TrashPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={handleRestore}>{t("trash.restore")}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={purgeTarget !== null} onOpenChange={(open) => !open && setPurgeTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("trash.purge")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("trash.purgeConfirm")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handlePurge}
+            >
+              {t("trash.purge")}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

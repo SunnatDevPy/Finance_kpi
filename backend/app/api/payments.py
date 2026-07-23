@@ -11,6 +11,7 @@ from app.schemas.pagination import Page
 from app.schemas.payment import PaymentCreate, PaymentListRead, PaymentRead, PaymentsPage
 from app.services.audit import record_audit
 from app.services.contract_status import sync_status_after_payment
+from app.services.purge import purge_payment
 from app.services.helpers import get_contract_or_404, get_payment_or_404
 
 router = APIRouter(prefix="/payments", dependencies=[Depends(get_current_user)])
@@ -196,3 +197,16 @@ def restore_payment(
         summary=f"To'lov arxivdan tiklandi: {payment.amount} (shartnoma #{payment.contract_id})",
     )
     return payment
+
+
+@router.delete(
+    "/{payment_id}/permanent",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_admin)],
+)
+def purge_payment_endpoint(
+    payment_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    purge_payment(db, payment_id, current_user)

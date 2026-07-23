@@ -171,3 +171,38 @@ def test_audit_log_records_create_update_delete(client, auth_headers):
     assert "update" in actions
     assert "delete" in actions
     assert data["total"] == 3
+
+
+def test_purge_client_removes_from_trash_permanently(client, auth_headers):
+    created = _create_client(client, auth_headers, name="Purge Me LLC")
+    client_id = created["id"]
+    client.delete(f"/api/v1/clients/{client_id}", headers=auth_headers)
+
+    purge_resp = client.delete(f"/api/v1/clients/{client_id}/permanent", headers=auth_headers)
+    assert purge_resp.status_code == 204
+
+    trash = client.get("/api/v1/clients/trash", headers=auth_headers).json()
+    assert all(item["id"] != client_id for item in trash["items"])
+
+    restore_resp = client.post(f"/api/v1/clients/{client_id}/restore", headers=auth_headers)
+    assert restore_resp.status_code == 404
+
+
+def test_purge_active_client_is_rejected(client, auth_headers, sample_client):
+    response = client.delete(
+        f"/api/v1/clients/{sample_client.id}/permanent",
+        headers=auth_headers,
+    )
+    assert response.status_code == 404
+
+
+def test_purge_contract_removes_from_trash(client, auth_headers, sample_contract):
+    contract_id = sample_contract.id
+    client.delete(f"/api/v1/contracts/{contract_id}", headers=auth_headers)
+
+    purge_resp = client.delete(f"/api/v1/contracts/{contract_id}/permanent", headers=auth_headers)
+    assert purge_resp.status_code == 204
+
+    trash = client.get("/api/v1/contracts/trash", headers=auth_headers).json()
+    assert all(item["id"] != contract_id for item in trash["items"])
+

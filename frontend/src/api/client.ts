@@ -374,6 +374,7 @@ export const api = {
     import: (file: File) => uploadFile<ClientImportResult>("/clients/import", file),
     trash: (params?: TrashParams) => request<Paginated<Client>>(`/clients/trash${trashQueryString(params)}`),
     restore: (id: number) => request<Client>(`/clients/${id}/restore`, { method: "POST" }),
+    purge: (id: number) => request<void>(`/clients/${id}/permanent`, { method: "DELETE" }),
     uploadLogo: (id: number, file: File) => uploadFile<Client>(`/clients/${id}/logo`, file),
     deleteLogo: (id: number) => request<Client>(`/clients/${id}/logo`, { method: "DELETE" }),
     exportCard: (id: number) => download(`/clients/${id}/export`, `mijoz_${id}.xlsx`),
@@ -495,6 +496,7 @@ export const api = {
       request<Contract>(`/contracts/${contractId}/complete`, { method: "POST" }),
     trash: (params?: TrashParams) => request<Paginated<Contract>>(`/contracts/trash${trashQueryString(params)}`),
     restore: (id: number) => request<Contract>(`/contracts/${id}/restore`, { method: "POST" }),
+    purge: (id: number) => request<void>(`/contracts/${id}/permanent`, { method: "DELETE" }),
     downloadDocument: (id: number, type: "invoice" | "act" | "contract", contractNumber?: string | null) => {
       const prefix =
         type === "invoice" ? "schyot-faktura" : type === "act" ? "akt" : "shartnoma";
@@ -537,6 +539,7 @@ export const api = {
     delete: (id: number) => request<void>(`/payments/${id}`, { method: "DELETE" }),
     trash: (params?: TrashParams) => request<Paginated<Payment>>(`/payments/trash${trashQueryString(params)}`),
     restore: (id: number) => request<Payment>(`/payments/${id}/restore`, { method: "POST" }),
+    purge: (id: number) => request<void>(`/payments/${id}/permanent`, { method: "DELETE" }),
   },
 
   expenses: {
@@ -593,6 +596,7 @@ export const api = {
     delete: (id: number) => request<void>(`/expenses/${id}`, { method: "DELETE" }),
     trash: (params?: TrashParams) => request<Paginated<Expense>>(`/expenses/trash${trashQueryString(params)}`),
     restore: (id: number) => request<Expense>(`/expenses/${id}/restore`, { method: "POST" }),
+    purge: (id: number) => request<void>(`/expenses/${id}/permanent`, { method: "DELETE" }),
   },
 
   incomes: {
@@ -649,6 +653,7 @@ export const api = {
     delete: (id: number) => request<void>(`/incomes/${id}`, { method: "DELETE" }),
     trash: (params?: TrashParams) => request<Paginated<Income>>(`/incomes/trash${trashQueryString(params)}`),
     restore: (id: number) => request<Income>(`/incomes/${id}/restore`, { method: "POST" }),
+    purge: (id: number) => request<void>(`/incomes/${id}/permanent`, { method: "DELETE" }),
   },
 
   finance: {

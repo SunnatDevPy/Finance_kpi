@@ -35,6 +35,7 @@ from app.services.helpers import (
     contract_to_read,
     get_client_or_404,
 )
+from app.services.purge import purge_client
 from app.services.uploads import ALLOWED_LOGO_CONTENT_TYPES, MAX_LOGO_BYTES, delete_client_logo, save_client_logo
 
 router = APIRouter(prefix="/clients", dependencies=[Depends(get_current_user)])
@@ -291,6 +292,19 @@ def update_client(
     return client
 
 
+@router.delete(
+    "/{client_id}/permanent",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_admin)],
+)
+def purge_client_endpoint(
+    client_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    purge_client(db, client_id, current_user)
+
+
 @router.post("/{client_id}/logo", response_model=ClientRead)
 async def upload_client_logo(
     client_id: int,
@@ -406,3 +420,16 @@ def restore_client(
         summary=f"Mijoz arxivdan tiklandi: {client.company_name}",
     )
     return client
+
+
+@router.delete(
+    "/{client_id}/permanent",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_admin)],
+)
+def purge_client_endpoint(
+    client_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    purge_client(db, client_id, current_user)

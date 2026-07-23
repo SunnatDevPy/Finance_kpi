@@ -12,6 +12,7 @@ from app.schemas.pagination import Page
 from app.services.audit import diff_fields, record_audit
 from app.services.expenses import get_expense_summary
 from app.services.helpers import get_expense_or_404
+from app.services.purge import purge_expense
 
 router = APIRouter(prefix="/expenses", dependencies=[Depends(get_current_user)])
 
@@ -184,3 +185,16 @@ def restore_expense(
         summary=f"Xarajat arxivdan tiklandi: {expense.title}",
     )
     return expense
+
+
+@router.delete(
+    "/{expense_id}/permanent",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_admin)],
+)
+def purge_expense_endpoint(
+    expense_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    purge_expense(db, expense_id, current_user)

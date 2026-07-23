@@ -723,6 +723,8 @@ export const uz = {
     restore: "Tiklash",
     restoreConfirm: "Ushbu yozuvni arxivdan tiklashni xohlaysizmi?",
     restored: "Muvaffaqiyatli tiklandi",
+    purge: "Butunlay o'chirish",
+    purgeConfirm: "Bu amalni qaytarib bo'lmaydi. Yozuv bazadan butunlay o'chirilsinmi?",
     empty: "Arxiv bo'sh",
     deletedAt: "O'chirilgan sana",
   },
