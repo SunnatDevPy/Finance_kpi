@@ -319,6 +319,22 @@ export const api = {
       const qs = q.toString();
       return request<Paginated<AuditLogEntry>>(`/audit/log${qs ? `?${qs}` : ""}`);
     },
+    clearLog: (params?: {
+      entityType?: AuditEntityType;
+      entityId?: number;
+      userId?: number;
+      dateFrom?: string;
+      dateTo?: string;
+    }) => {
+      const q = new URLSearchParams();
+      if (params?.entityType) q.set("entity_type", params.entityType);
+      if (params?.entityId !== undefined) q.set("entity_id", String(params.entityId));
+      if (params?.userId !== undefined) q.set("user_id", String(params.userId));
+      if (params?.dateFrom) q.set("date_from", params.dateFrom);
+      if (params?.dateTo) q.set("date_to", params.dateTo);
+      const qs = q.toString();
+      return request<{ deleted: number }>(`/audit/log${qs ? `?${qs}` : ""}`, { method: "DELETE" });
+    },
   },
 
   export: {

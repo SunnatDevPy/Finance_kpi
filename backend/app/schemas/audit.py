@@ -43,3 +43,7 @@ class AuditLogPage(BaseModel):
     total: int
     skip: int
     limit: int
+
+
+class AuditLogClearResult(BaseModel):
+    deleted: int

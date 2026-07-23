@@ -1,12 +1,12 @@
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_admin
 from app.database import get_db
-from app.schemas.audit import AuditLogPage, LoginHistoryRead
-from app.services.audit import list_audit_logs
+from app.schemas.audit import AuditLogClearResult, AuditLogPage, LoginHistoryRead
+from app.services.audit import clear_audit_logs, list_audit_logs
 from app.services.login_history import list_login_history
 
 router = APIRouter(prefix="/audit", dependencies=[Depends(require_admin)])
@@ -42,3 +42,23 @@ def get_audit_log(
         limit=limit,
     )
     return AuditLogPage(items=items, total=total, skip=skip, limit=limit)
+
+
+@router.delete("/log", response_model=AuditLogClearResult, status_code=status.HTTP_200_OK)
+def clear_audit_log(
+    db: Session = Depends(get_db),
+    entity_type: str | None = Query(default=None),
+    entity_id: int | None = Query(default=None),
+    user_id: int | None = Query(default=None),
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+) -> AuditLogClearResult:
+    deleted = clear_audit_logs(
+        db,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        user_id=user_id,
+        date_from=date_from,
+        date_to=date_to,
+    )
+    return AuditLogClearResult(deleted=deleted)

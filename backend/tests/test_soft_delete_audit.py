@@ -173,6 +173,50 @@ def test_audit_log_records_create_update_delete(client, auth_headers):
     assert data["total"] == 3
 
 
+def test_purge_client_removes_audit_history(client, auth_headers):
+    created = _create_client(client, auth_headers, name="Audit Purge LLC")
+    client_id = created["id"]
+    client.delete(f"/api/v1/clients/{client_id}", headers=auth_headers)
+
+    log_before = client.get(
+        "/api/v1/audit/log",
+        headers=auth_headers,
+        params={"entity_type": "client", "entity_id": client_id},
+    )
+    assert log_before.json()["total"] >= 1
+
+    purge_resp = client.delete(f"/api/v1/clients/{client_id}/permanent", headers=auth_headers)
+    assert purge_resp.status_code == 204
+
+    log_after = client.get(
+        "/api/v1/audit/log",
+        headers=auth_headers,
+        params={"entity_type": "client", "entity_id": client_id},
+    )
+    assert log_after.json()["total"] == 0
+
+
+def test_clear_audit_log_by_filter(client, auth_headers):
+    created = _create_client(client, auth_headers, name="Audit Clear LLC")
+    client_id = created["id"]
+
+    clear_resp = client.delete(
+        "/api/v1/audit/log",
+        headers=auth_headers,
+        params={"entity_type": "client", "entity_id": client_id},
+    )
+    assert clear_resp.status_code == 200
+    assert clear_resp.json()["deleted"] >= 1
+
+    log_after = client.get(
+        "/api/v1/audit/log",
+        headers=auth_headers,
+        params={"entity_type": "client", "entity_id": client_id},
+    )
+    assert log_after.json()["total"] == 0
+
+    client.delete(f"/api/v1/clients/{client_id}", headers=auth_headers)
+
 def test_purge_client_removes_from_trash_permanently(client, auth_headers):
     created = _create_client(client, auth_headers, name="Purge Me LLC")
     client_id = created["id"]

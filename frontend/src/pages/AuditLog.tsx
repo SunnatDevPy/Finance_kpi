@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { HistoryIcon } from "lucide-react";
+import { HistoryIcon, Trash2Icon } from "lucide-react";
 import { api } from "../api/client";
 import { PageError } from "../components/PageError";
 import { PageHeader, PageShell } from "../components/PageHeader";
@@ -24,7 +24,18 @@ import {
 import { useI18n } from "../context/I18nContext";
 import { useListLoading } from "../hooks/useListLoading";
 import { Badge } from "@/components/ui/badge";
+import { MotionButton, motionTap } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -84,8 +95,10 @@ export function AuditLogPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [total, setTotal] = useState(0);
+  const [clearOpen, setClearOpen] = useState(false);
 
   const parsedEntityId = entityId.trim() && /^\d+$/.test(entityId.trim()) ? Number(entityId.trim()) : undefined;
+  const hasFilters = entityType !== "all" || Boolean(parsedEntityId) || Boolean(dateFrom) || Boolean(dateTo);
 
   const load = (silent = true) => {
     start(silent);
@@ -117,6 +130,24 @@ export function AuditLogPage() {
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entityType, entityId, dateFrom, dateTo, page, pageSize]);
+
+  const handleClearHistory = async () => {
+    setClearOpen(false);
+    try {
+      await api.audit.clearLog({
+        entityType: entityType === "all" ? undefined : entityType,
+        entityId: parsedEntityId,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+      });
+      setEntries([]);
+      setTotal(0);
+      setPage(1);
+      setError("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t("common.error"));
+    }
+  };
 
   return (
     <PageShell>
@@ -177,6 +208,18 @@ export function AuditLogPage() {
             onVisibleChange={setColumnVisible}
             className="sm:ml-auto"
           />
+          <MotionButton
+            type="button"
+            variant="destructive"
+            size="sm"
+            className="rounded-lg"
+            disabled={total === 0}
+            onClick={() => setClearOpen(true)}
+            {...motionTap}
+          >
+            <Trash2Icon data-icon="inline-start" />
+            {t("auditLog.clearHistory")}
+          </MotionButton>
         </div>
         <CardContent className="p-0">
           <PremiumDataTable
@@ -239,6 +282,26 @@ export function AuditLogPage() {
           </PremiumDataTable>
         </CardContent>
       </Card>
+
+      <AlertDialog open={clearOpen} onOpenChange={setClearOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("auditLog.clearHistory")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {hasFilters ? t("auditLog.clearHistoryConfirm") : t("auditLog.clearHistoryConfirmAll")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleClearHistory}
+            >
+              {t("auditLog.clearHistory")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageShell>
   );
 }
