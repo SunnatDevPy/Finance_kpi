@@ -22,7 +22,6 @@ import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
 import { api } from "../api/client";
 import { CancelIcon, DeleteIconBtn, LoadingIconBtn, SaveIconBtn } from "../components/ButtonIcons";
 import { DateRangePicker } from "../components/DateRangePicker";
-import { ExportButtons } from "../components/ExportButtons";
 import { Modal } from "../components/Modal";
 import { PageError } from "../components/PageError";
 import { PageHeader, PageShell } from "../components/PageHeader";
@@ -415,7 +414,6 @@ export function FinancePage() {
     <PageShell>
       <PageHeader title={t("finance.title")} subtitle={t("finance.subtitle")}>
         <div className="flex flex-wrap items-center gap-2">
-          <ExportButtons resource="expenses" dateFrom={dateFrom} dateTo={dateTo} showLabel={false} />
           <MotionButton type="button" variant="outline" onClick={openImportModal} {...motionTap}>
             <FileUpIcon data-icon="inline-start" />
             {t("finance.importFromExcel")}

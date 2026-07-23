@@ -16,6 +16,7 @@ interface ExportButtonsProps {
   resource: ExportResource;
   dateFrom?: string;
   dateTo?: string;
+  ids?: number[];
   showLabel?: boolean;
   /** Dark hero/banner backgrounds — glass-style buttons instead of solid white */
   onDark?: boolean;
@@ -34,6 +35,7 @@ export function ExportButtons({
   resource,
   dateFrom,
   dateTo,
+  ids,
   showLabel = true,
   onDark = false,
 }: ExportButtonsProps) {
@@ -41,14 +43,20 @@ export function ExportButtons({
   const [loading, setLoading] = useState<"xlsx" | "pdf" | null>(null);
   const [error, setError] = useState("");
 
-  const dateParams =
-    dateFrom || dateTo ? { date_from: dateFrom, date_to: dateTo } : undefined;
+  const exportParams = {
+    ...(dateFrom || dateTo ? { date_from: dateFrom, date_to: dateTo } : {}),
+    ...(ids?.length ? { ids } : {}),
+  };
 
   const handleExport = async (format: "xlsx" | "pdf") => {
     setError("");
     setLoading(format);
     try {
-      await api.export.download(resource, format, dateParams);
+      await api.export.download(
+        resource,
+        format,
+        Object.keys(exportParams).length > 0 ? exportParams : undefined,
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : t("export.failed"));
     } finally {

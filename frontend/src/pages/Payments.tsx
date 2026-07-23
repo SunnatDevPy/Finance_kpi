@@ -226,7 +226,12 @@ export function PaymentsPage() {
   return (
     <PageShell>
       <PageHeader title={t("payments.title")} subtitle={t("payments.subtitle")}>
-        <ExportButtons resource="payments" dateFrom={dateFrom} dateTo={dateTo} />
+        <ExportButtons
+          resource="payments"
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          ids={selection.count > 0 ? selection.selectedIds : undefined}
+        />
         <MotionButton onClick={openPayModal} {...motionTap}>
           <PlusIcon data-icon="inline-start" />
           {t("clients.addPayment")}
@@ -265,11 +270,7 @@ export function PaymentsPage() {
             className="sm:ml-auto"
           />
         </div>
-        <BulkActionBar
-          count={selection.count}
-          onClear={selection.clear}
-          onExport={(format) => api.export.download("payments", format, { ids: selection.selectedIds })}
-        >
+        <BulkActionBar count={selection.count} onClear={selection.clear}>
           {isAdmin && (
             <MotionButton
               type="button"

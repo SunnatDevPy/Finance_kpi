@@ -1,34 +1,19 @@
-import { useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { FileSpreadsheetIcon, FileTextIcon, Loader2Icon, XIcon } from "lucide-react";
+import { XIcon } from "lucide-react";
 import { useI18n } from "../context/I18nContext";
 import { Button } from "@/components/ui/button";
 
 interface BulkActionBarProps {
   count: number;
   onClear: () => void;
-  onExport: (format: "xlsx" | "pdf") => Promise<void>;
   children?: ReactNode;
   className?: string;
 }
 
-/** Bir nechta qator tanlanganda tepada chiqadigan ommaviy amallar paneli (masalan bulk eksport). */
-export function BulkActionBar({ count, onClear, onExport, children, className }: BulkActionBarProps) {
+/** Bir nechta qator tanlanganda tepada chiqadigan ommaviy amallar paneli. */
+export function BulkActionBar({ count, onClear, children, className }: BulkActionBarProps) {
   const { t } = useI18n();
-  const [loading, setLoading] = useState<"xlsx" | "pdf" | null>(null);
-  const [error, setError] = useState("");
-
-  const handleExport = async (format: "xlsx" | "pdf") => {
-    setError("");
-    setLoading(format);
-    try {
-      await onExport(format);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t("export.failed"));
-    } finally {
-      setLoading(null);
-    }
-  };
 
   return (
     <AnimatePresence>
@@ -46,45 +31,12 @@ export function BulkActionBar({ count, onClear, onExport, children, className }:
             </span>
             <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
               {children}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={loading !== null}
-                onClick={() => handleExport("xlsx")}
-                aria-busy={loading === "xlsx"}
-              >
-                {loading === "xlsx" ? (
-                  <Loader2Icon className="size-3.5 animate-spin" data-icon="inline-start" />
-                ) : (
-                  <FileSpreadsheetIcon data-icon="inline-start" />
-                )}
-                {t("export.excel")}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={loading !== null}
-                onClick={() => handleExport("pdf")}
-                aria-busy={loading === "pdf"}
-              >
-                {loading === "pdf" ? (
-                  <Loader2Icon className="size-3.5 animate-spin" data-icon="inline-start" />
-                ) : (
-                  <FileTextIcon data-icon="inline-start" />
-                )}
-                {t("export.pdf")}
-              </Button>
               <Button type="button" variant="ghost" size="sm" onClick={onClear}>
                 <XIcon data-icon="inline-start" />
                 {t("common.clearSelection")}
               </Button>
             </div>
           </div>
-          {error && (
-            <p className="mx-4 -mt-1 mb-2 text-xs text-destructive sm:mx-6">{error}</p>
-          )}
         </motion.div>
       )}
     </AnimatePresence>

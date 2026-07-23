@@ -431,6 +431,7 @@ export function ContractsPage() {
           resource="contracts"
           dateFrom={exportDateFrom}
           dateTo={exportDateTo}
+          ids={selection.count > 0 ? selection.selectedIds : undefined}
         />
         <MotionButton variant="outline" onClick={openImportModal} {...motionTap}>
           <FileUpIcon data-icon="inline-start" />
@@ -528,11 +529,7 @@ export function ContractsPage() {
             className="sm:ml-auto"
           />
         </div>
-        <BulkActionBar
-          count={selection.count}
-          onClear={selection.clear}
-          onExport={(format) => api.export.download("contracts", format, { ids: selection.selectedIds })}
-        >
+        <BulkActionBar count={selection.count} onClear={selection.clear}>
           {isAdmin && (
             <MotionButton
               type="button"

@@ -339,7 +339,6 @@ export function DashboardPage() {
           </div>
           <div className="flex w-full flex-col items-stretch gap-4 sm:w-auto sm:min-w-[280px] sm:items-end">
             <div className="toolbar-cluster justify-end">
-              <ExportButtons resource="debts" onDark dateFrom={dateFrom} dateTo={dateTo} />
               <ExportButtons resource="payments" onDark dateFrom={dateFrom} dateTo={dateTo} />
             </div>
             <DateRangePicker
