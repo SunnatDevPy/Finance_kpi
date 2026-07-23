@@ -420,6 +420,7 @@ export const api = {
       dateFrom?: string;
       dateTo?: string;
       status?: ContractWorkflowStatus;
+      serviceTypeId?: number;
       debtFilter?: DebtFilter;
       hasDebt?: boolean;
       skip?: number;
@@ -431,6 +432,7 @@ export const api = {
       if (params?.dateFrom) q.set("date_from", params.dateFrom);
       if (params?.dateTo) q.set("date_to", params.dateTo);
       if (params?.status) q.set("status", params.status);
+      if (params?.serviceTypeId) q.set("service_type_id", String(params.serviceTypeId));
       if (params?.debtFilter) q.set("debt_filter", params.debtFilter);
       if (params?.hasDebt !== undefined) q.set("has_debt", params.hasDebt ? "true" : "false");
       if (params?.skip !== undefined) q.set("skip", String(params.skip));

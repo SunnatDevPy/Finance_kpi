@@ -286,6 +286,8 @@ export const ru: TranslationDict = {
     downloadContract: "Договор (PDF)",
     state: "Статус",
     allStatuses: "Все статусы",
+    serviceTypeFilter: "Тип услуги",
+    allServiceTypes: "Все услуги",
     debtFilter: "Задолженность",
     allDebt: "Все",
     withDebt: "Есть долг",

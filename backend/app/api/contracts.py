@@ -65,6 +65,7 @@ def list_contracts(
     date_from: date | None = Query(default=None),
     date_to: date | None = Query(default=None),
     status: ContractWorkflowStatus | None = Query(default=None),
+    service_type_id: int | None = Query(default=None),
     debt_filter: DebtFilter | None = Query(default=None),
     has_debt: bool | None = Query(default=None),
     skip: int = Query(default=0, ge=0),
@@ -76,6 +77,14 @@ def list_contracts(
         filters.append(Contract.client_id == client_id)
     if status is not None:
         filters.append(Contract.status == status)
+    if service_type_id is not None:
+        filters.append(
+            Contract.id.in_(
+                select(ContractLineItem.contract_id).where(
+                    ContractLineItem.service_type_id == service_type_id
+                )
+            )
+        )
     if debt_filter is not None:
         filters.append(Contract.id.in_(contract_ids_with_debt_filter(debt_filter)))
     elif has_debt is not None:

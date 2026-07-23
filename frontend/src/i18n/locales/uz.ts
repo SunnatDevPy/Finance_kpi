@@ -284,6 +284,8 @@ export const uz = {
     downloadContract: "Shartnoma (PDF)",
     state: "Holat",
     allStatuses: "Barcha holatlar",
+    serviceTypeFilter: "Xizmat turi",
+    allServiceTypes: "Barcha xizmatlar",
     debtFilter: "Qarz",
     allDebt: "Barchasi",
     withDebt: "Qarz bor",
