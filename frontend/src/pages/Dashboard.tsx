@@ -120,6 +120,7 @@ export function DashboardPage() {
   const { t } = useI18n();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [regionStats, setRegionStats] = useState<ClientRegionStatsItem[]>([]);
+  const [regionCountryFilter, setRegionCountryFilter] = useState("all");
   const [regionCityFilter, setRegionCityFilter] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -170,22 +171,33 @@ export function DashboardPage() {
     api.dashboardClientsByRegion()
       .then((items) => {
         setRegionStats(items);
+        setRegionCountryFilter("all");
         setRegionCityFilter("all");
       })
       .catch((e) => setRegionError(e.message));
   }, []);
 
-  const regionCityOptions = useMemo(
-    () => [...new Set(regionStats.map((item) => item.city))].sort((a, b) => a.localeCompare(b, "uz")),
+  const regionCountryOptions = useMemo(
+    () => [...new Set(regionStats.map((item) => item.country).filter(Boolean))].sort((a, b) => a.localeCompare(b, "uz")),
     [regionStats],
   );
 
+  const regionCityOptions = useMemo(() => {
+    const scoped =
+      regionCountryFilter === "all"
+        ? regionStats
+        : regionStats.filter((item) => item.country === regionCountryFilter);
+    return [...new Set(scoped.map((item) => item.city))].sort((a, b) => a.localeCompare(b, "uz"));
+  }, [regionStats, regionCountryFilter]);
+
   const filteredRegionStats = useMemo(
     () =>
-      regionCityFilter === "all"
-        ? regionStats
-        : regionStats.filter((item) => item.city === regionCityFilter),
-    [regionStats, regionCityFilter],
+      regionStats.filter((item) => {
+        if (regionCountryFilter !== "all" && item.country !== regionCountryFilter) return false;
+        if (regionCityFilter !== "all" && item.city !== regionCityFilter) return false;
+        return true;
+      }),
+    [regionStats, regionCountryFilter, regionCityFilter],
   );
 
   useEffect(() => {
@@ -689,26 +701,51 @@ export function DashboardPage() {
                 <CardDescription className="text-xs">{t("dashboard.clientsByRegionDesc")}</CardDescription>
               </div>
             </div>
-            {regionCityOptions.length > 0 && (
-              <Select
-                value={regionCityFilter}
-                onValueChange={(value) => value && setRegionCityFilter(value)}
-                className="w-full sm:w-56"
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={t("clients.city")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value="all">{t("clients.allCities")}</SelectItem>
-                    {regionCityOptions.map((city) => (
-                      <SelectItem key={city} value={city}>
-                        {city}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+            {regionCountryOptions.length > 0 && (
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                <Select
+                  value={regionCountryFilter}
+                  onValueChange={(value) => {
+                    if (!value) return;
+                    setRegionCountryFilter(value);
+                    setRegionCityFilter("all");
+                  }}
+                  className="w-full sm:w-56"
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("clients.country")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="all">{t("clients.allCountries")}</SelectItem>
+                      {regionCountryOptions.map((country) => (
+                        <SelectItem key={country} value={country}>
+                          {country}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={regionCityFilter}
+                  onValueChange={(value) => value && setRegionCityFilter(value)}
+                  className="w-full sm:w-56"
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("dashboard.regionColumn")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="all">{t("clients.allRegions")}</SelectItem>
+                      {regionCityOptions.map((city) => (
+                        <SelectItem key={city} value={city}>
+                          {city}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
             )}
           </div>
         </CardHeader>
@@ -722,14 +759,15 @@ export function DashboardPage() {
             <PremiumDataTable
               empty={filteredRegionStats.length === 0}
               emptyMessage={t("dashboard.noRegionData")}
-              skeletonCols={4}
+              skeletonCols={5}
             >
               <TableHeader>
                 <TableRow>
-                  <TableHead>{t("clients.city")}</TableHead>
+                  <TableHead>{t("dashboard.regionColumn")}</TableHead>
                   <TableHead className="w-[5.5rem] text-right">{t("dashboard.regionClients")}</TableHead>
                   <TableHead className="text-right">{t("dashboard.regionAmount")}</TableHead>
                   <TableHead className="text-right">{t("dashboard.regionReceived")}</TableHead>
+                  <TableHead className="text-right">{t("dashboard.regionDebt")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -747,6 +785,9 @@ export function DashboardPage() {
                     <TableCell className="text-right tabular-nums">{formatAmount(item.total_amount)}</TableCell>
                     <TableCell className="text-right tabular-nums text-emerald-600 dark:text-emerald-400">
                       {formatAmount(item.total_paid)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-red-600 dark:text-red-400">
+                      {formatAmount(item.total_debt)}
                     </TableCell>
                   </MotionTableRow>
                 ))}
