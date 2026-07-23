@@ -54,6 +54,14 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
@@ -112,6 +120,7 @@ export function DashboardPage() {
   const { t } = useI18n();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [regionStats, setRegionStats] = useState<ClientRegionStatsItem[]>([]);
+  const [regionCityFilter, setRegionCityFilter] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [error, setError] = useState("");
@@ -159,9 +168,25 @@ export function DashboardPage() {
   useEffect(() => {
     setRegionError("");
     api.dashboardClientsByRegion()
-      .then(setRegionStats)
+      .then((items) => {
+        setRegionStats(items);
+        setRegionCityFilter("all");
+      })
       .catch((e) => setRegionError(e.message));
   }, []);
+
+  const regionCityOptions = useMemo(
+    () => [...new Set(regionStats.map((item) => item.city))].sort((a, b) => a.localeCompare(b, "uz")),
+    [regionStats],
+  );
+
+  const filteredRegionStats = useMemo(
+    () =>
+      regionCityFilter === "all"
+        ? regionStats
+        : regionStats.filter((item) => item.city === regionCityFilter),
+    [regionStats, regionCityFilter],
+  );
 
   useEffect(() => {
     setLtvLoading(true);
@@ -654,14 +679,37 @@ export function DashboardPage() {
       {/* ── Clients by region ── */}
       <Card className="content-card">
         <CardHeader className="border-b">
-          <div className="flex items-center gap-3">
-            <span className="flex size-8 items-center justify-center rounded-lg bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
-              <MapPinIcon className="size-4" />
-            </span>
-            <div>
-              <CardTitle className="text-base">{t("dashboard.clientsByRegion")}</CardTitle>
-              <CardDescription className="text-xs">{t("dashboard.clientsByRegionDesc")}</CardDescription>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="flex size-8 items-center justify-center rounded-lg bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
+                <MapPinIcon className="size-4" />
+              </span>
+              <div>
+                <CardTitle className="text-base">{t("dashboard.clientsByRegion")}</CardTitle>
+                <CardDescription className="text-xs">{t("dashboard.clientsByRegionDesc")}</CardDescription>
+              </div>
             </div>
+            {regionCityOptions.length > 0 && (
+              <Select
+                value={regionCityFilter}
+                onValueChange={(value) => value && setRegionCityFilter(value)}
+                className="w-full sm:w-56"
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={t("clients.city")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="all">{t("clients.allCities")}</SelectItem>
+                    {regionCityOptions.map((city) => (
+                      <SelectItem key={city} value={city}>
+                        {city}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            )}
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -672,7 +720,7 @@ export function DashboardPage() {
           )}
           {!regionError && (
             <PremiumDataTable
-              empty={regionStats.length === 0}
+              empty={filteredRegionStats.length === 0}
               emptyMessage={t("dashboard.noRegionData")}
               skeletonCols={4}
             >
@@ -685,7 +733,7 @@ export function DashboardPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {regionStats.map((item, index) => (
+                {filteredRegionStats.map((item, index) => (
                   <MotionTableRow key={`${item.country}-${item.city}`} {...rowEnter(index)}>
                     <TableCell>
                       <div className="min-w-0">
