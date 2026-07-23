@@ -439,6 +439,18 @@ export interface FinanceImportResult {
   errors: FinanceImportError[];
 }
 
+export interface FinanceTurnover {
+  year: number;
+  yearly_plan: string;
+  client_payments: string;
+  other_income: string;
+  total_inflow: string;
+  total_expense: string;
+  net_balance: string;
+  contracts_volume: string;
+  plan_percent: number | null;
+}
+
 export interface AuditLogEntry {
   id: number;
   entity_type: string;

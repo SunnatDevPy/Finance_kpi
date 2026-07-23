@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import {
   AlertTriangleIcon,
   ArrowDownCircleIcon,
@@ -7,12 +8,15 @@ import {
   CheckCircle2Icon,
   DownloadIcon,
   ExternalLinkIcon,
+  FileTextIcon,
   FileUpIcon,
   PencilIcon,
   PlusIcon,
   ScaleIcon,
   Trash2Icon,
+  TrendingUpIcon,
   UploadCloudIcon,
+  WalletIcon,
   XCircleIcon,
 } from "lucide-react";
 import { api } from "../api/client";
@@ -63,7 +67,7 @@ import {
   FloatingLabelMoneyInput,
   FloatingLabelTextarea,
 } from "@/components/ui/floating-label-input";
-import { Input } from "@/components/ui/input";
+import { Input, MoneyInput } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -73,10 +77,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { ExpenseCategory, FinanceEntryType, FinanceImportResult, FinanceLedgerItem, IncomeCategory } from "../types";
+import type { ExpenseCategory, FinanceEntryType, FinanceImportResult, FinanceLedgerItem, FinanceTurnover, IncomeCategory } from "../types";
+import { useAuth } from "../context/AuthContext";
+import { usePersistedState } from "../hooks/usePersistedState";
 import { EXPENSE_CATEGORIES, expenseCategoryLabel } from "../utils/expenseCategory";
 import { INCOME_CATEGORIES, incomeCategoryLabel } from "../utils/incomeCategory";
-import { formatDateWithWeekday, formatMoney } from "../utils/format";
+import { formatDateWithWeekday, formatMoney, toWholeAmountDigits } from "../utils/format";
+import { cn } from "@/lib/utils";
+
+const TURNOVER_YEAR_START = 2019;
 
 const FINANCE_OPTIONAL_COLUMNS = [
   { id: "type", labelKey: "finance.typeIncome", defaultVisible: true },
@@ -118,11 +127,21 @@ function typeBadgeClass(type: FinanceEntryType): string {
 
 export function FinancePage() {
   const { t } = useI18n();
+  const { isAdmin } = useAuth();
   const navigate = useNavigate();
   const { isVisible, setColumnVisible, visibleCount, items: columnPickerItems } =
     usePickerColumns("wtma.finance.tableColumns", FINANCE_OPTIONAL_COLUMNS, t);
 
   const [items, setItems] = useState<FinanceLedgerItem[]>([]);
+  const [turnover, setTurnover] = useState<FinanceTurnover | null>(null);
+  const [turnoverLoading, setTurnoverLoading] = useState(true);
+  const [planInput, setPlanInput] = useState("");
+  const [planSaving, setPlanSaving] = useState(false);
+  const [planMessage, setPlanMessage] = useState("");
+  const [turnoverYear, setTurnoverYear] = usePersistedState(
+    "wtma.finance.turnoverYear",
+    String(new Date().getFullYear()),
+  );
   const [entryType, setEntryType] = useState<FinanceEntryType | "all">("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -149,6 +168,62 @@ export function FinancePage() {
   const [importResult, setImportResult] = useState<FinanceImportResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const yearOptions = useMemo(() => {
+    const current = new Date().getFullYear();
+  const years: number[] = [];
+    for (let year = current; year >= TURNOVER_YEAR_START; year -= 1) {
+      years.push(year);
+    }
+    return years;
+  }, []);
+
+  const selectedYear = Number.parseInt(turnoverYear, 10) || new Date().getFullYear();
+
+  const loadTurnover = (year = selectedYear) => {
+    setTurnoverLoading(true);
+    api.finance
+      .turnover(year)
+      .then((data) => {
+        setTurnover(data);
+        setPlanInput(toWholeAmountDigits(data.yearly_plan));
+      })
+      .catch((e) => setError(e.message))
+      .finally(() => setTurnoverLoading(false));
+  };
+
+  const applyYearFilter = (year: number) => {
+    setDateFrom(`${year}-01-01`);
+    setDateTo(`${year}-12-31`);
+  };
+
+  const handleYearChange = (yearValue: string) => {
+    if (!yearValue) return;
+    setTurnoverYear(yearValue);
+    const year = Number.parseInt(yearValue, 10);
+    applyYearFilter(year);
+    loadTurnover(year);
+  };
+
+  const handlePlanSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isAdmin) return;
+    setPlanSaving(true);
+    setPlanMessage("");
+    try {
+      const data = await api.finance.updateTurnoverPlan(
+        selectedYear,
+        Number.parseFloat(planInput),
+      );
+      setTurnover(data);
+      setPlanInput(toWholeAmountDigits(data.yearly_plan));
+      setPlanMessage(t("finance.turnover.planSaved"));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("common.error"));
+    } finally {
+      setPlanSaving(false);
+    }
+  };
+
   const load = (silent = true) => {
     start(silent);
     api.finance
@@ -170,6 +245,12 @@ export function FinancePage() {
       .catch((e) => setError(e.message))
       .finally(() => finish());
   };
+
+  useEffect(() => {
+    applyYearFilter(selectedYear);
+    loadTurnover(selectedYear);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     setPage(1);
@@ -238,6 +319,7 @@ export function FinancePage() {
       }
       setModalOpen(false);
       load(false);
+      loadTurnover(selectedYear);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("common.error"));
     }
@@ -254,6 +336,7 @@ export function FinancePage() {
         await api.expenses.delete(id);
       }
       load(false);
+      loadTurnover(selectedYear);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("common.error"));
     }
@@ -270,6 +353,7 @@ export function FinancePage() {
     setImportModalOpen(false);
     if (importResult && (importResult.created_income > 0 || importResult.created_expense > 0)) {
       load(true);
+      loadTurnover(selectedYear);
     }
   };
 
@@ -315,6 +399,137 @@ export function FinancePage() {
       </PageHeader>
 
       <PageError message={error} />
+
+      <Card className="content-card">
+        <CardHeader className="border-b pb-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <CardTitle className="text-base">{t("finance.turnover.title")}</CardTitle>
+              <CardDescription className="text-xs">{t("finance.turnover.subtitle")}</CardDescription>
+            </div>
+            <Select value={turnoverYear} onValueChange={handleYearChange} className="w-full sm:w-36">
+              <SelectTrigger>
+                <SelectValue placeholder={t("finance.turnover.year")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {yearOptions.map((year) => (
+                    <SelectItem key={year} value={String(year)}>
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-5 pt-5">
+          {isAdmin && (
+            <form
+              onSubmit={handlePlanSave}
+              className="flex flex-col gap-3 rounded-xl border border-border/60 bg-muted/20 p-4 sm:flex-row sm:items-end"
+            >
+              <div className="flex flex-1 flex-col gap-2">
+                <Label htmlFor="yearly_plan">{t("finance.turnover.yearlyPlan")}</Label>
+                <MoneyInput
+                  id="yearly_plan"
+                  required
+                  value={planInput}
+                  onValueChange={setPlanInput}
+                />
+                <p className="text-xs text-muted-foreground">{t("finance.turnover.yearlyPlanHint")}</p>
+              </div>
+              <MotionButton type="submit" disabled={planSaving || turnoverLoading} {...motionTap}>
+                {planSaving ? <LoadingIconBtn /> : <SaveIconBtn />}
+                {planSaving ? t("common.saving") : t("common.save")}
+              </MotionButton>
+            </form>
+          )}
+          {planMessage && (
+            <p className="text-sm text-emerald-600 dark:text-emerald-400">{planMessage}</p>
+          )}
+
+          {turnover && (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <span className="text-muted-foreground">{t("finance.turnover.planProgress")}</span>
+                <span className="font-semibold tabular-nums text-foreground">
+                  {turnover.plan_percent ?? 0}%
+                </span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                <motion.div
+                  className="h-full rounded-full bg-primary"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${Math.min(100, turnover.plan_percent ?? 0)}%` }}
+                  transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {t("finance.turnover.planFact")
+                  .replace("{fact}", formatMoney(turnover.total_inflow))
+                  .replace("{plan}", formatMoney(turnover.yearly_plan))}
+              </p>
+            </div>
+          )}
+
+          <StaggerContainer
+            className={cn(
+              "grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3",
+              turnoverLoading && "opacity-60",
+            )}
+          >
+            <StaggerItem>
+              <StatCard
+                title={t("finance.turnover.clientPayments")}
+                value={formatMoney(turnover?.client_payments ?? "0")}
+                accent="blue"
+                icon={WalletIcon}
+              />
+            </StaggerItem>
+            <StaggerItem>
+              <StatCard
+                title={t("finance.turnover.otherIncome")}
+                value={formatMoney(turnover?.other_income ?? "0")}
+                accent="green"
+                icon={ArrowUpCircleIcon}
+              />
+            </StaggerItem>
+            <StaggerItem>
+              <StatCard
+                title={t("finance.turnover.totalInflow")}
+                value={formatMoney(turnover?.total_inflow ?? "0")}
+                accent="green"
+                icon={TrendingUpIcon}
+              />
+            </StaggerItem>
+            <StaggerItem>
+              <StatCard
+                title={t("finance.turnover.totalExpense")}
+                value={formatMoney(turnover?.total_expense ?? "0")}
+                accent="red"
+                icon={ArrowDownCircleIcon}
+              />
+            </StaggerItem>
+            <StaggerItem>
+              <StatCard
+                title={t("finance.turnover.netBalance")}
+                value={formatMoney(turnover?.net_balance ?? "0")}
+                accent={Number(turnover?.net_balance ?? 0) >= 0 ? "blue" : "amber"}
+                icon={ScaleIcon}
+              />
+            </StaggerItem>
+            <StaggerItem>
+              <StatCard
+                title={t("finance.turnover.contractsVolume")}
+                value={formatMoney(turnover?.contracts_volume ?? "0")}
+                accent="blue"
+                icon={FileTextIcon}
+              />
+            </StaggerItem>
+          </StaggerContainer>
+        </CardContent>
+      </Card>
 
       <StaggerContainer className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StaggerItem>

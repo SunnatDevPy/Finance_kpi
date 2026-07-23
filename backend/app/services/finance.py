@@ -1,11 +1,12 @@
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import Contract, Expense, Income, Payment
-from app.schemas.finance import FinanceEntryType, FinanceLedgerItem, FinanceLedgerPage
+from app.models import Contract, ContractLineItem, Expense, Income, Payment
+from app.schemas.finance import FinanceEntryType, FinanceLedgerItem, FinanceLedgerPage, FinanceTurnoverRead
+from app.services.app_settings import get_yearly_plan
 
 
 def get_finance_ledger(
@@ -123,4 +124,68 @@ def get_finance_ledger(
         total_income=total_income,
         total_expense=total_expense,
         net_balance=net_balance,
+    )
+
+
+def get_finance_turnover(db: Session, *, year: int) -> FinanceTurnoverRead:
+    year_start = date(year, 1, 1)
+    year_end = date(year, 12, 31)
+
+    client_payments = db.scalar(
+        select(func.coalesce(func.sum(Payment.amount), 0))
+        .select_from(Payment)
+        .join(Contract, Contract.id == Payment.contract_id)
+        .where(
+            Payment.paid_at >= year_start,
+            Payment.paid_at <= year_end,
+            Payment.deleted_at.is_(None),
+            Contract.deleted_at.is_(None),
+        )
+    ) or Decimal("0")
+
+    other_income = db.scalar(
+        select(func.coalesce(func.sum(Income.amount), 0)).where(
+            Income.income_date >= year_start,
+            Income.income_date <= year_end,
+            Income.deleted_at.is_(None),
+        )
+    ) or Decimal("0")
+
+    total_expense = db.scalar(
+        select(func.coalesce(func.sum(Expense.amount), 0)).where(
+            Expense.expense_date >= year_start,
+            Expense.expense_date <= year_end,
+            Expense.deleted_at.is_(None),
+        )
+    ) or Decimal("0")
+
+    contracts_volume = db.scalar(
+        select(func.coalesce(func.sum(ContractLineItem.price), 0))
+        .select_from(ContractLineItem)
+        .join(Contract, Contract.id == ContractLineItem.contract_id)
+        .where(
+            ContractLineItem.is_cancelled.is_(False),
+            Contract.deleted_at.is_(None),
+            Contract.start_date >= year_start,
+            Contract.start_date <= year_end,
+        )
+    ) or Decimal("0")
+
+    total_inflow = client_payments + other_income
+    net_balance = total_inflow - total_expense
+    yearly_plan = get_yearly_plan(db, year)
+    plan_percent = (
+        int(round((total_inflow / yearly_plan) * 100)) if yearly_plan > 0 else None
+    )
+
+    return FinanceTurnoverRead(
+        year=year,
+        yearly_plan=yearly_plan,
+        client_payments=client_payments,
+        other_income=other_income,
+        total_inflow=total_inflow,
+        total_expense=total_expense,
+        net_balance=net_balance,
+        contracts_volume=contracts_volume,
+        plan_percent=plan_percent,
     )

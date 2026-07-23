@@ -22,6 +22,7 @@ import type {
   FinanceEntryType,
   FinanceImportResult,
   FinanceLedgerPage,
+  FinanceTurnover,
   Income,
   IncomeCategory,
   IncomeSummary,
@@ -670,6 +671,12 @@ export const api = {
       const qs = q.toString();
       return request<FinanceLedgerPage>(`/finance/ledger${qs ? `?${qs}` : ""}`);
     },
+    turnover: (year: number) => request<FinanceTurnover>(`/finance/turnover?year=${year}`),
+    updateTurnoverPlan: (year: number, yearly_plan: number) =>
+      request<FinanceTurnover>("/finance/turnover-plan", {
+        method: "PATCH",
+        body: JSON.stringify({ year, yearly_plan }),
+      }),
     downloadImportTemplate: () =>
       download("/finance/import-template", "moliya_tarixi_shabloni.xlsx"),
     import: (file: File) => uploadFile<FinanceImportResult>("/finance/import", file),
