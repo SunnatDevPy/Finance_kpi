@@ -4,8 +4,13 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.database import get_db
-from app.schemas.dashboard import ChartPoint, DashboardStats, TopClientLtvItem
-from app.services.dashboard import get_dashboard_stats, get_revenue_trend, get_top_clients_by_ltv
+from app.schemas.dashboard import ChartPoint, ClientRegionStatsItem, DashboardStats, TopClientLtvItem
+from app.services.dashboard import (
+    get_clients_by_region,
+    get_dashboard_stats,
+    get_revenue_trend,
+    get_top_clients_by_ltv,
+)
 
 router = APIRouter(prefix="/dashboard", dependencies=[Depends(get_current_user)])
 
@@ -35,3 +40,8 @@ def revenue_trend(
 ) -> list[ChartPoint]:
     """Trailing N months of revenue, always anchored to today (ignores date filters)."""
     return get_revenue_trend(db, months=months)
+
+
+@router.get("/clients-by-region", response_model=list[ClientRegionStatsItem])
+def clients_by_region(db: Session = Depends(get_db)) -> list[ClientRegionStatsItem]:
+    return get_clients_by_region(db)

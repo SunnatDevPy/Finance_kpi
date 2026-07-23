@@ -99,3 +99,13 @@ def test_revenue_trend_validates_months_range(client, auth_headers):
         "/api/v1/dashboard/revenue-trend", headers=auth_headers, params={"months": 0}
     )
     assert response.status_code == 422
+
+
+def test_clients_by_region(client, auth_headers, sample_contract):
+    response = client.get("/api/v1/dashboard/clients-by-region", headers=auth_headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["city"] == "Toshkent"
+    assert data[0]["clients_count"] == 1
+    assert float(data[0]["total_amount"]) == 1_500_000.0

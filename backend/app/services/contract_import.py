@@ -19,7 +19,7 @@ TEMPLATE_HEADERS = [
     "Shartnoma № va sana (masalan: №1 dan 23.01.2026)",
     "Summa / Сумма*",
     "To'landi / Поступление",
-    "ЭСФ / izoh",
+    "EHR / izoh",
 ]
 
 EXAMPLE_ROW = [
@@ -28,7 +28,7 @@ EXAMPLE_ROW = [
     "№1 dan 23.01.2026",
     "50 000 000",
     "28 000 000",
-    "17ЭСФ",
+    "17EHR",
 ]
 
 # Har bir ustunni sarlavha matnidan (o'zbek/rus, turli formatlar) avtomatik aniqlash uchun
@@ -41,7 +41,7 @@ _HEADER_ALIASES: dict[str, list[str]] = {
     "amount": ["сумма", "summa"],
     "paid": ["поступлен", "tolandi", "оплат"],
     "debt": ["долг", "qarz", "debt"],
-    "invoice": ["эсф", "esf", "ндс", "nds"],
+    "invoice": ["эсф", "esf", "ehr", "эхр", "ндс", "nds", "elektron hisob"],
 }
 
 _REQUIRED_FIELD_LABELS: dict[str, str] = {

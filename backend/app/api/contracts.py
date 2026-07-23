@@ -265,15 +265,13 @@ def duplicate_contract(
     current_user: User = Depends(get_current_user),
 ) -> ContractRead:
     source = get_contract_or_404(db, contract_id)
-    duration = source.end_date - source.start_date
-    new_start = date.today()
-    new_end = new_start + duration
+    new_date = date.today()
     next_number = _next_contract_number_for_client(db, source.client_id).next_number
 
     contract = Contract(
         client_id=source.client_id,
-        start_date=new_start,
-        end_date=new_end,
+        start_date=new_date,
+        end_date=new_date,
         notes=source.notes,
         contract_number=next_number,
         status=ContractWorkflowStatus.YANGI,
@@ -340,10 +338,12 @@ def update_contract(
 
     start_date = payload.start_date if payload.start_date is not None else contract.start_date
     end_date = payload.end_date if payload.end_date is not None else contract.end_date
+    if payload.start_date is not None and payload.end_date is None:
+        end_date = payload.start_date
     if end_date < start_date:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Tugash sanasi boshlanish sanasidan oldin bo'lishi mumkin emas",
+            detail="Sana noto'g'ri",
         )
 
     before = {

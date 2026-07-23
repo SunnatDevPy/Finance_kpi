@@ -32,7 +32,7 @@ class ContractLineItemRead(ContractLineItemBase):
 class ContractBase(BaseModel):
     client_id: int
     start_date: date
-    end_date: date
+    end_date: date | None = None
     notes: str | None = None
     contract_number: str | None = Field(default=None, max_length=50)
     invoice_number: str | None = Field(default=None, max_length=100)
@@ -40,8 +40,10 @@ class ContractBase(BaseModel):
 
     @model_validator(mode="after")
     def validate_dates(self) -> "ContractBase":
+        if self.end_date is None:
+            self.end_date = self.start_date
         if self.end_date < self.start_date:
-            raise ValueError("Tugash sanasi boshlanish sanasidan oldin bo'lishi mumkin emas")
+            raise ValueError("Sana noto'g'ri")
         return self
 
 
@@ -60,8 +62,12 @@ class ContractUpdate(BaseModel):
 
     @model_validator(mode="after")
     def validate_dates(self) -> "ContractUpdate":
+        if self.start_date is not None and self.end_date is None:
+            self.end_date = self.start_date
+        if self.end_date is not None and self.start_date is None:
+            self.start_date = self.end_date
         if self.start_date and self.end_date and self.end_date < self.start_date:
-            raise ValueError("Tugash sanasi boshlanish sanasidan oldin bo'lishi mumkin emas")
+            raise ValueError("Sana noto'g'ri")
         return self
 
 

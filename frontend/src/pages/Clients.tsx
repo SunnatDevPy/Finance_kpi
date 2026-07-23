@@ -258,7 +258,7 @@ export function ClientsPage() {
         setClients((prev) => prev.map((c) => (c.id === editing.id ? updated : c)));
       } else {
         if (addContract) {
-          if (!contractForm.start_date || !contractForm.end_date) {
+          if (!contractForm.start_date) {
             setError(t("clients.selectDateError"));
             return;
           }
@@ -275,7 +275,7 @@ export function ClientsPage() {
           await api.contracts.create({
             client_id: created.id,
             start_date: contractForm.start_date,
-            end_date: contractForm.end_date,
+            end_date: contractForm.start_date,
             status: contractForm.status,
             notes: contractForm.notes || undefined,
             contract_number: contractForm.contract_number || nextData.next_number,

@@ -4,15 +4,14 @@ import { FloatingLabelStatusSelect } from "./FloatingLabelStatusSelect";
 import { RemoveIconBtn } from "./ButtonIcons";
 import { DEFAULT_CONTRACT_WORKFLOW_STATUS } from "@/data/contractWorkflow";
 import type { ContractWorkflowStatus } from "@/data/contractWorkflow";
-import { DateRangePicker } from "./DateRangePicker";
 import { MotionButton, motionTap } from "@/components/ui/button";
+import { FloatingLabelDatePicker } from "@/components/ui/date-picker";
 import {
-  floatedLabel,
   FloatingLabelInput,
   FloatingLabelMoneyInput,
   FloatingLabelTextarea,
   labelPeer,
-  restingLabel,
+  floatedLabel,
 } from "@/components/ui/floating-label-input";
 import { cn } from "@/lib/utils";
 import {
@@ -60,6 +59,10 @@ export function emptyContractForm(
   };
 }
 
+export function setContractDate(contractDate: string): Partial<ContractFormState> {
+  return { start_date: contractDate, end_date: contractDate };
+}
+
 export function ContractFormFields({
   form,
   onChange,
@@ -70,28 +73,18 @@ export function ContractFormFields({
   onRemoveLineItem,
 }: ContractFormFieldsProps) {
   const { t } = useI18n();
+  const contractDate = form.start_date || form.end_date;
 
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_11.5rem]">
-        <div className="relative min-w-0 pt-3">
-          <DateRangePicker
-            formField
-            className="w-full"
-            from={form.start_date}
-            to={form.end_date}
-            onChange={(start_date, end_date) => onChange({ start_date, end_date })}
-          />
-          <label
-            className={cn(
-              labelPeer,
-              form.start_date || form.end_date ? floatedLabel : restingLabel,
-            )}
-          >
-            {t("contracts.period")}
-            <span className="text-brand-500"> *</span>
-          </label>
-        </div>
+        <FloatingLabelDatePicker
+          id="contract_date"
+          label={t("contracts.contractDate")}
+          value={contractDate}
+          onChange={(value) => onChange(setContractDate(value))}
+          required
+        />
         <FloatingLabelStatusSelect
           id="contract_workflow_status"
           label={t("contracts.state")}

@@ -2,6 +2,7 @@ import type {
   AppSettings,
   AuditEntityType,
   AuditLogEntry,
+  ClientRegionStatsItem,
   ChartPoint,
   Client,
   ClientCard,
@@ -265,6 +266,9 @@ export const api = {
 
   dashboardRevenueTrend: (months: 6 | 12 = 12) =>
     request<ChartPoint[]>(`/dashboard/revenue-trend?months=${months}`),
+
+  dashboardClientsByRegion: () =>
+    request<ClientRegionStatsItem[]>("/dashboard/clients-by-region"),
 
   debts: {
     list: (search?: string) =>

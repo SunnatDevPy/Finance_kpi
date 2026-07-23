@@ -237,6 +237,15 @@ export interface ContractFormLineItem {
   price: string;
 }
 
+export interface ClientRegionStatsItem {
+  country: string;
+  city: string;
+  clients_count: number;
+  total_amount: string;
+  total_paid: string;
+  total_debt: string;
+}
+
 export interface TopClientLtvItem {
   client_id: number;
   company_name: string;

@@ -301,7 +301,7 @@ export function TrashPage() {
                       {clientNames[item.client_id] ?? `ID ${item.client_id}`}
                     </TableCellPrimary>
                     <TableCellMuted>
-                      {formatDateWithWeekday(item.start_date, "short")} — {formatDateWithWeekday(item.end_date, "short")}
+                      {formatDateWithWeekday(item.start_date, "short")}
                     </TableCellMuted>
                     <TableCellMoney>{formatMoney(item.total_amount)}</TableCellMoney>
                     <TableCellDate>{formatDateWithWeekday(item.updated_at)}</TableCellDate>

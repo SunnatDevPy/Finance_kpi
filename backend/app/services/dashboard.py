@@ -3,7 +3,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 from sqlalchemy import case, extract, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models import (
     Client,
@@ -20,6 +20,7 @@ from app.models import (
 from app.schemas.dashboard import (
     ChartPoint,
     ClientCountStats,
+    ClientRegionStatsItem,
     ContractWorkflowStats,
     DashboardCharts,
     DashboardStats,
@@ -31,6 +32,7 @@ from app.schemas.dashboard import (
 
 from app.services.app_settings import get_monthly_plan
 from app.services.cancelled_stats import sum_cancelled_line_items
+from app.services.helpers import client_total_amount, client_total_paid
 
 MONTH_LABELS = [
     "Yan",
@@ -625,3 +627,52 @@ def get_top_clients_by_ltv(db: Session, limit: int = 10) -> list[TopClientLtvIte
         )
         for row in rows
     ]
+
+
+def get_clients_by_region(db: Session) -> list[ClientRegionStatsItem]:
+    clients = list(
+        db.scalars(
+            select(Client)
+            .options(
+                selectinload(Client.contracts).selectinload(Contract.line_items),
+                selectinload(Client.contracts).selectinload(Contract.payments),
+            )
+            .where(Client.deleted_at.is_(None))
+        ).all()
+    )
+
+    buckets: dict[tuple[str, str], dict[str, Decimal | int]] = {}
+    for client in clients:
+        city = (client.city or "").strip()
+        if not city:
+            continue
+        country = (client.country or "O'zbekiston").strip()
+        key = (country, city)
+        if key not in buckets:
+            buckets[key] = {
+                "clients_count": 0,
+                "total_amount": Decimal("0"),
+                "total_paid": Decimal("0"),
+            }
+        active_contracts = [contract for contract in client.contracts if contract.deleted_at is None]
+        buckets[key]["clients_count"] = int(buckets[key]["clients_count"]) + 1
+        buckets[key]["total_amount"] = Decimal(buckets[key]["total_amount"]) + client_total_amount(
+            active_contracts
+        )
+        buckets[key]["total_paid"] = Decimal(buckets[key]["total_paid"]) + client_total_paid(
+            active_contracts
+        )
+
+    items = [
+        ClientRegionStatsItem(
+            country=country,
+            city=city,
+            clients_count=int(data["clients_count"]),
+            total_amount=Decimal(data["total_amount"]),
+            total_paid=Decimal(data["total_paid"]),
+            total_debt=Decimal(data["total_amount"]) - Decimal(data["total_paid"]),
+        )
+        for (country, city), data in buckets.items()
+    ]
+    items.sort(key=lambda item: (-item.clients_count, item.city))
+    return items

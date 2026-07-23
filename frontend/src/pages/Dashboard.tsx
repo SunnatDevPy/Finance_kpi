@@ -17,7 +17,7 @@ import {
 import {
   AlertTriangleIcon,
   BanknoteIcon,
-  CalendarDaysIcon,
+  MapPinIcon,
   CheckCircle2Icon,
   CrownIcon,
   ScaleIcon,
@@ -40,7 +40,6 @@ import {
   TableBody,
   TableCell,
   TableCellCompany,
-  TableCellDate,
   TableCellMoney,
   TableHead,
   TableHeader,
@@ -53,7 +52,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   ChartContainer,
@@ -61,10 +59,9 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-import type { ChartPoint, DashboardStats, ExpiringContract, TopClientLtvItem } from "../types";
-import { usePreferences } from "../context/PreferencesContext";
+import type { ChartPoint, ClientRegionStatsItem, DashboardStats, TopClientLtvItem } from "../types";
 import { useI18n } from "../context/I18nContext";
-import { formatCompactMoney, formatDateWithWeekday, formatMoney, formatPercent, toNumber } from "../utils/format";
+import { formatAmount, formatCompactMoney, formatMoney, formatPercent, toNumber } from "../utils/format";
 import { cn } from "@/lib/utils";
 import { CONTRACT_WORKFLOW_STATUSES } from "@/data/contractWorkflow";
 
@@ -113,13 +110,12 @@ function RevealCard({ children, className }: { children: ReactNode; className?: 
 
 export function DashboardPage() {
   const { t } = useI18n();
-  const { notifyDays } = usePreferences();
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [expiring, setExpiring] = useState<ExpiringContract[]>([]);
+  const [regionStats, setRegionStats] = useState<ClientRegionStatsItem[]>([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [error, setError] = useState("");
-  const [expiringError, setExpiringError] = useState("");
+  const [regionError, setRegionError] = useState("");
   const [loading, setLoading] = useState(true);
   const [ltvClients, setLtvClients] = useState<TopClientLtvItem[]>([]);
   const [ltvLimit, setLtvLimit] = useState<(typeof LTV_LIMIT_OPTIONS)[number]>(10);
@@ -161,12 +157,11 @@ export function DashboardPage() {
   }, [dateFrom, dateTo]);
 
   useEffect(() => {
-    setExpiringError("");
-    api.notifications
-      .expiringContracts(notifyDays)
-      .then(setExpiring)
-      .catch((e) => setExpiringError(e.message));
-  }, [notifyDays]);
+    setRegionError("");
+    api.dashboardClientsByRegion()
+      .then(setRegionStats)
+      .catch((e) => setRegionError(e.message));
+  }, []);
 
   useEffect(() => {
     setLtvLoading(true);
@@ -656,69 +651,59 @@ export function DashboardPage() {
         </div>
       </section>
 
-      {/* ── Expiring contracts ── */}
+      {/* ── Clients by region ── */}
       <Card className="content-card">
-        <CardHeader className="border-b bg-gradient-to-r from-amber-50 to-white dark:from-amber-950/20 dark:to-card">
+        <CardHeader className="border-b">
           <div className="flex items-center gap-3">
-            <span className="flex size-8 items-center justify-center rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-900/50 dark:text-amber-400">
-              <CalendarDaysIcon className="size-4" />
+            <span className="flex size-8 items-center justify-center rounded-lg bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
+              <MapPinIcon className="size-4" />
             </span>
             <div>
-              <CardTitle className="text-base">{t("dashboard.expiringContracts")}</CardTitle>
-              <CardDescription className="text-xs">
-                {notifyDays} {t("notifications.expiringDesc")}
-              </CardDescription>
+              <CardTitle className="text-base">{t("dashboard.clientsByRegion")}</CardTitle>
+              <CardDescription className="text-xs">{t("dashboard.clientsByRegionDesc")}</CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          {expiringError && (
+          {regionError && (
             <p className="px-6 py-4 text-sm text-red-600 dark:text-red-400">
-              {t("common.error")}: {expiringError}
+              {t("common.error")}: {regionError}
             </p>
           )}
-          {!expiringError && (
-          <PremiumDataTable
-            empty={expiring.length === 0}
-            emptyMessage={t("dashboard.noExpiring")}
-            skeletonCols={5}
-          >
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("dashboard.company")}</TableHead>
-                <TableHead>{t("common.date")}</TableHead>
-                <TableHead>{t("notifications.daysLeft")}</TableHead>
-                <TableHead>{t("common.debt")}</TableHead>
-                <TableHead className="text-right">{t("common.actions")}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {expiring.map((item, index) => (
-                <MotionTableRow key={item.contract_id} {...rowEnter(index)}>
-                  <TableCellCompany to={`/clients/${item.client_id}`} name={item.company_name} />
-                  <TableCellDate>{formatDateWithWeekday(item.end_date)}</TableCellDate>
-                  <TableCell>
-                    <Badge
-                      variant={item.days_left <= 7 ? "destructive" : "secondary"}
-                      className={cn(
-                        item.days_left > 7 &&
-                          item.days_left <= 14 &&
-                          "border-amber-200 bg-amber-100 text-amber-800 dark:border-amber-800/60 dark:bg-amber-900/50 dark:text-amber-300",
-                      )}
-                    >
-                      {item.days_left} {t("notifications.daysLeft")}
-                    </Badge>
-                  </TableCell>
-                  <TableCellMoney tone="negative">
-                    {formatMoney(item.debt_amount)}
-                  </TableCellMoney>
-                  <TableCell className="text-right">
-                    <TableViewLink to={`/clients/${item.client_id}`} />
-                  </TableCell>
-                </MotionTableRow>
-              ))}
-            </TableBody>
-          </PremiumDataTable>
+          {!regionError && (
+            <PremiumDataTable
+              empty={regionStats.length === 0}
+              emptyMessage={t("dashboard.noRegionData")}
+              skeletonCols={4}
+            >
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t("clients.city")}</TableHead>
+                  <TableHead className="w-[5.5rem] text-right">{t("dashboard.regionClients")}</TableHead>
+                  <TableHead className="text-right">{t("dashboard.regionAmount")}</TableHead>
+                  <TableHead className="text-right">{t("dashboard.regionReceived")}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {regionStats.map((item, index) => (
+                  <MotionTableRow key={`${item.country}-${item.city}`} {...rowEnter(index)}>
+                    <TableCell>
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-foreground">{item.city}</p>
+                        {item.country && item.country !== "O'zbekiston" && (
+                          <p className="truncate text-xs text-muted-foreground">{item.country}</p>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums font-medium">{item.clients_count}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatAmount(item.total_amount)}</TableCell>
+                    <TableCell className="text-right tabular-nums text-emerald-600 dark:text-emerald-400">
+                      {formatAmount(item.total_paid)}
+                    </TableCell>
+                  </MotionTableRow>
+                ))}
+              </TableBody>
+            </PremiumDataTable>
           )}
         </CardContent>
       </Card>

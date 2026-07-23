@@ -20,6 +20,8 @@ import { ContractStatusBadge } from "../components/ContractStatusBadge";
 import { CancelIcon, DeleteIconBtn, LoadingIconBtn, RemoveIconBtn, SaveIconBtn } from "../components/ButtonIcons";
 import { BulkActionBar } from "../components/BulkActionBar";
 import { DateRangePicker } from "../components/DateRangePicker";
+import { setContractDate } from "../components/ContractFormFields";
+import { FloatingLabelDatePicker } from "@/components/ui/date-picker";
 import { ExportButtons } from "../components/ExportButtons";
 import { Modal } from "../components/Modal";
 import { QuickPaymentModal, type QuickPaymentTarget } from "../components/QuickPaymentModal";
@@ -55,7 +57,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { MotionButton, motionTap } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FloatingLabelInput, FloatingLabelMoneyInput, FloatingLabelTextarea, floatedLabel, labelPeer, restingLabel } from "@/components/ui/floating-label-input";
+import { FloatingLabelInput, FloatingLabelMoneyInput, FloatingLabelTextarea, floatedLabel, labelPeer } from "@/components/ui/floating-label-input";
 import { FloatingLabelStatusSelect } from "@/components/FloatingLabelStatusSelect";
 import { CONTRACT_WORKFLOW_STATUSES, contractRowTint, DEFAULT_CONTRACT_WORKFLOW_STATUS } from "@/data/contractWorkflow";
 import type { ContractWorkflowStatus } from "@/data/contractWorkflow";
@@ -237,7 +239,7 @@ export function ContractsPage() {
     setForm({
       client_id: String(contract.client_id),
       start_date: contract.start_date,
-      end_date: contract.end_date,
+      end_date: contract.start_date,
       status: contract.status,
       notes: contract.notes || "",
       contract_number: contract.contract_number || "",
@@ -304,13 +306,14 @@ export function ContractsPage() {
       setError(t("contracts.selectClientError"));
       return;
     }
-    if (!form.start_date || !form.end_date) {
+    if (!form.start_date) {
       setError(t("clients.selectDateError"));
       return;
     }
+    const contractDate = form.start_date;
     const payload = {
-      start_date: form.start_date,
-      end_date: form.end_date,
+      start_date: contractDate,
+      end_date: contractDate,
       status: form.status,
       notes: form.notes || undefined,
       contract_number: form.contract_number || undefined,
@@ -585,23 +588,12 @@ export function ContractsPage() {
                           №{contract.contract_number}
                         </span>
                       )}
-                      <div className="flex flex-col gap-0.5 text-xs md:flex-row md:items-center md:gap-1.5">
-                        <span className="whitespace-nowrap font-medium tabular-nums text-foreground/90">
-                          {formatDate(contract.start_date)}
-                          <span className="ml-1 font-normal text-muted-foreground">
-                            {formatWeekday(contract.start_date, "short")}
-                          </span>
+                      <span className="whitespace-nowrap text-xs font-medium tabular-nums text-foreground/90">
+                        {formatDate(contract.start_date)}
+                        <span className="ml-1 font-normal text-muted-foreground">
+                          {formatWeekday(contract.start_date, "short")}
                         </span>
-                        <span className="hidden text-muted-foreground/40 md:inline" aria-hidden>
-                          →
-                        </span>
-                        <span className="whitespace-nowrap font-medium tabular-nums text-foreground/90">
-                          {formatDate(contract.end_date)}
-                          <span className="ml-1 font-normal text-muted-foreground">
-                            {formatWeekday(contract.end_date, "short")}
-                          </span>
-                        </span>
-                      </div>
+                      </span>
                     </div>
                   </TableCellDate>
                   )}
@@ -757,26 +749,13 @@ export function ContractsPage() {
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_11.5rem]">
-              <div className="relative min-w-0 pt-3">
-                <DateRangePicker
-                  formField
-                  className="w-full"
-                  from={form.start_date}
-                  to={form.end_date}
-                  onChange={(start_date, end_date) =>
-                    setForm({ ...form, start_date, end_date })
-                  }
-                />
-                <label
-                  className={cn(
-                    labelPeer,
-                    form.start_date || form.end_date ? floatedLabel : restingLabel,
-                  )}
-                >
-                  {t("contracts.period")}
-                  <span className="text-brand-500"> *</span>
-                </label>
-              </div>
+              <FloatingLabelDatePicker
+                id="contract_date_edit"
+                label={t("contracts.contractDate")}
+                value={form.start_date || form.end_date}
+                onChange={(value) => setForm((prev) => ({ ...prev, ...setContractDate(value) }))}
+                required
+              />
               <FloatingLabelStatusSelect
                 id="contract_workflow_status"
                 label={t("contracts.state")}

@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Building2Icon, HistoryIcon, SettingsIcon, ShieldIcon, UserIcon } from "lucide-react";
+import { Building2Icon, HistoryIcon, ShieldIcon, UserIcon } from "lucide-react";
 import { api } from "../api/client";
 import { KeyIconBtn, LoadingIconBtn, SaveIconBtn } from "../components/ButtonIcons";
 import { PageError } from "../components/PageError";
@@ -20,7 +20,6 @@ import {
 import { StaggerContainer, StaggerItem } from "../components/Stagger";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
-import { usePreferences } from "../context/PreferencesContext";
 import { formatDateTimeWithWeekday, toWholeAmountDigits } from "../utils/format";
 import type { CompanyProfile, LoginHistoryEntry } from "../types";
 import { FloatingLabelInput, FloatingLabelPhoneInput } from "@/components/ui/floating-label-input";
@@ -33,13 +32,9 @@ import { Label } from "@/components/ui/label";
 export function ProfilePage() {
   const { user, isAdmin } = useAuth();
   const { t } = useI18n();
-  const { notifyDays, setNotifyDays } = usePreferences();
   const [error, setError] = useState("");
-  const [prefsError, setPrefsError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
-  const [prefsSuccess, setPrefsSuccess] = useState("");
-  const [notifyDaysInput, setNotifyDaysInput] = useState(String(notifyDays));
   const [monthlyPlanInput, setMonthlyPlanInput] = useState("");
   const [planError, setPlanError] = useState("");
   const [planSuccess, setPlanSuccess] = useState("");
@@ -61,10 +56,6 @@ export function ProfilePage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyLoadError, setHistoryLoadError] = useState("");
   const [settingsLoadError, setSettingsLoadError] = useState("");
-
-  useEffect(() => {
-    setNotifyDaysInput(String(notifyDays));
-  }, [notifyDays]);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -120,19 +111,6 @@ export function ProfilePage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handlePrefsSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    setPrefsSuccess("");
-    setPrefsError("");
-    const value = Number.parseInt(notifyDaysInput, 10);
-    if (Number.isNaN(value) || value < 1 || value > 365) {
-      setPrefsError(t("profile.notifyDaysInvalid"));
-      return;
-    }
-    setNotifyDays(value);
-    setPrefsSuccess(t("profile.prefsSaved"));
   };
 
   const handlePlanSubmit = async (e: FormEvent) => {
@@ -213,43 +191,6 @@ export function ProfilePage() {
               </dd>
             </div>
           </dl>
-        </CardContent>
-      </Card>
-      </StaggerItem>
-
-      <StaggerItem>
-      <Card className="content-card">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <SettingsIcon className="size-5" />
-            {t("profile.preferences")}
-          </CardTitle>
-          <CardDescription>{t("profile.preferencesDesc")}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {prefsError && <p className="mb-4 text-sm text-red-600 dark:text-red-400">{prefsError}</p>}
-          {prefsSuccess && (
-            <p className="mb-4 text-sm text-emerald-600 dark:text-emerald-400">{prefsSuccess}</p>
-          )}
-          <form onSubmit={handlePrefsSubmit} className="flex flex-col gap-4 sm:flex-row sm:items-end">
-            <div className="flex flex-1 flex-col gap-2">
-              <Label htmlFor="notify_days">{t("profile.notifyDays")}</Label>
-              <Input
-                id="notify_days"
-                type="number"
-                min={1}
-                max={365}
-                required
-                value={notifyDaysInput}
-                onChange={(e) => setNotifyDaysInput(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">{t("profile.notifyDaysHint")}</p>
-            </div>
-            <Button type="submit">
-              <SaveIconBtn />
-              {t("common.save")}
-            </Button>
-          </form>
         </CardContent>
       </Card>
       </StaggerItem>

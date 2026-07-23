@@ -275,7 +275,7 @@ export function ClientCardPage() {
     e.preventDefault();
     if (!card) return;
     setError("");
-    if (!contractForm.start_date || !contractForm.end_date) {
+    if (!contractForm.start_date) {
       setError(t("clients.selectDateError"));
       return;
     }
@@ -287,7 +287,7 @@ export function ClientCardPage() {
       await api.contracts.create({
         client_id: card.id,
         start_date: contractForm.start_date,
-        end_date: contractForm.end_date,
+        end_date: contractForm.start_date,
         status: contractForm.status,
         notes: contractForm.notes || undefined,
         contract_number: contractForm.contract_number || undefined,
@@ -660,8 +660,7 @@ export function ClientCardPage() {
                         </span>
                       )}
                       <span className="text-xs font-medium text-foreground">
-                        {formatDateWithWeekday(contract.start_date, "short")} —{" "}
-                        {formatDateWithWeekday(contract.end_date, "short")}
+                        {formatDateWithWeekday(contract.start_date, "short")}
                       </span>
                       {contract.is_cancelled ? (
                         <Badge variant="secondary" className="h-5 gap-1 px-1.5 text-[10px] text-muted-foreground">

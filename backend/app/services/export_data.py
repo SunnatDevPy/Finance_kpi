@@ -88,7 +88,6 @@ def fetch_contracts_rows(
                 contract.client.company_name,
                 contract.contract_number or "",
                 contract.start_date.isoformat(),
-                contract.end_date.isoformat(),
                 _money(contract.total_amount),
                 _money(contract.paid_amount),
                 _money(contract.debt_amount),
@@ -212,13 +211,12 @@ CLIENT_HEADERS = ["Korxona", "Mas'ul", "Telefon", "Shahar", "Holat"]
 CONTRACT_HEADERS = [
     "Mijoz",
     "Shartnoma №",
-    "Boshlanish",
-    "Tugash",
+    "Sana",
     "Jami",
     "To'langan",
     "Qarz",
     "Xizmatlar",
-    "ЭСФ",
+    "EHR",
 ]
 PAYMENT_HEADERS = ["Sana", "Kontrakt ID", "Mijoz", "Summa", "Izoh"]
 DEBT_HEADERS = ["Korxona", "Mas'ul", "Telefon", "Qarz"]
@@ -284,7 +282,6 @@ def fetch_client_contracts_rows(db: Session, client_id: int) -> list[list[str]]:
                 contract.contract_number or "",
                 CONTRACT_STATUS_LABELS.get(contract.status, contract.status.value),
                 contract.start_date.isoformat(),
-                contract.end_date.isoformat(),
                 _money(contract.total_amount),
                 _money(contract.paid_amount),
                 _money(contract.debt_amount),
@@ -321,13 +318,12 @@ def fetch_client_payments_rows(db: Session, client_id: int) -> list[list[str]]:
 CLIENT_CARD_CONTRACT_HEADERS = [
     "Shartnoma №",
     "Holat",
-    "Boshlanish",
-    "Tugash",
+    "Sana",
     "Jami",
     "To'langan",
     "Qarz",
     "Xizmatlar",
-    "ЭСФ",
+    "EHR",
 ]
 CLIENT_CARD_PAYMENT_HEADERS = ["Sana", "Shartnoma ID", "Summa", "Izoh"]
 CLIENT_CARD_PROFILE_HEADERS = ["Maydon", "Qiymat"]

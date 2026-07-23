@@ -27,8 +27,7 @@ test.describe("Full business flow", () => {
     await expect(page.getByRole("dialog")).toBeVisible();
 
     await selectRadixOption(page, companyName);
-    await page.locator("#start_date").fill(isoDate(0));
-    await page.locator("#end_date").fill(isoDate(365));
+    await page.locator("#contract_date").fill(isoDate(0));
     await page.locator('input[type="number"]').first().fill(contractPrice);
     await page.getByRole("button", { name: /saqlash|сохранить|save/i }).click();
 

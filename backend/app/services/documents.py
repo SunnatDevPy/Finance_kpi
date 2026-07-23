@@ -204,7 +204,7 @@ def _build_document(
 
 
 def build_invoice_pdf(contract: Contract, company: dict[str, str]) -> BytesIO:
-    period = f"{contract.start_date.strftime('%d.%m.%Y')} — {contract.end_date.strftime('%d.%m.%Y')}"
+    period = contract.start_date.strftime("%d.%m.%Y")
     intro = (
         f"Ushbu schyot-faktura {contract.contract_number or contract.id}-sonli shartnoma "
         f"({period}) asosida taqdim etiladi. Quyidagi xizmatlar bo'yicha to'lov amalga oshirilishi so'raladi:"
@@ -219,7 +219,7 @@ def build_invoice_pdf(contract: Contract, company: dict[str, str]) -> BytesIO:
 
 
 def build_act_pdf(contract: Contract, company: dict[str, str]) -> BytesIO:
-    period = f"{contract.start_date.strftime('%d.%m.%Y')} — {contract.end_date.strftime('%d.%m.%Y')}"
+    period = contract.start_date.strftime("%d.%m.%Y")
     intro = (
         f"Ushbu dalolatnoma {contract.contract_number or contract.id}-sonli shartnoma ({period}) doirasida "
         "quyida keltirilgan xizmatlar to'liq va sifatli bajarilganligini, tomonlarning bir-biriga "
@@ -243,7 +243,7 @@ _STATUS_LABELS = {
 
 
 def _contract_meta_table(contract: Contract, styles: dict, font_regular: str, font_bold: str) -> Table:
-    period = f"{contract.start_date.strftime('%d.%m.%Y')} — {contract.end_date.strftime('%d.%m.%Y')}"
+    period = contract.start_date.strftime("%d.%m.%Y")
     status = _STATUS_LABELS.get(
         contract.status.value if hasattr(contract.status, "value") else str(contract.status),
         str(contract.status),
@@ -257,7 +257,7 @@ def _contract_meta_table(contract: Contract, styles: dict, font_regular: str, fo
         ["Qarz", _money(contract.debt_amount)],
     ]
     if contract.invoice_number:
-        rows.insert(1, ["ESF raqami", contract.invoice_number])
+        rows.insert(1, ["EHR raqami", contract.invoice_number])
 
     table = Table(rows, colWidths=[45 * mm, 125 * mm])
     table.setStyle(
