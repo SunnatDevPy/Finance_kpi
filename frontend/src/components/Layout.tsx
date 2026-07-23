@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   ArchiveIcon,
   CreditCardIcon,
@@ -18,6 +18,8 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
 import { AppHeader } from "./AppHeader";
+import { PageLoader } from "./PageLoader";
+import { prefetchRoute } from "../lib/routePrefetch";
 import { cn } from "@/lib/utils";
 
 const SIDEBAR_COLLAPSE_KEY = "finance_sidebar_collapsed";
@@ -40,6 +42,8 @@ function SidebarLink({
       to={to}
       end={end}
       title={collapsed ? label : undefined}
+      onMouseEnter={() => prefetchRoute(to)}
+      onFocus={() => prefetchRoute(to)}
       className={({ isActive }) =>
         cn(
           "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
@@ -289,17 +293,16 @@ export function Layout() {
         />
         <main className="main-canvas flex-1">
           <div className="mx-auto max-w-7xl px-5 py-7 sm:px-8 sm:py-8 lg:px-10 lg:py-9">
-            <AnimatePresence mode="wait">
+            <Suspense fallback={<PageLoader />}>
               <motion.div
                 key={location.pathname}
-                initial={{ opacity: 0, y: 8 }}
+                initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
               >
                 <Outlet />
               </motion.div>
-            </AnimatePresence>
+            </Suspense>
           </div>
         </main>
       </div>

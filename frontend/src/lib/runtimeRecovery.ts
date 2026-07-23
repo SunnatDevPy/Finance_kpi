@@ -94,18 +94,31 @@ export function initRuntimeRecovery(): void {
   }, 9000);
 }
 
-export function lazyWithRetry<T>(factory: () => Promise<T>): () => Promise<T> {
+export function lazyWithRetry<T>(factory: () => Promise<T>, retries = 3): () => Promise<T> {
   return async () => {
-    try {
-      return await factory();
-    } catch (error) {
-      if (isRecoverableLoadError(error) && canAutoReload()) {
-        scheduleAutoReload("lazy-chunk");
-        return new Promise(() => {
-          /* reload kutilmoqda */
-        });
+    let lastError: unknown;
+
+    for (let attempt = 0; attempt < retries; attempt += 1) {
+      try {
+        return await factory();
+      } catch (error) {
+        lastError = error;
+        if (!isRecoverableLoadError(error)) {
+          throw error;
+        }
+        if (attempt < retries - 1) {
+          await new Promise((resolve) => window.setTimeout(resolve, 250 * (attempt + 1)));
+        }
       }
-      throw error;
     }
+
+    if (isRecoverableLoadError(lastError) && canAutoReload()) {
+      scheduleAutoReload("lazy-chunk");
+      return new Promise(() => {
+        /* reload kutilmoqda */
+      });
+    }
+
+    throw lastError;
   };
 }

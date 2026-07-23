@@ -13,11 +13,7 @@ import { ThemeProvider } from "./context/ThemeContext";
 import { markRouteReady } from "./lib/appReady";
 import { lazyWithRetry, markAppHealthy } from "./lib/runtimeRecovery";
 
-/** Suspense qamrovi ichida joylashgan — shu sabab uning effekti faqat
- * haqiqiy sahifa (lazy chunk) yuklanib, fallback (`PageLoader`) haqiqiy
- * kontent bilan almashtirilgandagina ishga tushadi. Shu orqali ilova
- * birinchi ochilishida faqat bitta (index.html dagi) loader ko'rinadi —
- * `PageLoader` orqasidan yana bitta "ikkinchi yuklash" chiqmaydi. */
+/** Birinchi lazy sahifa DOM'ga tushganda boshlang'ich loader yashiriladi. */
 function RouteReady({ children }: { children: ReactNode }) {
   useEffect(() => {
     markRouteReady();
@@ -49,12 +45,18 @@ export default function App() {
           <AuthProvider>
             <ToastViewport />
             <PwaInstallBanner />
-            <Suspense fallback={<PageLoader />}>
-              <RouteReady>
-                <Routes>
-                  <Route path="/login" element={<LoginPage />} />
-                  <Route element={<ProtectedRoute />}>
-                    <Route element={<Layout />}>
+            <RouteReady>
+              <Routes>
+                <Route
+                  path="/login"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <LoginPage />
+                    </Suspense>
+                  }
+                />
+                <Route element={<ProtectedRoute />}>
+                  <Route element={<Layout />}>
                       <Route index element={<DashboardPage />} />
                       <Route path="clients" element={<ClientsPage />} />
                       <Route path="clients/:id" element={<ClientCardPage />} />
@@ -74,8 +76,7 @@ export default function App() {
                   </Route>
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
-              </RouteReady>
-            </Suspense>
+            </RouteReady>
           </AuthProvider>
         </BrowserRouter>
         </AppErrorBoundary>
