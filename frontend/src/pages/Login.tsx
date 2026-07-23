@@ -1,62 +1,16 @@
 import { useState, useEffect, type FormEvent } from "react";
 import { Navigate } from "react-router-dom";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { LogInIcon, Loader2Icon, LockIcon, UserIcon, AlertCircleIcon } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
-import { useMediaQuery } from "../hooks/useMediaQuery";
 import { SettingsToolbar } from "../components/SettingsToolbar";
-import { LoginGlobe } from "../components/login/LoginGlobe";
 import { LoginAtmosphere } from "../components/login/LoginAtmosphere";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 const EASE = [0.16, 1, 0.3, 1] as const;
-const INTRO_MS = 2500;
-const TRANSITION_S = 1.15;
-const MOBILE_GLOBE_SIZE = 158;
-
-/** Globusning aynan shu ulushi (30%) login karta ortida yashiringan turadi. */
-const OVERLAP_RATIO = 0.3;
-const CARD_WIDTH = 440;
-
-type Phase = "intro" | "revealed";
-
-interface StageLayout {
-  diameter: number;
-  centerX: number;
-  cardLeft: number;
-  cardWidth: number;
-  introCenterX: number;
-  mobile: boolean;
-}
-
-const clamp = (min: number, value: number, max: number) => Math.min(max, Math.max(min, value));
-
-function computeStageLayout(vw: number): StageLayout {
-  if (vw < 640) {
-    const cardWidth = Math.min(CARD_WIDTH, vw - 32);
-    return {
-      diameter: MOBILE_GLOBE_SIZE,
-      centerX: vw / 2,
-      cardLeft: vw / 2 - cardWidth / 2,
-      cardWidth,
-      introCenterX: vw / 2,
-      mobile: true,
-    };
-  }
-
-  const diameter = clamp(370, vw * 0.44, 1200);
-  const cardWidth = CARD_WIDTH;
-  const visibleGlobeWidth = diameter * (1 - OVERLAP_RATIO);
-  const totalWidth = visibleGlobeWidth + cardWidth;
-  const compositionLeft = Math.max(16, (vw - totalWidth) / 2);
-  const centerX = compositionLeft + diameter / 2;
-  const cardLeft = compositionLeft + visibleGlobeWidth;
-
-  return { diameter, centerX, cardLeft, cardWidth, introCenterX: vw / 2, mobile: false };
-}
 
 function LoginFormCard({
   t,
@@ -91,7 +45,7 @@ function LoginFormCard({
         <div className="mb-6 sm:mb-8">
           <div className="mb-4 flex h-11 w-14 items-center justify-center rounded-xl border border-cyan-500/20 bg-white p-1.5 shadow-sm dark:border-cyan-400/20">
             <img
-              src="/logo.svg"
+              src="/logo.png"
               alt="World Textile Marketing Agency"
               className="h-full w-full object-contain"
             />
@@ -196,7 +150,6 @@ function LoginFooter() {
 export function LoginPage() {
   const { user, login, sessionExpired, clearSessionExpired } = useAuth();
   const { t } = useI18n();
-  const isMobile = useMediaQuery("(max-width: 639px)");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(() => (sessionExpired ? t("auth.sessionExpired") : ""));
@@ -208,46 +161,6 @@ export function LoginPage() {
       clearSessionExpired();
     }
   }, [sessionExpired, clearSessionExpired, t]);
-  const reduceMotion = useReducedMotion();
-  const skipIntro = reduceMotion || isMobile;
-  const [phase, setPhase] = useState<Phase>(() => (skipIntro ? "revealed" : "intro"));
-  const [layout, setLayout] = useState<StageLayout>(() =>
-    computeStageLayout(typeof window !== "undefined" ? window.innerWidth : 1440),
-  );
-
-  useEffect(() => {
-    if (skipIntro) setPhase("revealed");
-  }, [skipIntro]);
-
-  useEffect(() => {
-    let raf = 0;
-    let lastWidth = typeof window !== "undefined" ? window.innerWidth : 0;
-
-    const update = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        const width = window.visualViewport?.width ?? window.innerWidth;
-        if (Math.abs(width - lastWidth) < 28) return;
-        lastWidth = width;
-        setLayout(computeStageLayout(width));
-      });
-    };
-
-    update();
-    window.addEventListener("resize", update);
-    window.visualViewport?.addEventListener("resize", update);
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener("resize", update);
-      window.visualViewport?.removeEventListener("resize", update);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (skipIntro) return;
-    const timer = window.setTimeout(() => setPhase("revealed"), INTRO_MS);
-    return () => window.clearTimeout(timer);
-  }, [skipIntro]);
 
   if (user) {
     return <Navigate to="/" replace />;
@@ -277,74 +190,23 @@ export function LoginPage() {
     onSubmit: handleSubmit,
   };
 
-  const revealed = phase === "revealed";
-
-  if (layout.mobile) {
-    return (
-      <div className="relative min-h-[100dvh] overflow-x-hidden overflow-y-auto bg-background text-foreground">
-        <LoginAtmosphere revealed lite />
-
-        <div className="absolute right-4 top-4 z-50">
-          <SettingsToolbar variant="login" />
-        </div>
-
-        <div className="relative z-10 mx-auto flex w-full max-w-md flex-col items-center px-4 pb-8 pt-16">
-          <LoginGlobe className="mb-2 shrink-0" size={MOBILE_GLOBE_SIZE} lite />
-          <div className="w-full">
-            <LoginFormCard {...formProps} />
-            <LoginFooter />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background text-foreground">
-      <LoginAtmosphere revealed={revealed} />
+    <div className="relative flex min-h-[100dvh] items-center justify-center overflow-x-hidden bg-background px-4 py-10 text-foreground">
+      <LoginAtmosphere revealed lite />
 
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: revealed ? 1 : 0 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
-        className="absolute right-4 top-4 z-50 sm:right-6 sm:top-6"
-      >
+      <div className="absolute right-4 top-4 z-50 sm:right-6 sm:top-6">
         <SettingsToolbar variant="login" />
-      </motion.div>
+      </div>
 
       <motion.div
-        className="absolute z-20 top-1/2"
-        style={{ left: 0, width: layout.diameter, height: layout.diameter }}
-        initial={false}
-        animate={
-          revealed
-            ? { x: layout.centerX - layout.diameter / 2, y: "-50%", scale: 1 }
-            : { x: layout.introCenterX - layout.diameter / 2, y: "-50%", scale: 1.12 }
-        }
-        transition={{ duration: TRANSITION_S, ease: EASE }}
+        initial={{ opacity: 0, y: 16, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.45, ease: EASE }}
+        className="relative z-10 w-full max-w-md"
       >
-        <div className="pointer-events-none absolute -inset-[48%] rounded-full bg-indigo-500/[0.07] blur-[80px] dark:bg-indigo-500/16" />
-        <div className="pointer-events-none absolute -inset-[34%] rounded-full bg-cyan-400/[0.06] blur-[64px] dark:bg-cyan-400/14" />
-        <LoginGlobe className="relative z-10" size={layout.diameter} />
+        <LoginFormCard {...formProps} />
+        <LoginFooter />
       </motion.div>
-
-      <div
-        className="absolute z-30 top-1/2 -translate-y-1/2 px-4"
-        style={{ left: layout.cardLeft, width: layout.cardWidth }}
-      >
-        <motion.div
-          initial={false}
-          animate={{
-            opacity: revealed ? 1 : 0,
-            y: revealed ? 0 : 20,
-          }}
-          transition={{ duration: TRANSITION_S, ease: EASE, delay: revealed ? 0.12 : 0 }}
-          className={`w-full ${!revealed ? "pointer-events-none" : ""}`}
-        >
-          <LoginFormCard {...formProps} />
-          <LoginFooter />
-        </motion.div>
-      </div>
     </div>
   );
 }
