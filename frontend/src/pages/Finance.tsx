@@ -60,7 +60,6 @@ import { MotionButton, motionTap } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FloatingLabelDatePicker } from "@/components/ui/date-picker";
 import {
-  FloatingLabelInput,
   FloatingLabelMoneyInput,
   FloatingLabelTextarea,
 } from "@/components/ui/floating-label-input";
@@ -125,7 +124,6 @@ function moneyTooltip(value: unknown) {
 
 const FINANCE_OPTIONAL_COLUMNS = [
   { id: "type", labelKey: "finance.typeIncome", defaultVisible: true },
-  { id: "title", labelKey: "expenses.titleField", defaultVisible: true },
   { id: "category", labelKey: "finance.category", defaultVisible: true },
   { id: "amount", labelKey: "common.amount", defaultVisible: true },
   { id: "note", labelKey: "common.note", defaultVisible: true },
@@ -138,7 +136,6 @@ type EntryKind = "income" | "expense";
 interface EntryForm {
   kind: EntryKind;
   category: string;
-  title: string;
   amount: string;
   date: string;
   note: string;
@@ -148,11 +145,16 @@ function emptyForm(kind: EntryKind = "income"): EntryForm {
   return {
     kind,
     category: kind === "income" ? "sale" : "other",
-    title: "",
     amount: "",
     date: new Date().toISOString().slice(0, 10),
     note: "",
   };
+}
+
+function resolveEntryTitle(note: string, category: string, label: (category: string) => string): string {
+  const trimmed = note.trim();
+  if (trimmed) return trimmed.slice(0, 255);
+  return label(category).slice(0, 255);
 }
 
 function typeBadgeClass(type: FinanceEntryType): string {
@@ -329,10 +331,9 @@ export function FinancePage() {
     setForm({
       kind: item.type,
       category: item.category ?? "other",
-      title: item.title,
       amount: String(Math.round(Math.abs(Number(item.amount)))),
       date: item.date,
-      note: item.note ?? "",
+      note: item.note?.trim() || item.title,
     });
     setModalOpen(true);
   };
@@ -344,14 +345,19 @@ export function FinancePage() {
       setError(t("clients.selectDateError"));
       return;
     }
+    if (!form.note.trim()) {
+      setError(t("finance.noteRequired"));
+      return;
+    }
+    const note = form.note.trim();
     try {
       if (form.kind === "income") {
         const payload = {
           category: form.category as IncomeCategory,
-          title: form.title.trim(),
+          title: resolveEntryTitle(note, form.category, (cat) => incomeCategoryLabel(t, cat)),
           amount: Number.parseFloat(form.amount),
           income_date: form.date,
-          note: form.note.trim() || undefined,
+          note,
         };
         if (editing) {
           await api.incomes.update(editing.id, payload);
@@ -361,10 +367,10 @@ export function FinancePage() {
       } else {
         const payload = {
           category: form.category as ExpenseCategory,
-          title: form.title.trim(),
+          title: resolveEntryTitle(note, form.category, (cat) => expenseCategoryLabel(t, cat)),
           amount: Number.parseFloat(form.amount),
           expense_date: form.date,
-          note: form.note.trim() || undefined,
+          note,
         };
         if (editing) {
           await api.expenses.update(editing.id, payload);
@@ -675,7 +681,6 @@ export function FinancePage() {
               <TableRow>
                 <TableHead>{t("common.date")}</TableHead>
                 {isVisible("type") && <TableHead>{t("finance.typeIncome")}</TableHead>}
-                {isVisible("title") && <TableHead>{t("expenses.titleField")}</TableHead>}
                 {isVisible("category") && <TableHead>{t("finance.category")}</TableHead>}
                 {isVisible("amount") && <TableHead>{t("common.amount")}</TableHead>}
                 {isVisible("note") && <TableHead>{t("common.note")}</TableHead>}
@@ -695,9 +700,6 @@ export function FinancePage() {
                     </Badge>
                   </TableCellMuted>
                   )}
-                  {isVisible("title") && (
-                  <TableCellPrimary>{item.title}</TableCellPrimary>
-                  )}
                   {isVisible("category") && (
                   <TableCellMuted>
                     {item.type === "income" && item.category
@@ -713,7 +715,9 @@ export function FinancePage() {
                   </TableCellMoney>
                   )}
                   {isVisible("note") && (
-                  <TableCellMuted className="max-w-xs">{item.note}</TableCellMuted>
+                  <TableCellPrimary className="max-w-xs">
+                    {item.note?.trim() || item.title || "—"}
+                  </TableCellPrimary>
                   )}
                   <TableCellActions>
                     <div className="action-toolbar">
@@ -821,14 +825,6 @@ export function FinancePage() {
               </SelectContent>
             </Select>
           </div>
-          <FloatingLabelInput
-            id="finance-title"
-            label={t("finance.titleField")}
-            placeholder={t("finance.titlePlaceholder")}
-            required
-            value={form.title}
-            onChange={(e) => setForm({ ...form, title: e.target.value })}
-          />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FloatingLabelMoneyInput
               id="finance-amount"
@@ -848,6 +844,7 @@ export function FinancePage() {
           <FloatingLabelTextarea
             id="finance-note"
             label={t("finance.note")}
+            required
             value={form.note}
             onChange={(e) => setForm({ ...form, note: e.target.value })}
             rows={3}
