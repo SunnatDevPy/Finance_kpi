@@ -58,6 +58,10 @@ services:
     ports:
       - "${HTTP_PORT:-80}:80"
       - "${HTTPS_PORT:-443}:443"
+    # Docker ichki DNS (127.0.0.11) ba'zan Let's Encrypt ga ulanishni buzadi
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     environment:
       DOMAIN: ${DOMAIN:-wtma.okaposai.uz}
       LANDING_DOMAIN: ${LANDING_DOMAIN:-landing.okaposai.uz}
@@ -80,4 +84,5 @@ volumes:
 
 networks:
   wtma:
+    external: true
     name: wtma
