@@ -5,7 +5,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models import Contract, ContractLineItem, Expense, Income, Payment
-from app.schemas.finance import FinanceEntryType, FinanceLedgerItem, FinanceLedgerPage, FinanceTurnoverRead
+from app.schemas.finance import FinanceEntryType, FinanceLedgerItem, FinanceLedgerPage, FinanceTurnoverRead, FinanceTurnoverTrendRead
 from app.services.app_settings import get_yearly_plan
 
 
@@ -189,3 +189,32 @@ def get_finance_turnover(db: Session, *, year: int) -> FinanceTurnoverRead:
         contracts_volume=contracts_volume,
         plan_percent=plan_percent,
     )
+
+
+def get_finance_turnover_trend(
+    db: Session,
+    *,
+    year_from: int,
+    year_to: int,
+) -> FinanceTurnoverTrendRead:
+    from app.schemas.finance import FinanceTurnoverTrendPoint
+
+    if year_to < year_from:
+        year_from, year_to = year_to, year_from
+
+    points = []
+    for year in range(year_from, year_to + 1):
+        turnover = get_finance_turnover(db, year=year)
+        points.append(
+            FinanceTurnoverTrendPoint(
+                year=turnover.year,
+                client_payments=turnover.client_payments,
+                other_income=turnover.other_income,
+                total_inflow=turnover.total_inflow,
+                total_expense=turnover.total_expense,
+                net_balance=turnover.net_balance,
+                contracts_volume=turnover.contracts_volume,
+            )
+        )
+
+    return FinanceTurnoverTrendRead(year_from=year_from, year_to=year_to, points=points)

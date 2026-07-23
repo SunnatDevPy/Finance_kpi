@@ -6,10 +6,16 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_admin
 from app.database import get_db
-from app.schemas.finance import FinanceEntryType, FinanceLedgerPage, FinanceTurnoverPlanUpdate, FinanceTurnoverRead
+from app.schemas.finance import (
+    FinanceEntryType,
+    FinanceLedgerPage,
+    FinanceTurnoverPlanUpdate,
+    FinanceTurnoverRead,
+    FinanceTurnoverTrendRead,
+)
 from app.schemas.finance_import import FinanceImportResult
 from app.services.app_settings import set_yearly_plan
-from app.services.finance import get_finance_ledger, get_finance_turnover
+from app.services.finance import get_finance_ledger, get_finance_turnover, get_finance_turnover_trend
 from app.services.finance_import import build_finance_import_template, import_finance_from_xlsx
 
 router = APIRouter(prefix="/finance", dependencies=[Depends(get_current_user)])
@@ -42,6 +48,15 @@ def finance_turnover(
     year: int = Query(default=date.today().year, ge=2000, le=2100),
 ) -> FinanceTurnoverRead:
     return get_finance_turnover(db, year=year)
+
+
+@router.get("/turnover-trend", response_model=FinanceTurnoverTrendRead)
+def finance_turnover_trend(
+    db: Session = Depends(get_db),
+    year_from: int = Query(default=2020, ge=2000, le=2100),
+    year_to: int = Query(default=2026, ge=2000, le=2100),
+) -> FinanceTurnoverTrendRead:
+    return get_finance_turnover_trend(db, year_from=year_from, year_to=year_to)
 
 
 @router.patch("/turnover-plan", response_model=FinanceTurnoverRead)

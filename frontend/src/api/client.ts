@@ -23,6 +23,7 @@ import type {
   FinanceImportResult,
   FinanceLedgerPage,
   FinanceTurnover,
+  FinanceTurnoverTrend,
   Income,
   IncomeCategory,
   IncomeSummary,
@@ -695,6 +696,10 @@ export const api = {
       return request<FinanceLedgerPage>(`/finance/ledger${qs ? `?${qs}` : ""}`);
     },
     turnover: (year: number) => request<FinanceTurnover>(`/finance/turnover?year=${year}`),
+    turnoverTrend: (yearFrom = 2020, yearTo = 2026) =>
+      request<FinanceTurnoverTrend>(
+        `/finance/turnover-trend?year_from=${yearFrom}&year_to=${yearTo}`,
+      ),
     updateTurnoverPlan: (year: number, yearly_plan: number) =>
       request<FinanceTurnover>("/finance/turnover-plan", {
         method: "PATCH",

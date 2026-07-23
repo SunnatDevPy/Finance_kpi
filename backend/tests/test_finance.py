@@ -220,3 +220,24 @@ def test_finance_turnover_plan_update(client, auth_headers):
     data = resp.json()
     assert Decimal(data["yearly_plan"]) == Decimal("120000000.00")
     assert data["plan_percent"] is not None
+
+
+def test_finance_turnover_trend(client, auth_headers, sample_contract):
+    client.post(
+        "/api/v1/payments",
+        headers=auth_headers,
+        json={"contract_id": sample_contract.id, "amount": "1000000.00", "paid_at": "2026-03-01"},
+    )
+
+    resp = client.get(
+        "/api/v1/finance/turnover-trend",
+        headers=auth_headers,
+        params={"year_from": 2020, "year_to": 2026},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["year_from"] == 2020
+    assert data["year_to"] == 2026
+    assert len(data["points"]) == 7
+    point_2026 = next(item for item in data["points"] if item["year"] == 2026)
+    assert Decimal(point_2026["total_inflow"]) == Decimal("1000000.00")

@@ -44,3 +44,19 @@ class FinanceTurnoverRead(BaseModel):
 class FinanceTurnoverPlanUpdate(BaseModel):
     year: int = Field(ge=2000, le=2100)
     yearly_plan: Decimal = Field(gt=0, decimal_places=2, max_digits=18)
+
+
+class FinanceTurnoverTrendPoint(BaseModel):
+    year: int
+    client_payments: Decimal
+    other_income: Decimal
+    total_inflow: Decimal
+    total_expense: Decimal
+    net_balance: Decimal
+    contracts_volume: Decimal
+
+
+class FinanceTurnoverTrendRead(BaseModel):
+    year_from: int
+    year_to: int
+    points: list[FinanceTurnoverTrendPoint]

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
 import {
   AlertTriangleIcon,
   ArrowDownCircleIcon,
@@ -19,6 +18,7 @@ import {
   WalletIcon,
   XCircleIcon,
 } from "lucide-react";
+import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
 import { api } from "../api/client";
 import { CancelIcon, DeleteIconBtn, LoadingIconBtn, SaveIconBtn } from "../components/ButtonIcons";
 import { DateRangePicker } from "../components/DateRangePicker";
@@ -67,7 +67,15 @@ import {
   FloatingLabelMoneyInput,
   FloatingLabelTextarea,
 } from "@/components/ui/floating-label-input";
-import { Input, MoneyInput } from "@/components/ui/input";
+import {
+  ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -77,15 +85,32 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { ExpenseCategory, FinanceEntryType, FinanceImportResult, FinanceLedgerItem, FinanceTurnover, IncomeCategory } from "../types";
-import { useAuth } from "../context/AuthContext";
+import type {
+  ExpenseCategory,
+  FinanceEntryType,
+  FinanceImportResult,
+  FinanceLedgerItem,
+  FinanceTurnover,
+  FinanceTurnoverTrend,
+  IncomeCategory,
+} from "../types";
 import { usePersistedState } from "../hooks/usePersistedState";
 import { EXPENSE_CATEGORIES, expenseCategoryLabel } from "../utils/expenseCategory";
 import { INCOME_CATEGORIES, incomeCategoryLabel } from "../utils/incomeCategory";
-import { formatDateWithWeekday, formatMoney, toWholeAmountDigits } from "../utils/format";
+import {
+  formatCompactMoney,
+  formatDateWithWeekday,
+  formatMoney,
+  toNumber,
+} from "../utils/format";
 import { cn } from "@/lib/utils";
 
-const TURNOVER_YEAR_START = 2019;
+const TURNOVER_YEAR_START = 2020;
+const TURNOVER_CHART_YEAR_END = 2026;
+
+function moneyTooltip(value: unknown) {
+  return formatMoney(String(value ?? 0));
+}
 
 const FINANCE_OPTIONAL_COLUMNS = [
   { id: "type", labelKey: "finance.typeIncome", defaultVisible: true },
@@ -127,17 +152,14 @@ function typeBadgeClass(type: FinanceEntryType): string {
 
 export function FinancePage() {
   const { t } = useI18n();
-  const { isAdmin } = useAuth();
   const navigate = useNavigate();
   const { isVisible, setColumnVisible, visibleCount, items: columnPickerItems } =
     usePickerColumns("wtma.finance.tableColumns", FINANCE_OPTIONAL_COLUMNS, t);
 
   const [items, setItems] = useState<FinanceLedgerItem[]>([]);
   const [turnover, setTurnover] = useState<FinanceTurnover | null>(null);
+  const [turnoverTrend, setTurnoverTrend] = useState<FinanceTurnoverTrend | null>(null);
   const [turnoverLoading, setTurnoverLoading] = useState(true);
-  const [planInput, setPlanInput] = useState("");
-  const [planSaving, setPlanSaving] = useState(false);
-  const [planMessage, setPlanMessage] = useState("");
   const [turnoverYear, setTurnoverYear] = usePersistedState(
     "wtma.finance.turnoverYear",
     String(new Date().getFullYear()),
@@ -169,23 +191,55 @@ export function FinancePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const yearOptions = useMemo(() => {
-    const current = new Date().getFullYear();
-  const years: number[] = [];
-    for (let year = current; year >= TURNOVER_YEAR_START; year -= 1) {
+    const end = Math.max(TURNOVER_CHART_YEAR_END, new Date().getFullYear());
+    const years: number[] = [];
+    for (let year = end; year >= TURNOVER_YEAR_START; year -= 1) {
       years.push(year);
     }
     return years;
   }, []);
 
+  const turnoverChartConfig = useMemo(
+    () =>
+      ({
+        total_inflow: {
+          label: t("finance.turnover.totalInflow"),
+          color: "hsl(160 72% 38%)",
+        },
+        total_expense: {
+          label: t("finance.turnover.totalExpense"),
+          color: "hsl(0 72% 51%)",
+        },
+        net_balance: {
+          label: t("finance.turnover.netBalance"),
+          color: "hsl(217 91% 60%)",
+        },
+      }) satisfies ChartConfig,
+    [t],
+  );
+
+  const turnoverChartData = useMemo(
+    () =>
+      (turnoverTrend?.points ?? []).map((point) => ({
+        year: String(point.year),
+        total_inflow: toNumber(point.total_inflow),
+        total_expense: toNumber(point.total_expense),
+        net_balance: toNumber(point.net_balance),
+      })),
+    [turnoverTrend],
+  );
+
   const selectedYear = Number.parseInt(turnoverYear, 10) || new Date().getFullYear();
 
   const loadTurnover = (year = selectedYear) => {
     setTurnoverLoading(true);
-    api.finance
-      .turnover(year)
-      .then((data) => {
-        setTurnover(data);
-        setPlanInput(toWholeAmountDigits(data.yearly_plan));
+    Promise.all([
+      api.finance.turnover(year),
+      api.finance.turnoverTrend(TURNOVER_YEAR_START, TURNOVER_CHART_YEAR_END),
+    ])
+      .then(([summary, trend]) => {
+        setTurnover(summary);
+        setTurnoverTrend(trend);
       })
       .catch((e) => setError(e.message))
       .finally(() => setTurnoverLoading(false));
@@ -202,26 +256,6 @@ export function FinancePage() {
     const year = Number.parseInt(yearValue, 10);
     applyYearFilter(year);
     loadTurnover(year);
-  };
-
-  const handlePlanSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isAdmin) return;
-    setPlanSaving(true);
-    setPlanMessage("");
-    try {
-      const data = await api.finance.updateTurnoverPlan(
-        selectedYear,
-        Number.parseFloat(planInput),
-      );
-      setTurnover(data);
-      setPlanInput(toWholeAmountDigits(data.yearly_plan));
-      setPlanMessage(t("finance.turnover.planSaved"));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t("common.error"));
-    } finally {
-      setPlanSaving(false);
-    }
   };
 
   const load = (silent = true) => {
@@ -381,15 +415,10 @@ export function FinancePage() {
     <PageShell>
       <PageHeader title={t("finance.title")} subtitle={t("finance.subtitle")}>
         <div className="flex flex-wrap items-center gap-2">
-          <ExportButtons resource="incomes" dateFrom={dateFrom} dateTo={dateTo} showLabel={false} />
           <ExportButtons resource="expenses" dateFrom={dateFrom} dateTo={dateTo} showLabel={false} />
           <MotionButton type="button" variant="outline" onClick={openImportModal} {...motionTap}>
             <FileUpIcon data-icon="inline-start" />
             {t("finance.importFromExcel")}
-          </MotionButton>
-          <MotionButton type="button" variant="outline" onClick={() => openCreate("expense")} {...motionTap}>
-            <ArrowDownCircleIcon data-icon="inline-start" />
-            {t("finance.addExpense")}
           </MotionButton>
           <MotionButton type="button" onClick={() => openCreate("income")} {...motionTap}>
             <PlusIcon data-icon="inline-start" />
@@ -424,54 +453,63 @@ export function FinancePage() {
           </div>
         </CardHeader>
         <CardContent className="flex flex-col gap-5 pt-5">
-          {isAdmin && (
-            <form
-              onSubmit={handlePlanSave}
-              className="flex flex-col gap-3 rounded-xl border border-border/60 bg-muted/20 p-4 sm:flex-row sm:items-end"
-            >
-              <div className="flex flex-1 flex-col gap-2">
-                <Label htmlFor="yearly_plan">{t("finance.turnover.yearlyPlan")}</Label>
-                <MoneyInput
-                  id="yearly_plan"
-                  required
-                  value={planInput}
-                  onValueChange={setPlanInput}
-                />
-                <p className="text-xs text-muted-foreground">{t("finance.turnover.yearlyPlanHint")}</p>
-              </div>
-              <MotionButton type="submit" disabled={planSaving || turnoverLoading} {...motionTap}>
-                {planSaving ? <LoadingIconBtn /> : <SaveIconBtn />}
-                {planSaving ? t("common.saving") : t("common.save")}
-              </MotionButton>
-            </form>
-          )}
-          {planMessage && (
-            <p className="text-sm text-emerald-600 dark:text-emerald-400">{planMessage}</p>
-          )}
-
-          {turnover && (
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between gap-3 text-sm">
-                <span className="text-muted-foreground">{t("finance.turnover.planProgress")}</span>
-                <span className="font-semibold tabular-nums text-foreground">
-                  {turnover.plan_percent ?? 0}%
-                </span>
-              </div>
-              <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                <motion.div
-                  className="h-full rounded-full bg-primary"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${Math.min(100, turnover.plan_percent ?? 0)}%` }}
-                  transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {t("finance.turnover.planFact")
-                  .replace("{fact}", formatMoney(turnover.total_inflow))
-                  .replace("{plan}", formatMoney(turnover.yearly_plan))}
-              </p>
-            </div>
-          )}
+          <div className="rounded-xl border border-border/60 bg-muted/10 p-4">
+            <p className="mb-3 text-sm font-medium text-foreground">
+              {t("finance.turnover.trendTitle")}
+            </p>
+            {turnoverChartData.length === 0 ? (
+              <p className="py-10 text-center text-sm text-muted-foreground">{t("common.noData")}</p>
+            ) : (
+              <ChartContainer config={turnoverChartConfig} className="h-[280px] w-full">
+                <LineChart data={turnoverChartData} margin={{ left: 8, right: 8, top: 8, bottom: 0 }}>
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                  <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={8} />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                    width={72}
+                    tickFormatter={formatCompactMoney}
+                  />
+                  <ChartTooltip
+                    content={
+                      <ChartTooltipContent formatter={(value) => moneyTooltip(value)} />
+                    }
+                  />
+                  <ChartLegend content={<ChartLegendContent />} />
+                  <Line
+                    type="monotone"
+                    dataKey="total_inflow"
+                    stroke="var(--color-total_inflow)"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    activeDot={{ r: 5 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="total_expense"
+                    stroke="var(--color-total_expense)"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    activeDot={{ r: 5 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="net_balance"
+                    stroke="var(--color-net_balance)"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    activeDot={{ r: 5 }}
+                  />
+                </LineChart>
+              </ChartContainer>
+            )}
+            <p className="mt-2 text-xs text-muted-foreground">
+              {t("finance.turnover.trendDesc")
+                .replace("{from}", String(TURNOVER_YEAR_START))
+                .replace("{to}", String(TURNOVER_CHART_YEAR_END))}
+            </p>
+          </div>
 
           <StaggerContainer
             className={cn(

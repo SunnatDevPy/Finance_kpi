@@ -451,6 +451,22 @@ export interface FinanceTurnover {
   plan_percent: number | null;
 }
 
+export interface FinanceTurnoverTrendPoint {
+  year: number;
+  client_payments: string;
+  other_income: string;
+  total_inflow: string;
+  total_expense: string;
+  net_balance: string;
+  contracts_volume: string;
+}
+
+export interface FinanceTurnoverTrend {
+  year_from: number;
+  year_to: number;
+  points: FinanceTurnoverTrendPoint[];
+}
+
 export interface AuditLogEntry {
   id: number;
   entity_type: string;
