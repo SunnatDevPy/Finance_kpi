@@ -169,3 +169,54 @@ def test_finance_import_rejects_missing_required_columns(client, auth_headers):
         },
     )
     assert resp.status_code == 400
+
+
+def test_finance_turnover_summary(client, auth_headers, sample_contract):
+    client.post(
+        "/api/v1/payments",
+        headers=auth_headers,
+        json={"contract_id": sample_contract.id, "amount": "2000000.00", "paid_at": "2026-04-01"},
+    )
+    client.post(
+        "/api/v1/incomes",
+        headers=auth_headers,
+        json={
+            "category": "investment",
+            "title": "Investitsiya",
+            "amount": "1000000.00",
+            "income_date": "2026-04-02",
+        },
+    )
+    client.post(
+        "/api/v1/expenses",
+        headers=auth_headers,
+        json={
+            "category": "rent",
+            "title": "Ofis ijarasi",
+            "amount": "500000.00",
+            "expense_date": "2026-04-03",
+        },
+    )
+
+    resp = client.get("/api/v1/finance/turnover", headers=auth_headers, params={"year": 2026})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["year"] == 2026
+    assert Decimal(data["client_payments"]) == Decimal("2000000.00")
+    assert Decimal(data["other_income"]) == Decimal("1000000.00")
+    assert Decimal(data["total_inflow"]) == Decimal("3000000.00")
+    assert Decimal(data["total_expense"]) == Decimal("500000.00")
+    assert Decimal(data["net_balance"]) == Decimal("2500000.00")
+    assert Decimal(data["contracts_volume"]) == Decimal("1000000.00")
+
+
+def test_finance_turnover_plan_update(client, auth_headers):
+    resp = client.patch(
+        "/api/v1/finance/turnover-plan",
+        headers=auth_headers,
+        json={"year": 2026, "yearly_plan": "120000000.00"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert Decimal(data["yearly_plan"]) == Decimal("120000000.00")
+    assert data["plan_percent"] is not None

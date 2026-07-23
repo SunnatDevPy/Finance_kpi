@@ -7,6 +7,11 @@ from app.config import settings
 from app.models import AppSetting
 
 MONTHLY_PLAN_KEY = "monthly_plan"
+YEARLY_PLAN_KEY_PREFIX = "yearly_plan_"
+
+
+def yearly_plan_key(year: int) -> str:
+    return f"{YEARLY_PLAN_KEY_PREFIX}{year}"
 
 COMPANY_PROFILE_DEFAULTS: dict[str, str] = {
     "company_name": "World Textile Marketing Agency",
@@ -35,6 +40,28 @@ def set_monthly_plan(db: Session, amount: Decimal) -> Decimal:
     value = str(amount)
     if row is None:
         db.add(AppSetting(key=MONTHLY_PLAN_KEY, value=value))
+    else:
+        row.value = value
+    db.commit()
+    return amount
+
+
+def get_yearly_plan(db: Session, year: int) -> Decimal:
+    row = db.get(AppSetting, yearly_plan_key(year))
+    if row is None:
+        return get_monthly_plan(db) * 12
+    try:
+        return Decimal(row.value)
+    except InvalidOperation:
+        return get_monthly_plan(db) * 12
+
+
+def set_yearly_plan(db: Session, year: int, amount: Decimal) -> Decimal:
+    key = yearly_plan_key(year)
+    row = db.get(AppSetting, key)
+    value = str(amount)
+    if row is None:
+        db.add(AppSetting(key=key, value=value))
     else:
         row.value = value
     db.commit()

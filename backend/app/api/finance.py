@@ -4,11 +4,12 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, 
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_admin
 from app.database import get_db
-from app.schemas.finance import FinanceEntryType, FinanceLedgerPage
+from app.schemas.finance import FinanceEntryType, FinanceLedgerPage, FinanceTurnoverPlanUpdate, FinanceTurnoverRead
 from app.schemas.finance_import import FinanceImportResult
-from app.services.finance import get_finance_ledger
+from app.services.app_settings import set_yearly_plan
+from app.services.finance import get_finance_ledger, get_finance_turnover
 from app.services.finance_import import build_finance_import_template, import_finance_from_xlsx
 
 router = APIRouter(prefix="/finance", dependencies=[Depends(get_current_user)])
@@ -33,6 +34,24 @@ def finance_ledger(
         skip=skip,
         limit=limit,
     )
+
+
+@router.get("/turnover", response_model=FinanceTurnoverRead)
+def finance_turnover(
+    db: Session = Depends(get_db),
+    year: int = Query(default=date.today().year, ge=2000, le=2100),
+) -> FinanceTurnoverRead:
+    return get_finance_turnover(db, year=year)
+
+
+@router.patch("/turnover-plan", response_model=FinanceTurnoverRead)
+def update_finance_turnover_plan(
+    payload: FinanceTurnoverPlanUpdate,
+    db: Session = Depends(get_db),
+    _: object = Depends(require_admin),
+) -> FinanceTurnoverRead:
+    set_yearly_plan(db, payload.year, payload.yearly_plan)
+    return get_finance_turnover(db, year=payload.year)
 
 
 @router.get("/import-template")
