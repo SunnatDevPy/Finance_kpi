@@ -699,7 +699,7 @@ export const api = {
     },
     turnover: (year: FinanceTurnoverYear, period: FinancePeriod = "full") =>
       request<FinanceTurnover>(`/finance/turnover?year=${year}&period=${period}`),
-    turnoverTrend: (yearFrom = 2020, yearTo = new Date().getFullYear()) =>
+    turnoverTrend: (yearFrom = 2019, yearTo = new Date().getFullYear()) =>
       request<FinanceTurnoverTrend>(
         `/finance/turnover-trend?year_from=${yearFrom}&year_to=${yearTo}`,
       ),

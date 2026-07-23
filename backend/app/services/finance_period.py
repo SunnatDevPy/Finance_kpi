@@ -4,7 +4,7 @@ from typing import Literal
 
 FinancePeriod = Literal["full", "q1", "q2", "q3", "q4"]
 
-TURNOVER_YEAR_START = 2020
+TURNOVER_YEAR_START = 2019
 TURNOVER_YEAR_END = 2035
 
 

@@ -74,7 +74,7 @@ def finance_turnover(
 @router.get("/turnover-trend", response_model=FinanceTurnoverTrendRead)
 def finance_turnover_trend(
     db: Session = Depends(get_db),
-    year_from: int = Query(default=2020, ge=2000, le=2035),
+    year_from: int = Query(default=2019, ge=2000, le=2035),
     year_to: int = Query(default=date.today().year, ge=2000, le=2035),
 ) -> FinanceTurnoverTrendRead:
     return get_finance_turnover_trend(db, year_from=year_from, year_to=year_to)
