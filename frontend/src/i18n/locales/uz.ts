@@ -599,6 +599,7 @@ export const uz = {
       title: "Oborot",
       subtitle: "Tanlangan yil va davr bo'yicha tushum, chiqim va sof balans",
       year: "Yil",
+      allYears: "Barcha yillar",
       period: "Davr",
       annualRevenue: "Yillik daromad",
       trendDesc: "{from}–{to} yillar bo'yicha mijoz to'lovlari va chiqimlar",

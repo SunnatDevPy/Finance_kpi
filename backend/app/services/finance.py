@@ -14,7 +14,13 @@ from app.schemas.finance import (
     FinanceTurnoverTrendRead,
 )
 from app.services.expenses import get_expense_summary
-from app.services.finance_period import FinancePeriod, resolve_finance_period
+from app.services.finance_period import (
+    FinancePeriod,
+    TURNOVER_YEAR_END,
+    TURNOVER_YEAR_START,
+    resolve_all_years_span,
+    resolve_finance_period,
+)
 
 
 def get_finance_ledger(
@@ -173,6 +179,42 @@ def get_finance_turnover(
             FinanceExpenseCategoryAmount(category=row.category.value, total=row.total)
             for row in expense_summary.by_category
         ],
+    )
+
+
+def get_finance_turnover_all_years(
+    db: Session,
+    *,
+    period: FinancePeriod = "full",
+    year_from: int = TURNOVER_YEAR_START,
+    year_to: int = TURNOVER_YEAR_END,
+) -> FinanceTurnoverRead:
+    total_revenue = Decimal("0")
+    total_expense = Decimal("0")
+    category_totals: dict[str, Decimal] = {}
+
+    for year in range(year_from, year_to + 1):
+        row = get_finance_turnover(db, year=year, period=period)
+        total_revenue += row.total_revenue
+        total_expense += row.total_expense
+        for item in row.expenses_by_category:
+            category_totals[item.category] = category_totals.get(item.category, Decimal("0")) + item.total
+
+    date_from, date_to = resolve_all_years_span(year_from=year_from, year_to=year_to)
+    expenses_by_category = [
+        FinanceExpenseCategoryAmount(category=category, total=total)
+        for category, total in sorted(category_totals.items(), key=lambda item: item[1], reverse=True)
+    ]
+
+    return FinanceTurnoverRead(
+        year=0,
+        period=period,
+        date_from=date_from,
+        date_to=date_to,
+        total_revenue=total_revenue,
+        total_expense=total_expense,
+        net_balance=total_revenue - total_expense,
+        expenses_by_category=expenses_by_category,
     )
 
 

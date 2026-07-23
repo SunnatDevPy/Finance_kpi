@@ -69,6 +69,29 @@ def test_finance_turnover_period_filter(client, auth_headers, sample_contract):
     assert Decimal(q2.json()["total_revenue"]) == Decimal("2000000.00")
 
 
+def test_finance_turnover_all_years(client, auth_headers, sample_contract):
+    client.post(
+        "/api/v1/payments",
+        headers=auth_headers,
+        json={"contract_id": sample_contract.id, "amount": "1000000.00", "paid_at": "2025-03-01"},
+    )
+    client.post(
+        "/api/v1/payments",
+        headers=auth_headers,
+        json={"contract_id": sample_contract.id, "amount": "2000000.00", "paid_at": "2026-05-01"},
+    )
+
+    resp = client.get(
+        "/api/v1/finance/turnover",
+        headers=auth_headers,
+        params={"year": "all"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["year"] == 0
+    assert Decimal(data["total_revenue"]) == Decimal("3000000.00")
+
+
 def test_finance_turnover_plan_update(client, auth_headers):
     resp = client.patch(
         "/api/v1/finance/turnover-plan",

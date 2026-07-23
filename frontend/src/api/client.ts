@@ -23,6 +23,7 @@ import type {
   FinanceImportResult,
   FinanceLedgerPage,
   FinancePeriod,
+  FinanceTurnoverYear,
   FinanceTurnover,
   FinanceTurnoverTrend,
   Income,
@@ -696,7 +697,7 @@ export const api = {
       const qs = q.toString();
       return request<FinanceLedgerPage>(`/finance/ledger${qs ? `?${qs}` : ""}`);
     },
-    turnover: (year: number, period: FinancePeriod = "full") =>
+    turnover: (year: FinanceTurnoverYear, period: FinancePeriod = "full") =>
       request<FinanceTurnover>(`/finance/turnover?year=${year}&period=${period}`),
     turnoverTrend: (yearFrom = 2020, yearTo = 2035) =>
       request<FinanceTurnoverTrend>(

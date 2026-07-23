@@ -441,6 +441,8 @@ export interface FinanceImportResult {
 
 export type FinancePeriod = "full" | "q1" | "q2" | "q3" | "q4";
 
+export type FinanceTurnoverYear = number | "all";
+
 export interface FinanceTurnover {
   year: number;
   period: string;

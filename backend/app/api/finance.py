@@ -15,7 +15,12 @@ from app.schemas.finance import (
 )
 from app.schemas.finance_import import FinanceImportResult
 from app.services.app_settings import set_yearly_plan
-from app.services.finance import get_finance_ledger, get_finance_turnover, get_finance_turnover_trend
+from app.services.finance import (
+    get_finance_ledger,
+    get_finance_turnover,
+    get_finance_turnover_all_years,
+    get_finance_turnover_trend,
+)
 from app.services.finance_import import build_finance_import_template, import_finance_from_xlsx
 from app.services.finance_period import FinancePeriod
 
@@ -46,10 +51,24 @@ def finance_ledger(
 @router.get("/turnover", response_model=FinanceTurnoverRead)
 def finance_turnover(
     db: Session = Depends(get_db),
-    year: int = Query(default=date.today().year, ge=2000, le=2035),
+    year: str = Query(default=str(date.today().year)),
     period: FinancePeriod = Query(default="full"),
 ) -> FinanceTurnoverRead:
-    return get_finance_turnover(db, year=year, period=period)
+    if year == "all":
+        return get_finance_turnover_all_years(db, period=period)
+    try:
+        year_int = int(year)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Yil butun son yoki 'all' bo'lishi kerak",
+        ) from exc
+    if year_int < 2000 or year_int > 2035:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Yil 2000–2035 oralig'ida bo'lishi kerak",
+        )
+    return get_finance_turnover(db, year=year_int, period=period)
 
 
 @router.get("/turnover-trend", response_model=FinanceTurnoverTrendRead)

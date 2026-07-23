@@ -601,6 +601,7 @@ export const ru: TranslationDict = {
       title: "Оборот",
       subtitle: "Поступления, расходы и чистый баланс за выбранный год и период",
       year: "Год",
+      allYears: "Все годы",
       period: "Период",
       annualRevenue: "Годовой доход",
       trendDesc: "Платежи клиентов и расходы за {from}–{to}",

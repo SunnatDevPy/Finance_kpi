@@ -88,6 +88,7 @@ import type {
   FinanceImportResult,
   FinanceLedgerItem,
   FinancePeriod,
+  FinanceTurnoverYear,
   FinanceTurnover,
   FinanceTurnoverTrend,
   IncomeCategory,
@@ -105,6 +106,7 @@ import { cn } from "@/lib/utils";
 
 const TURNOVER_YEAR_START = 2020;
 const TURNOVER_YEAR_END = 2035;
+const TURNOVER_YEAR_ALL = "all" as const;
 const TURNOVER_PERIODS: FinancePeriod[] = ["full", "q1", "q2", "q3", "q4"];
 
 const EXPENSE_BAR_COLORS = [
@@ -241,9 +243,15 @@ export function FinancePage() {
     return { items, max };
   }, [turnover]);
 
-  const selectedYear = Number.parseInt(turnoverYear, 10) || new Date().getFullYear();
+  const selectedYear: FinanceTurnoverYear =
+    turnoverYear === TURNOVER_YEAR_ALL
+      ? TURNOVER_YEAR_ALL
+      : Number.parseInt(turnoverYear, 10) || new Date().getFullYear();
 
-  const loadTurnover = (year = selectedYear, period: FinancePeriod = turnoverPeriod) => {
+  const loadTurnover = (
+    year: FinanceTurnoverYear = selectedYear,
+    period: FinancePeriod = turnoverPeriod,
+  ) => {
     setTurnoverLoading(true);
     Promise.all([
       api.finance.turnover(year, period),
@@ -262,7 +270,8 @@ export function FinancePage() {
   const handleYearChange = (yearValue: string) => {
     if (!yearValue) return;
     setTurnoverYear(yearValue);
-    const year = Number.parseInt(yearValue, 10);
+    const year: FinanceTurnoverYear =
+      yearValue === TURNOVER_YEAR_ALL ? TURNOVER_YEAR_ALL : Number.parseInt(yearValue, 10);
     loadTurnover(year, turnoverPeriod);
   };
 
@@ -497,12 +506,13 @@ export function FinancePage() {
               <CardDescription className="text-xs">{t("finance.turnover.subtitle")}</CardDescription>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-              <Select value={turnoverYear} onValueChange={handleYearChange} className="w-full sm:w-36">
+              <Select value={turnoverYear} onValueChange={handleYearChange} className="w-full sm:w-44">
                 <SelectTrigger>
                   <SelectValue placeholder={t("finance.turnover.year")} />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-60">
                   <SelectGroup>
+                    <SelectItem value={TURNOVER_YEAR_ALL}>{t("finance.turnover.allYears")}</SelectItem>
                     {yearOptions.map((year) => (
                       <SelectItem key={year} value={String(year)}>
                         {year}
@@ -515,7 +525,7 @@ export function FinancePage() {
                 <SelectTrigger>
                   <SelectValue placeholder={t("finance.turnover.period")} />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-60">
                   <SelectGroup>
                     {TURNOVER_PERIODS.map((period) => (
                       <SelectItem key={period} value={period}>
