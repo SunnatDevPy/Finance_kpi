@@ -255,6 +255,13 @@ export interface TopClientLtvItem {
   share_pct: number;
 }
 
+export interface TopClientItem {
+  client_id: number;
+  company_name: string;
+  total_paid: string;
+  total_debt: string;
+}
+
 export interface ClientImportError {
   row: number;
   message: string;

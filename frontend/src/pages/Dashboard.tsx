@@ -16,6 +16,8 @@ import {
 } from "recharts";
 import {
   AlertTriangleIcon,
+  ArrowDownIcon,
+  ArrowUpIcon,
   BanknoteIcon,
   MapPinIcon,
   CheckCircle2Icon,
@@ -67,7 +69,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-import type { ChartPoint, ClientRegionStatsItem, DashboardStats, TopClientLtvItem } from "../types";
+import type { ChartPoint, ClientRegionStatsItem, DashboardStats, TopClientItem, TopClientLtvItem } from "../types";
 import { useI18n } from "../context/I18nContext";
 import { formatAmount, formatCompactMoney, formatMoney, formatPercent, toNumber } from "../utils/format";
 import { cn } from "@/lib/utils";
@@ -88,8 +90,10 @@ const RANK_STYLES = [
   "bg-orange-400 text-orange-950",
 ];
 
-const LTV_LIMIT_OPTIONS = [10, 20, 30] as const;
+const TABLE_LIMIT_OPTIONS = [10, 20, 30] as const;
 const TREND_MONTH_OPTIONS = [6, 12] as const;
+type TableLimit = (typeof TABLE_LIMIT_OPTIONS)[number];
+type SortOrder = "asc" | "desc";
 
 const CONTRACT_STATUS_COLORS: Record<(typeof CONTRACT_WORKFLOW_STATUSES)[number], string> = {
   yangi: "hsl(220 70% 50%)",
@@ -100,6 +104,50 @@ const CONTRACT_STATUS_COLORS: Record<(typeof CONTRACT_WORKFLOW_STATUSES)[number]
 
 function moneyTooltip(value: unknown) {
   return formatMoney(Number(value));
+}
+
+function TableLimitSortControls({
+  limit,
+  onLimitChange,
+  order,
+  onOrderChange,
+}: {
+  limit: TableLimit;
+  onLimitChange: (value: TableLimit) => void;
+  order: SortOrder;
+  onOrderChange: (value: SortOrder) => void;
+}) {
+  const { t } = useI18n();
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className="segmented-control">
+        {TABLE_LIMIT_OPTIONS.map((option) => (
+          <Button
+            key={option}
+            type="button"
+            size="sm"
+            variant={limit === option ? "default" : "ghost"}
+            className="h-8 px-3.5"
+            onClick={() => onLimitChange(option)}
+          >
+            Top {option}
+          </Button>
+        ))}
+      </div>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className="size-8 shrink-0 p-0"
+        onClick={() => onOrderChange(order === "desc" ? "asc" : "desc")}
+        aria-label={order === "desc" ? t("common.sortAsc") : t("common.sortDesc")}
+        title={order === "desc" ? t("common.sortAsc") : t("common.sortDesc")}
+      >
+        {order === "desc" ? <ArrowDownIcon className="size-4" /> : <ArrowUpIcon className="size-4" />}
+      </Button>
+    </div>
+  );
 }
 
 function RevealCard({ children, className }: { children: ReactNode; className?: string }) {
@@ -127,8 +175,14 @@ export function DashboardPage() {
   const [error, setError] = useState("");
   const [regionError, setRegionError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [rankedClients, setRankedClients] = useState<TopClientItem[]>([]);
+  const [rankedLimit, setRankedLimit] = useState<TableLimit>(10);
+  const [rankedOrder, setRankedOrder] = useState<SortOrder>("desc");
+  const [rankedLoading, setRankedLoading] = useState(true);
+  const [rankedError, setRankedError] = useState("");
   const [ltvClients, setLtvClients] = useState<TopClientLtvItem[]>([]);
-  const [ltvLimit, setLtvLimit] = useState<(typeof LTV_LIMIT_OPTIONS)[number]>(10);
+  const [ltvLimit, setLtvLimit] = useState<TableLimit>(10);
+  const [ltvOrder, setLtvOrder] = useState<SortOrder>("desc");
   const [ltvLoading, setLtvLoading] = useState(true);
   const [ltvError, setLtvError] = useState("");
   const [trendMonths, setTrendMonths] = useState<(typeof TREND_MONTH_OPTIONS)[number]>(12);
@@ -201,14 +255,29 @@ export function DashboardPage() {
   );
 
   useEffect(() => {
+    setRankedLoading(true);
+    setRankedError("");
+    api
+      .dashboardTopClientsRanked({
+        limit: rankedLimit,
+        order: rankedOrder,
+        date_from: dateFrom || undefined,
+        date_to: dateTo || undefined,
+      })
+      .then(setRankedClients)
+      .catch((e) => setRankedError(e.message))
+      .finally(() => setRankedLoading(false));
+  }, [rankedLimit, rankedOrder, dateFrom, dateTo]);
+
+  useEffect(() => {
     setLtvLoading(true);
     setLtvError("");
     api
-      .dashboardTopClients(ltvLimit)
+      .dashboardTopClients(ltvLimit, ltvOrder)
       .then(setLtvClients)
       .catch((e) => setLtvError(e.message))
       .finally(() => setLtvLoading(false));
-  }, [ltvLimit]);
+  }, [ltvLimit, ltvOrder]);
 
   useEffect(() => {
     setTrendLoading(true);
@@ -986,19 +1055,33 @@ export function DashboardPage() {
       {/* ── Top clients ── */}
       <Card className="content-card">
         <CardHeader className="border-b bg-gradient-to-r from-blue-50 to-white dark:from-blue-950/20 dark:to-card">
-          <div className="flex items-center gap-3">
-            <span className="flex size-8 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-400">
-              <UsersIcon className="size-4" />
-            </span>
-            <div>
-              <CardTitle className="text-base">{t("dashboard.topClientsTable")}</CardTitle>
-              <CardDescription className="text-xs">{t("dashboard.topClientsTableDesc")}</CardDescription>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="flex size-8 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-400">
+                <UsersIcon className="size-4" />
+              </span>
+              <div>
+                <CardTitle className="text-base">{t("dashboard.topClientsTable")}</CardTitle>
+                <CardDescription className="text-xs">{t("dashboard.topClientsTableDesc")}</CardDescription>
+              </div>
             </div>
+            <TableLimitSortControls
+              limit={rankedLimit}
+              onLimitChange={setRankedLimit}
+              order={rankedOrder}
+              onOrderChange={setRankedOrder}
+            />
           </div>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className={cn("p-0", rankedLoading && "pointer-events-none opacity-60")}>
+          {rankedError && (
+            <p className="px-6 py-3 text-sm text-red-600 dark:text-red-400">
+              {t("common.error")}: {rankedError}
+            </p>
+          )}
+          {!rankedError && (
           <PremiumDataTable
-            empty={stats.top_clients.length === 0}
+            empty={rankedClients.length === 0}
             emptyMessage={t("common.noData")}
             skeletonCols={4}
           >
@@ -1013,7 +1096,7 @@ export function DashboardPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {stats.top_clients.map((client, index) => {
+              {rankedClients.map((client, index) => {
                 const paid = toNumber(client.total_paid);
                 const debt = toNumber(client.total_debt);
                 const ratio = Math.round((paid / Math.max(1, paid + debt)) * 100);
@@ -1062,6 +1145,7 @@ export function DashboardPage() {
               })}
             </TableBody>
           </PremiumDataTable>
+          )}
         </CardContent>
       </Card>
 
@@ -1078,20 +1162,12 @@ export function DashboardPage() {
                 <CardDescription className="text-xs">{t("dashboard.topClientsLtvDesc")}</CardDescription>
               </div>
             </div>
-            <div className="segmented-control">
-              {LTV_LIMIT_OPTIONS.map((option) => (
-                <Button
-                  key={option}
-                  type="button"
-                  size="sm"
-                  variant={ltvLimit === option ? "default" : "ghost"}
-                  className="h-8 px-3.5"
-                  onClick={() => setLtvLimit(option)}
-                >
-                  Top {option}
-                </Button>
-              ))}
-            </div>
+            <TableLimitSortControls
+              limit={ltvLimit}
+              onLimitChange={setLtvLimit}
+              order={ltvOrder}
+              onOrderChange={setLtvOrder}
+            />
           </div>
         </CardHeader>
         <CardContent className={cn("p-0 pt-2", ltvLoading && "pointer-events-none opacity-60")}>

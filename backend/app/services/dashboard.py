@@ -1,6 +1,7 @@
 from calendar import monthrange
 from datetime import date, timedelta
 from decimal import Decimal
+from typing import Literal
 
 from sqlalchemy import case, extract, func, select
 from sqlalchemy.orm import Session, selectinload
@@ -487,60 +488,13 @@ def get_dashboard_stats(
         .order_by(func.coalesce(func.sum(ContractLineItem.price), 0).desc())
     ).all()
 
-    contract_totals = (
-        select(
-            Contract.client_id.label("client_id"),
-            func.coalesce(func.sum(ContractLineItem.price), 0).label("contract_total"),
-        )
-        .join(ContractLineItem, ContractLineItem.contract_id == Contract.id)
-        .where(
-            ContractLineItem.is_cancelled.is_(False),
-            Contract.deleted_at.is_(None),
-        )
-        .group_by(Contract.client_id)
-        .subquery()
+    top_clients = get_top_clients_ranked(
+        db,
+        limit=10,
+        order="desc",
+        date_from=period_start if has_custom_range else None,
+        date_to=period_end if has_custom_range else None,
     )
-
-    payment_totals_stmt = (
-        select(
-            Contract.client_id.label("client_id"),
-            func.coalesce(func.sum(Payment.amount), 0).label("paid_total"),
-        )
-        .join(Payment, Payment.contract_id == Contract.id)
-        .where(Contract.deleted_at.is_(None), Payment.deleted_at.is_(None))
-    )
-    if has_custom_range:
-        payment_totals_stmt = payment_totals_stmt.where(
-            Payment.paid_at >= period_start,
-            Payment.paid_at <= period_end,
-        )
-    payment_totals = payment_totals_stmt.group_by(Contract.client_id).subquery()
-
-    top_rows = db.execute(
-        select(
-            Client.id,
-            Client.company_name,
-            func.coalesce(payment_totals.c.paid_total, 0),
-            func.coalesce(contract_totals.c.contract_total, 0)
-            - func.coalesce(payment_totals.c.paid_total, 0),
-        )
-        .where(Client.deleted_at.is_(None))
-        .outerjoin(contract_totals, contract_totals.c.client_id == Client.id)
-        .outerjoin(payment_totals, payment_totals.c.client_id == Client.id)
-        .order_by(func.coalesce(payment_totals.c.paid_total, 0).desc())
-        .limit(8)
-    ).all()
-
-    top_clients = [
-        TopClientItem(
-            client_id=row[0],
-            company_name=row[1],
-            total_paid=row[2],
-            total_debt=row[3],
-        )
-        for row in top_rows
-        if row[2] > 0 or row[3] > 0
-    ]
 
     cumulative_by_month = {}
     for month_date in months:
@@ -658,7 +612,81 @@ def get_dashboard_stats(
     )
 
 
-def get_top_clients_by_ltv(db: Session, limit: int = 10) -> list[TopClientLtvItem]:
+SortOrder = Literal["asc", "desc"]
+
+
+def get_top_clients_ranked(
+    db: Session,
+    *,
+    limit: int = 10,
+    order: SortOrder = "desc",
+    date_from: date | None = None,
+    date_to: date | None = None,
+) -> list[TopClientItem]:
+    """Rank clients by paid amount (optionally scoped to a date range)."""
+    contract_totals = (
+        select(
+            Contract.client_id.label("client_id"),
+            func.coalesce(func.sum(ContractLineItem.price), 0).label("contract_total"),
+        )
+        .join(ContractLineItem, ContractLineItem.contract_id == Contract.id)
+        .where(
+            ContractLineItem.is_cancelled.is_(False),
+            Contract.deleted_at.is_(None),
+        )
+        .group_by(Contract.client_id)
+        .subquery()
+    )
+
+    payment_totals_stmt = (
+        select(
+            Contract.client_id.label("client_id"),
+            func.coalesce(func.sum(Payment.amount), 0).label("paid_total"),
+        )
+        .join(Payment, Payment.contract_id == Contract.id)
+        .where(Contract.deleted_at.is_(None), Payment.deleted_at.is_(None))
+    )
+    if date_from is not None and date_to is not None:
+        payment_totals_stmt = payment_totals_stmt.where(
+            Payment.paid_at >= date_from,
+            Payment.paid_at <= date_to,
+        )
+    payment_totals = payment_totals_stmt.group_by(Contract.client_id).subquery()
+
+    paid_total = func.coalesce(payment_totals.c.paid_total, 0)
+    order_clause = paid_total.asc() if order == "asc" else paid_total.desc()
+
+    top_rows = db.execute(
+        select(
+            Client.id,
+            Client.company_name,
+            paid_total,
+            func.coalesce(contract_totals.c.contract_total, 0) - paid_total,
+        )
+        .where(Client.deleted_at.is_(None))
+        .outerjoin(contract_totals, contract_totals.c.client_id == Client.id)
+        .outerjoin(payment_totals, payment_totals.c.client_id == Client.id)
+        .order_by(order_clause)
+        .limit(limit)
+    ).all()
+
+    return [
+        TopClientItem(
+            client_id=row[0],
+            company_name=row[1],
+            total_paid=row[2],
+            total_debt=row[3],
+        )
+        for row in top_rows
+        if row[2] > 0 or row[3] > 0
+    ]
+
+
+def get_top_clients_by_ltv(
+    db: Session,
+    limit: int = 10,
+    order: SortOrder = "desc",
+) -> list[TopClientLtvItem]:
     """Rank clients by lifetime value (all-time total payments), ignoring any date filter."""
     ltv_totals = (
         select(
@@ -681,7 +709,11 @@ def get_top_clients_by_ltv(db: Session, limit: int = 10) -> list[TopClientLtvIte
         )
         .join(ltv_totals, ltv_totals.c.client_id == Client.id)
         .where(Client.deleted_at.is_(None))
-        .order_by(ltv_totals.c.paid_total.desc())
+        .order_by(
+            ltv_totals.c.paid_total.asc()
+            if order == "asc"
+            else ltv_totals.c.paid_total.desc()
+        )
         .limit(limit)
     ).all()
 

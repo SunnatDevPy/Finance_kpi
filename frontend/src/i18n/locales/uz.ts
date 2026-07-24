@@ -47,6 +47,8 @@ export const uz = {
     archive: "Arxivga o'tkazish",
     bulkArchiveTitle: "Tanlangan yozuvlarni arxivga o'tkazish",
     bulkArchiveDesc: "{count} ta yozuv arxivga o'tkaziladi. Kerak bo'lsa, Arxiv sahifasidan qaytarib tiklash mumkin.",
+    sortDesc: "Eng ko'p avval",
+    sortAsc: "Eng kam avval",
   },
   toast: {
     created: {

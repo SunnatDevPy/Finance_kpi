@@ -49,6 +49,8 @@ export const ru: TranslationDict = {
     archive: "В архив",
     bulkArchiveTitle: "Переместить выбранные записи в архив",
     bulkArchiveDesc: "{count} записей будет перемещено в архив. При необходимости их можно восстановить со страницы «Архив».",
+    sortDesc: "Сначала больше",
+    sortAsc: "Сначала меньше",
   },
   toast: {
     created: {

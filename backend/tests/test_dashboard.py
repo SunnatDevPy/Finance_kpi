@@ -68,6 +68,57 @@ def test_top_clients_ltv_empty_when_no_payments(client, auth_headers, sample_con
     assert response.json() == []
 
 
+def test_top_clients_ranked_with_limit_and_order(client, auth_headers, sample_contract):
+    client.post(
+        "/api/v1/payments",
+        headers=auth_headers,
+        json={
+            "contract_id": sample_contract.id,
+            "amount": "500000.00",
+            "paid_at": "2026-03-15",
+        },
+    )
+
+    response = client.get(
+        "/api/v1/dashboard/top-clients-ranked",
+        headers=auth_headers,
+        params={"limit": 20, "order": "desc"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["client_id"] == sample_contract.client_id
+    assert float(data[0]["total_paid"]) == 500_000.0
+
+    asc_response = client.get(
+        "/api/v1/dashboard/top-clients-ranked",
+        headers=auth_headers,
+        params={"limit": 10, "order": "asc"},
+    )
+    assert asc_response.status_code == 200
+    assert asc_response.json()[0]["client_id"] == sample_contract.client_id
+
+
+def test_top_clients_ltv_order_asc(client, auth_headers, sample_contract):
+    client.post(
+        "/api/v1/payments",
+        headers=auth_headers,
+        json={
+            "contract_id": sample_contract.id,
+            "amount": "500000.00",
+            "paid_at": "2026-03-15",
+        },
+    )
+
+    response = client.get(
+        "/api/v1/dashboard/top-clients",
+        headers=auth_headers,
+        params={"limit": 10, "order": "asc"},
+    )
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+
+
 def test_revenue_trend_default_12_months(client, auth_headers, sample_contract):
     client.post(
         "/api/v1/incomes",

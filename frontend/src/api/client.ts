@@ -37,6 +37,7 @@ import type {
   Paginated,
   ServiceType,
   ServiceTypeStats,
+  TopClientItem,
   TopClientLtvItem,
   User,
   UserRole,
@@ -266,8 +267,24 @@ export const api = {
     return request<DashboardStats>(`/dashboard${qs ? `?${qs}` : ""}`);
   },
 
-  dashboardTopClients: (limit = 10) =>
-    request<TopClientLtvItem[]>(`/dashboard/top-clients?limit=${limit}`),
+  dashboardTopClients: (
+    limit = 10,
+    order: "asc" | "desc" = "desc",
+  ) => request<TopClientLtvItem[]>(`/dashboard/top-clients?limit=${limit}&order=${order}`),
+
+  dashboardTopClientsRanked: (params?: {
+    limit?: number;
+    order?: "asc" | "desc";
+    date_from?: string;
+    date_to?: string;
+  }) => {
+    const q = new URLSearchParams();
+    q.set("limit", String(params?.limit ?? 10));
+    q.set("order", params?.order ?? "desc");
+    if (params?.date_from) q.set("date_from", params.date_from);
+    if (params?.date_to) q.set("date_to", params.date_to);
+    return request<TopClientItem[]>(`/dashboard/top-clients-ranked?${q.toString()}`);
+  },
 
   dashboardRevenueTrend: (months: 6 | 12 = 12) =>
     request<ChartPoint[]>(`/dashboard/revenue-trend?months=${months}`),
