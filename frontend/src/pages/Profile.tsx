@@ -1,5 +1,13 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Building2Icon, HistoryIcon, ShieldIcon, UserIcon } from "lucide-react";
+import {
+  Building2Icon,
+  DownloadIcon,
+  FileSpreadsheetIcon,
+  HistoryIcon,
+  Loader2Icon,
+  ShieldIcon,
+  UserIcon,
+} from "lucide-react";
 import { api } from "../api/client";
 import { KeyIconBtn, LoadingIconBtn, SaveIconBtn } from "../components/ButtonIcons";
 import { PageError } from "../components/PageError";
@@ -74,6 +82,8 @@ export function ProfilePage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyLoadError, setHistoryLoadError] = useState("");
   const [settingsLoadError, setSettingsLoadError] = useState("");
+  const [exportAllLoading, setExportAllLoading] = useState(false);
+  const [exportAllError, setExportAllError] = useState("");
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -175,6 +185,18 @@ export function ProfilePage() {
       setFinanceYearError(err instanceof Error ? err.message : t("common.error"));
     } finally {
       setFinanceYearLoading(false);
+    }
+  };
+
+  const handleExportAll = async () => {
+    setExportAllError("");
+    setExportAllLoading(true);
+    try {
+      await api.settings.exportAll();
+    } catch (err) {
+      setExportAllError(err instanceof Error ? err.message : t("common.error"));
+    } finally {
+      setExportAllLoading(false);
     }
   };
 
@@ -331,6 +353,36 @@ export function ProfilePage() {
                 )}
               </Button>
             </form>
+            <div className="my-6 h-px bg-border" />
+            {exportAllError && (
+              <p className="mb-4 text-sm text-red-600 dark:text-red-400">{exportAllError}</p>
+            )}
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div className="flex flex-col gap-1">
+                <Label>{t("profile.exportAll")}</Label>
+                <p className="text-xs text-muted-foreground">{t("profile.exportAllHint")}</p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleExportAll}
+                disabled={exportAllLoading}
+                className="w-fit"
+              >
+                {exportAllLoading ? (
+                  <>
+                    <Loader2Icon className="size-4 animate-spin" data-icon="inline-start" />
+                    {t("common.loading")}
+                  </>
+                ) : (
+                  <>
+                    <FileSpreadsheetIcon data-icon="inline-start" />
+                    {t("profile.exportAllButton")}
+                    <DownloadIcon className="size-3.5 opacity-60" />
+                  </>
+                )}
+              </Button>
+            </div>
           </CardContent>
         </Card>
         </StaggerItem>

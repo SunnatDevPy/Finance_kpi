@@ -404,6 +404,10 @@ export const ru: TranslationDict = {
     financeAutoPaymentsYearHint:
       "С выбранного года платежи по контрактам автоматически включаются в финансовый оборот. До этого учитываются только вручную введённые доходы и расходы.",
     financeAutoPaymentsYearSaved: "Год автоматического учёта сохранён",
+    exportAll: "Выгрузить все данные",
+    exportAllHint:
+      "Клиенты, контракты, платежи, доходы/расходы, задолженность и сотрудники — в одном файле Excel.",
+    exportAllButton: "Скачать Excel",
     systemSettings: "Системные настройки",
     systemSettingsDesc: "Общие параметры только для администратора",
     companyProfile: "Реквизиты компании",
