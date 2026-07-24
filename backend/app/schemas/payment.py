@@ -23,6 +23,19 @@ class PaymentCreate(PaymentBase):
     contract_id: int
 
 
+class PaymentUpdate(BaseModel):
+    amount: Decimal | None = Field(default=None, decimal_places=2, max_digits=18)
+    paid_at: date | None = None
+    note: str | None = None
+
+    @field_validator("amount")
+    @classmethod
+    def amount_not_zero(cls, value: Decimal | None) -> Decimal | None:
+        if value is not None and value == 0:
+            raise ValueError("Summa 0 bo'lishi mumkin emas")
+        return value
+
+
 class PaymentRead(PaymentBase):
     model_config = ConfigDict(from_attributes=True)
 

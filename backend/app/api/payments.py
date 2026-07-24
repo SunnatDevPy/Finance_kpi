@@ -8,8 +8,8 @@ from app.api.deps import get_current_user, require_admin
 from app.database import get_db
 from app.models import AuditAction, Client, Contract, Payment, User
 from app.schemas.pagination import Page
-from app.schemas.payment import PaymentCreate, PaymentListRead, PaymentRead, PaymentsPage
-from app.services.audit import record_audit
+from app.schemas.payment import PaymentCreate, PaymentListRead, PaymentRead, PaymentUpdate, PaymentsPage
+from app.services.audit import diff_fields, record_audit
 from app.services.contract_status import sync_status_after_payment
 from app.services.purge import purge_payment
 from app.services.helpers import get_contract_or_404, get_payment_or_404
@@ -149,6 +149,41 @@ def get_payment(payment_id: int, db: Session = Depends(get_db)) -> Payment:
     return get_payment_or_404(db, payment_id)
 
 
+@router.patch("/{payment_id}", response_model=PaymentRead)
+def update_payment(
+    payment_id: int,
+    payload: PaymentUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Payment:
+    payment = get_payment_or_404(db, payment_id)
+    data = payload.model_dump(exclude_unset=True)
+    if not data:
+        return payment
+
+    before = {field: getattr(payment, field) for field in data}
+    for field, value in data.items():
+        setattr(payment, field, value)
+
+    contract = get_contract_or_404(db, payment.contract_id)
+    sync_status_after_payment(contract)
+    db.commit()
+    db.refresh(payment)
+
+    changes = diff_fields(before, data)
+    if changes:
+        record_audit(
+            db,
+            user=current_user,
+            entity_type="payment",
+            entity_id=payment.id,
+            action=AuditAction.UPDATE,
+            changes=changes,
+            summary=f"To'lov tahrirlandi: {payment.amount} (shartnoma #{payment.contract_id})",
+        )
+    return payment
+
+
 @router.delete(
     "/{payment_id}",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -160,7 +195,9 @@ def delete_payment(
     current_user: User = Depends(get_current_user),
 ) -> None:
     payment = get_payment_or_404(db, payment_id)
+    contract = get_contract_or_404(db, payment.contract_id)
     payment.deleted_at = datetime.now(timezone.utc)
+    sync_status_after_payment(contract)
     db.commit()
     record_audit(
         db,
@@ -186,6 +223,8 @@ def restore_payment(
     if payment is None or payment.deleted_at is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="To'lov topilmadi")
     payment.deleted_at = None
+    contract = get_contract_or_404(db, payment.contract_id)
+    sync_status_after_payment(contract)
     db.commit()
     db.refresh(payment)
     record_audit(

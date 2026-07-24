@@ -21,6 +21,7 @@ import { api } from "../api/client";
 import { CancelIcon, DeleteIconBtn, LoadingIconBtn, SaveIconBtn } from "../components/ButtonIcons";
 import { DateRangePicker } from "../components/DateRangePicker";
 import { Modal } from "../components/Modal";
+import { PaymentEditModal } from "../components/PaymentEditModal";
 import { PageError } from "../components/PageError";
 import { PageHeader, PageShell } from "../components/PageHeader";
 import { TableColumnPicker } from "../components/TableColumnPicker";
@@ -91,6 +92,7 @@ import type {
   FinanceTurnover,
   FinanceTurnoverTrend,
   IncomeCategory,
+  Payment,
 } from "../types";
 import { usePersistedState } from "../hooks/usePersistedState";
 import { EXPENSE_CATEGORIES, expenseCategoryLabel } from "../utils/expenseCategory";
@@ -196,6 +198,7 @@ export function FinancePage() {
   const [editing, setEditing] = useState<FinanceLedgerItem | null>(null);
   const [form, setForm] = useState<EntryForm>(emptyForm());
   const [deleteTarget, setDeleteTarget] = useState<{ kind: EntryKind; id: number } | null>(null);
+  const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
 
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -325,8 +328,22 @@ export function FinancePage() {
     setModalOpen(true);
   };
 
+  const openEditPayment = (item: FinanceLedgerItem) => {
+    setEditingPayment({
+      id: item.id,
+      contract_id: 0,
+      amount: item.amount,
+      paid_at: item.date,
+      note: item.note,
+      created_at: "",
+    });
+  };
+
   const openEdit = (item: FinanceLedgerItem) => {
-    if (item.type === "payment") return;
+    if (item.type === "payment") {
+      openEditPayment(item);
+      return;
+    }
     setEditing(item);
     setForm({
       kind: item.type,
@@ -722,17 +739,29 @@ export function FinancePage() {
                   <TableCellActions>
                     <div className="action-toolbar">
                     {item.type === "payment" ? (
-                      <MotionButton
-                        variant="ghost"
-                        size="icon-sm"
-                        className="size-8"
-                        onClick={() => item.client_id && navigate(`/clients/${item.client_id}`)}
-                        disabled={!item.client_id}
-                        title={t("finance.viewClient")}
-                        {...motionTap}
-                      >
-                        <ExternalLinkIcon className="size-3.5" />
-                      </MotionButton>
+                      <>
+                        <MotionButton
+                          variant="ghost"
+                          size="icon-sm"
+                          className="size-8"
+                          onClick={() => openEditPayment(item)}
+                          title={t("common.edit")}
+                          {...motionTap}
+                        >
+                          <PencilIcon className="size-3.5" />
+                        </MotionButton>
+                        <MotionButton
+                          variant="ghost"
+                          size="icon-sm"
+                          className="size-8"
+                          onClick={() => item.client_id && navigate(`/clients/${item.client_id}`)}
+                          disabled={!item.client_id}
+                          title={t("finance.viewClient")}
+                          {...motionTap}
+                        >
+                          <ExternalLinkIcon className="size-3.5" />
+                        </MotionButton>
+                      </>
                     ) : (
                       <>
                         <MotionButton
@@ -983,6 +1012,15 @@ export function FinancePage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <PaymentEditModal
+        payment={editingPayment}
+        onClose={() => setEditingPayment(null)}
+        onSuccess={() => {
+          load(false);
+          loadTurnover(selectedYear);
+        }}
+      />
     </PageShell>
   );
 }

@@ -514,6 +514,8 @@ export const uz = {
     client: "Mijoz",
     deleteTitle: "To'lovni o'chirish",
     deleteDesc: "Bu amalni qaytarib bo'lmaydi. Kontrakt qarzi qayta hisoblanadi.",
+    editTitle: "To'lovni tahrirlash",
+    amountRequired: "Summa 0 bo'lmasligi kerak",
   },
   expenses: {
     title: "Xarajatlar",
@@ -738,6 +740,9 @@ export const uz = {
     clearHistoryConfirm: "Tanlangan filtr bo'yicha o'zgarishlar tarixi butunlay o'chiriladi. Bu amalni qaytarib bo'lmaydi. Davom etasizmi?",
     clearHistoryConfirmAll: "Barcha o'zgarishlar tarixi butunlay o'chiriladi. Bu amalni qaytarib bo'lmaydi. Davom etasizmi?",
     cleared: "{count} ta yozuv o'chirildi",
+    restore: "Tiklash",
+    restoreConfirm: "Ushbu yozuv arxivdan tiklanadi. Davom etasizmi?",
+    restoreFailed: "Tiklab bo'lmadi — yozuv allaqachon tiklangan yoki butunlay o'chirilgan bo'lishi mumkin",
   },
   trash: {
     title: "Arxiv",

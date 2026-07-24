@@ -558,6 +558,19 @@ export const api = {
         method: "POST",
         body: JSON.stringify(data),
       }),
+    get: (id: number) => request<Payment>(`/payments/${id}`),
+    update: (
+      id: number,
+      data: Partial<{
+        amount: number;
+        paid_at: string;
+        note: string | null;
+      }>,
+    ) =>
+      request<Payment>(`/payments/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
     delete: (id: number) => request<void>(`/payments/${id}`, { method: "DELETE" }),
     trash: (params?: TrashParams) => request<Paginated<Payment>>(`/payments/trash${trashQueryString(params)}`),
     restore: (id: number) => request<Payment>(`/payments/${id}/restore`, { method: "POST" }),

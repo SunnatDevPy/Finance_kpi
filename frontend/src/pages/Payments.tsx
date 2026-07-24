@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { ArchiveIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { ArchiveIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { api } from "../api/client";
 import { ExportButtons } from "../components/ExportButtons";
 import { BulkActionBar } from "../components/BulkActionBar";
+import { PaymentEditModal } from "../components/PaymentEditModal";
 import { CancelIcon, DeleteIconBtn, LoadingIconBtn, SaveIconBtn } from "../components/ButtonIcons";
 import { DateRangePicker } from "../components/DateRangePicker";
 import { Modal } from "../components/Modal";
@@ -78,6 +79,7 @@ export function PaymentsPage() {
   const [dateTo, setDateTo] = usePersistedState("wtma.payments.dateTo", "");
   const [search, setSearch] = usePersistedState("wtma.payments.search", "");
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [editPayment, setEditPayment] = useState<PaymentListItem | null>(null);
   const [bulkArchiveConfirm, setBulkArchiveConfirm] = useState(false);
   const [bulkArchiving, setBulkArchiving] = useState(false);
   const [error, setError] = useState("");
@@ -352,6 +354,16 @@ export function PaymentsPage() {
                   )}
                   <TableCellActions>
                     <div className="action-toolbar">
+                      <MotionButton
+                        variant="ghost"
+                        size="icon-sm"
+                        className="size-8"
+                        onClick={() => setEditPayment(payment)}
+                        title={t("common.edit")}
+                        {...motionTap}
+                      >
+                        <PencilIcon className="size-3.5" />
+                      </MotionButton>
                       {isAdmin && (
                       <MotionButton
                         variant="ghost"
@@ -512,6 +524,12 @@ export function PaymentsPage() {
           </div>
         </form>
       </Modal>
+
+      <PaymentEditModal
+        payment={editPayment}
+        onClose={() => setEditPayment(null)}
+        onSuccess={() => load(false)}
+      />
     </PageShell>
   );
 }

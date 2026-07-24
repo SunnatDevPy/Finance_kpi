@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { HistoryIcon, Trash2Icon } from "lucide-react";
+import { HistoryIcon, RotateCcwIcon, Trash2Icon } from "lucide-react";
 import { api } from "../api/client";
 import { PageError } from "../components/PageError";
 import { PageHeader, PageShell } from "../components/PageHeader";
@@ -14,6 +14,7 @@ import {
   PremiumDataTable,
   rowEnter,
   TableBody,
+  TableCellActions,
   TableCellDate,
   TableCellMuted,
   TableCellPrimary,
@@ -74,6 +75,45 @@ function actionVariant(action: AuditAction): "default" | "secondary" | "destruct
   return "default";
 }
 
+function formatChangeValue(value: unknown): string {
+  if (value === null || value === undefined || value === "") return "—";
+  return String(value);
+}
+
+function formatAuditChanges(
+  changes: Record<string, [unknown, unknown]> | null,
+  t: (key: string) => string,
+): string | null {
+  if (!changes || Object.keys(changes).length === 0) return null;
+  const labels: Record<string, string> = {
+    amount: t("common.amount"),
+    paid_at: t("common.date"),
+    note: t("common.note"),
+    title: t("finance.titleField"),
+    category: t("finance.category"),
+    income_date: t("common.date"),
+    expense_date: t("common.date"),
+  };
+  return Object.entries(changes)
+    .map(([field, [from, to]]) => {
+      const label = labels[field] ?? field;
+      return `${label}: ${formatChangeValue(from)} ${t("auditLog.from")} ${formatChangeValue(to)}`;
+    })
+    .join(" · ");
+}
+
+const RESTORABLE_ENTITY_TYPES: AuditEntityType[] = [
+  "client",
+  "contract",
+  "payment",
+  "expense",
+  "income",
+];
+
+function canRestoreFromAudit(entry: AuditLogEntry): boolean {
+  return entry.action === "delete" && RESTORABLE_ENTITY_TYPES.includes(entry.entity_type as AuditEntityType);
+}
+
 function actionLabel(action: AuditAction, t: (key: string) => string): string {
   if (action === "create") return t("auditLog.actionCreate");
   if (action === "update") return t("auditLog.actionUpdate");
@@ -96,6 +136,8 @@ export function AuditLogPage() {
   const [pageSize, setPageSize] = useState(20);
   const [total, setTotal] = useState(0);
   const [clearOpen, setClearOpen] = useState(false);
+  const [restoreTarget, setRestoreTarget] = useState<AuditLogEntry | null>(null);
+  const [restoring, setRestoring] = useState(false);
 
   const parsedEntityId = entityId.trim() && /^\d+$/.test(entityId.trim()) ? Number(entityId.trim()) : undefined;
   const hasFilters = entityType !== "all" || Boolean(parsedEntityId) || Boolean(dateFrom) || Boolean(dateTo);
@@ -146,6 +188,40 @@ export function AuditLogPage() {
       setError("");
     } catch (e) {
       setError(e instanceof Error ? e.message : t("common.error"));
+    }
+  };
+
+  const handleRestore = async () => {
+    if (!restoreTarget) return;
+    const entry = restoreTarget;
+    setRestoreTarget(null);
+    setRestoring(true);
+    try {
+      switch (entry.entity_type) {
+        case "client":
+          await api.clients.restore(entry.entity_id);
+          break;
+        case "contract":
+          await api.contracts.restore(entry.entity_id);
+          break;
+        case "payment":
+          await api.payments.restore(entry.entity_id);
+          break;
+        case "expense":
+          await api.expenses.restore(entry.entity_id);
+          break;
+        case "income":
+          await api.incomes.restore(entry.entity_id);
+          break;
+        default:
+          throw new Error(t("auditLog.restoreFailed"));
+      }
+      load(false);
+      setError("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t("auditLog.restoreFailed"));
+    } finally {
+      setRestoring(false);
     }
   };
 
@@ -248,6 +324,7 @@ export function AuditLogPage() {
                 {isVisible("summary") && <TableHead>{t("auditLog.summary")}</TableHead>}
                 {isVisible("user") && <TableHead>{t("auditLog.user")}</TableHead>}
                 {isVisible("time") && <TableHead>{t("auditLog.time")}</TableHead>}
+                <TableHead className="text-right">{t("common.actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -265,7 +342,14 @@ export function AuditLogPage() {
                   )}
                   {isVisible("summary") && (
                   <TableCellMuted className="max-w-md">
-                    {entry.summary ?? "—"}
+                    <div className="flex flex-col gap-1">
+                      <span>{entry.summary ?? "—"}</span>
+                      {formatAuditChanges(entry.changes, t) ? (
+                        <span className="text-xs text-muted-foreground/90">
+                          {formatAuditChanges(entry.changes, t)}
+                        </span>
+                      ) : null}
+                    </div>
                   </TableCellMuted>
                   )}
                   {isVisible("user") && (
@@ -276,6 +360,21 @@ export function AuditLogPage() {
                     {formatDateTimeWithWeekday(entry.created_at)}
                   </TableCellDate>
                   )}
+                  <TableCellActions>
+                    {canRestoreFromAudit(entry) ? (
+                      <MotionButton
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8"
+                        onClick={() => setRestoreTarget(entry)}
+                        {...motionTap}
+                      >
+                        <RotateCcwIcon data-icon="inline-start" />
+                        {t("auditLog.restore")}
+                      </MotionButton>
+                    ) : null}
+                  </TableCellActions>
                 </MotionTableRow>
               ))}
             </TableBody>
@@ -298,6 +397,21 @@ export function AuditLogPage() {
               onClick={handleClearHistory}
             >
               {t("auditLog.clearHistory")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={restoreTarget !== null} onOpenChange={(open) => !open && setRestoreTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("auditLog.restore")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("auditLog.restoreConfirm")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={restoring}>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction disabled={restoring} onClick={handleRestore}>
+              {t("auditLog.restore")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
