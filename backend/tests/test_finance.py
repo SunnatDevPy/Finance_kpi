@@ -1,7 +1,7 @@
 from decimal import Decimal
 from io import BytesIO
 
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 
 
 def test_finance_ledger_manual_income_expense_before_2027(
@@ -107,7 +107,7 @@ def test_finance_ledger_filters_by_type(client, auth_headers, sample_contract):
 def _build_finance_xlsx(rows: list[list], headers=None) -> bytes:
     wb = Workbook()
     ws = wb.active
-    ws.append(headers or ["Sana", "Turi", "Nomi", "Summa", "Kategoriya", "Izoh"])
+    ws.append(headers or ["Sana", "Turi", "Summa", "Kategoriya", "Izoh"])
     for row in rows:
         ws.append(row)
     buffer = BytesIO()
@@ -120,13 +120,21 @@ def test_finance_import_template_downloads(client, auth_headers):
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("application/vnd.openxmlformats")
 
+    wb = load_workbook(BytesIO(resp.content), read_only=True, data_only=True)
+    headers = [str(cell or "") for cell in next(wb.active.iter_rows(min_row=1, max_row=1, values_only=True))]
+    header_text = " ".join(headers).lower()
+    assert "sana" in header_text or "дата" in header_text
+    assert "summa" in header_text or "сумма" in header_text
+    assert "izoh" in header_text or "коммент" in header_text
+    assert "nomi" not in header_text and "название" not in header_text
+
 
 def test_finance_import_creates_income_and_expense(client, auth_headers):
     content = _build_finance_xlsx(
         [
-            ["23.01.2026", "Kirim", "Mijozdan naqd", "5000000", "Sotuv", "Eski hisobot"],
-            ["24.01.2026", "Chiqim", "Ofis ijarasi", "3000000", "Ijara", ""],
-            ["25.01.2026", "Kirim", "", "", "", ""],  # bo'sh summa -> xato
+            ["23.01.2026", "Kirim", "5000000", "Sotuv", "Mijozdan naqd — eski hisobot"],
+            ["24.01.2026", "Chiqim", "3000000", "Ijara", "Ofis ijarasi"],
+            ["25.01.2026", "Kirim", "", "", ""],  # bo'sh summa -> xato
         ]
     )
     resp = client.post(
@@ -160,8 +168,8 @@ def test_finance_import_creates_income_and_expense(client, auth_headers):
 def test_finance_import_infers_type_from_negative_amount(client, auth_headers):
     content = _build_finance_xlsx(
         [
-            ["01.02.2026", "", "Naqd tushum", "2000000", "", ""],
-            ["02.02.2026", "", "Xarajat", "-1500000", "", ""],
+            ["01.02.2026", "", "2000000", "", "Naqd tushum"],
+            ["02.02.2026", "", "-1500000", "", "Transport xarajati"],
         ]
     )
     resp = client.post(
@@ -179,6 +187,50 @@ def test_finance_import_infers_type_from_negative_amount(client, auth_headers):
     data = resp.json()
     assert data["created_income"] == 1
     assert data["created_expense"] == 1
+
+
+def test_finance_import_supports_legacy_nomi_column(client, auth_headers):
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["Sana", "Turi", "Nomi", "Summa", "Kategoriya", "Izoh"])
+    ws.append(["23.01.2026", "Kirim", "Mijozdan naqd", "5000000", "Sotuv", ""])
+    buffer = BytesIO()
+    wb.save(buffer)
+    content = buffer.getvalue()
+
+    resp = client.post(
+        "/api/v1/finance/import",
+        headers=auth_headers,
+        files={
+            "file": (
+                "legacy.xlsx",
+                content,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.json()["created_income"] == 1
+
+
+def test_finance_import_skips_template_example_rows(client, auth_headers):
+    from app.services.finance_import import build_finance_import_template
+
+    content = build_finance_import_template().getvalue()
+    resp = client.post(
+        "/api/v1/finance/import",
+        headers=auth_headers,
+        files={
+            "file": (
+                "template.xlsx",
+                content,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.json()["created_income"] == 0
+    assert resp.json()["created_expense"] == 0
 
 
 def test_finance_import_rejects_missing_required_columns(client, auth_headers):

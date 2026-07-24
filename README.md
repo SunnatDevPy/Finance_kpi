@@ -410,7 +410,7 @@ Eski Excel jadvalingizdagi tarixni bir yo'la ko'chirish. **Ustunlar tartibi muhi
 
 ### 3) Moliya tarixi — `Finance` sahifasi
 
-Sana, tur (kirim/chiqim), summa, kategoriya, izoh. Shablon yuklab olish mumkin.
+Sana, tur (kirim/chiqim), summa, kategoriya, izoh. Alohida «Nomi» ustuni yo'q — izoh asosiy maydon. Eski Excel fayllaridagi «Nomi» ustuni ham qabul qilinadi. Shablon yuklab olish mumkin; namuna qatorlar avtomatik o'tkazib yuboriladi.
 
 ### Moliya oborot API (qisqacha)
 
