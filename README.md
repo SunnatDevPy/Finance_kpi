@@ -55,7 +55,7 @@ Mijozlar, shartnomalar, to'lovlar, qarzdorlik, moliya (kirim/chiqim) va biznes s
 | Shartnoma raqami, ЭСФ | `contract_number`, `invoice_number` |
 | Xizmatni bekor qilish | Alohida qator yoki butun shartnoma; qayta faollashtirish |
 | Nusxalash, PDF hujjatlar | Schyot-faktura, akt, shartnoma PDF |
-| Filtrlar | Qidiruv, sana oralig'i, workflow holati, qarz filtri |
+| Filtrlar | Qidiruv, sana oralig'i, workflow holati, qarz filtri, **xizmat turi** |
 | Bulk | Tanlanganlarni eksport / arxivga o'tkazish |
 | Excel import | Eski Excel tarixini moslashuvchan ustun aniqlash bilan yuklash |
 
@@ -64,19 +64,23 @@ Mijozlar, shartnomalar, to'lovlar, qarzdorlik, moliya (kirim/chiqim) va biznes s
 | Imkoniyat | Tavsif |
 |-----------|--------|
 | Kirim va refund | Manfiy summa = qaytarish (qizil rangda) |
-| Modal orqali qo'shish | "Saqlash va yana qo'shish" |
+| Qo'shish | Modal orqali; "Saqlash va yana qo'shish" |
+| **Tahrirlash** | Summa, sana, izohni tuzatish (adashib 0 yoki noto'g'ri yozilgan bo'lsa) — o'zgarishlar audit jurnaliga yoziladi |
 | Filtrlar | Sana, qidiruv (mijoz, shartnoma raqami, telefon) |
-| Bulk arxiv / eksport | Checkbox tanlash |
+| Bulk arxiv / eksport | Checkbox tanlash (arxiv — faqat admin) |
 
 ### Moliya (`/finance`)
 
 | Imkoniyat | Tavsif |
 |-----------|--------|
+| **Yillik daromad** | Tepada alohida chiziqli diagramma (2019 — joriy yil): mijoz to'lovlari va chiqimlar |
+| **Oborot** | Yil filtri (2019–2035, **Barcha yillar**), davr (butun yil / 1–4 chorak) |
+| KPI kartalar | **Jami tushum** (faqat mijoz to'lovlari), **Jami chiqim**, **Sof balans** |
+| Xarajatlar taqsimoti | Qaysi kategoriya ko'p ekanligi (bar chart) |
 | Birlashgan ledger | Mijoz to'lovlari + boshqa kirimlar + xarajatlar bitta jadvalda |
-| Kirim / chiqim CRUD | `Income` (kategoriyalar: sotuv, xizmat, investitsiya, ...) va `Expense` |
-| Statistikalar | Jami kirim, chiqim, sof balans |
+| Kirim / chiqim | Izoh orqali kiritiladi (alohida "Nomi" maydoni yo'q) |
+| To'lov tahriri | Ledgerdagi mijoz to'lovlarini qalamcha bilan tuzatish |
 | Excel import | Eski moliya tarixini yuklash |
-| Eksport | Kirim va xarajatlar alohida |
 
 ### Qarzdorlik
 
@@ -93,6 +97,7 @@ Mijozlar, shartnomalar, to'lovlar, qarzdorlik, moliya (kirim/chiqim) va biznes s
 |-----------|--------|
 | KPI kartalar | Umumiy qarz, oylik tushum, reja vs fakt |
 | Diagrammalar | Mijozlar holati (donut), shartnomalar holati (donut), daromad trendi (6/12 oy) |
+| Xizmatlar bo'yicha | Barcha xizmat turlari alohida ko'rsatiladi (faqat "Boshqalar" emas) |
 | Top mijozlar (LTV) | To'lovlar bo'yicha reyting |
 | Muddati yaqin shartnomalar | Sozlanadigan kunlar (`notifyDays`) |
 | Tezkor tahlil | Xizmatlar bo'yicha hajm, balans progress |
@@ -111,7 +116,7 @@ Soft-delete qilingan yozuvlar: mijoz, kontrakt, to'lov, xarajat, kirim. Qidiruv,
 
 ### O'zgarishlar tarixi (`/audit-log`) — admin
 
-Kim, qachon, nima o'zgartirgan — entity turi, ID, sana filtri.
+Kim, qachon, nima o'zgartirgan — entity turi, ID, sana filtri. Tahrirlangan maydonlar diff ko'rinishida (`Summa: 100000 → 250000`). Arxivga o'tkazilgan yozuvlar uchun **Tiklash** tugmasi (mijoz, shartnoma, to'lov, kirim, chiqim).
 
 ### Profil (`/profile`)
 
@@ -154,7 +159,7 @@ Parol o'zgartirish, til/mavzu, bildirishnoma kunlari, oylik reja (admin), kompan
 | Animatsiya | **Framer Motion** |
 | Grafiklar | **Recharts** |
 | Marshrutlash | **React Router v7** |
-| Testlar | **pytest** (~83), **Playwright** (E2E) |
+| Testlar | **pytest** (~102), **Playwright** (E2E) |
 | Konteyner | **Docker Compose** (dev + prod) |
 | HTTPS (prod) | **Caddy** (Let's Encrypt) |
 | CI | **GitHub Actions** |
@@ -193,7 +198,7 @@ Finance_managment/
 │   │   │                           # Payments, Finance, ServiceTypes, Employees,
 │   │   │                           # Profile, Trash, AuditLog, Login
 │   │   ├── components/             # Layout, PremiumDataTable, StatCard, Modal,
-│   │   │                           # ToastViewport, NotificationBell, ExportButtons, …
+│   │   │                           # PaymentEditModal, QuickPaymentModal, …
 │   │   ├── components/ui/          # shadcn/ui komponentlar
 │   │   ├── api/client.ts           # Barcha API so'rovlari + toast integratsiyasi
 │   │   ├── context/                # Auth, I18n, Preferences, Theme
@@ -293,7 +298,7 @@ Birinchi ishga tushishda avtomatik:
 
 | Xizmat | URL |
 |--------|-----|
-| Panel (UI) | http://localhost:3000 |
+| Panel (UI) | http://localhost:5173 |
 | Backend API | http://localhost:8002 |
 | Swagger | http://localhost:8002/docs |
 | PostgreSQL | `localhost:5433` |
@@ -345,7 +350,7 @@ npm install
 npm run dev
 ```
 
-Frontend http://localhost:3000 — Vite API so'rovlarini `8002` (Docker) yoki `8000` (lokal) ga proksi qiladi (`vite.config.ts`).
+Frontend http://localhost:5173 (Docker) yoki `npm run dev` — Vite API so'rovlarini `8002` (Docker) yoki `8000` (lokal) ga proksi qiladi (`vite.config.ts`).
 
 ---
 
@@ -360,17 +365,17 @@ Barcha endpointlar `/api/v1` prefiksi ostida.
 | **Auth** | `POST /auth/login`, `GET /auth/me`, `POST /auth/change-password` |
 | **Clients** | CRUD, `GET /clients/{id}/card`, logo, import, trash/restore |
 | **Contracts** | CRUD, duplicate, line-item cancel/reactivate, cancel-all, confirm/complete, documents (PDF), import |
-| **Payments** | CRUD, trash/restore |
+| **Payments** | CRUD (tahrirlash + audit), trash/restore |
 | **Expenses** | CRUD, summary, trash/restore |
 | **Incomes** | CRUD, summary, trash/restore |
-| **Finance** | `GET /finance/ledger`, import |
+| **Finance** | `GET /finance/ledger`, `GET /finance/turnover?year=&period=`, `GET /finance/turnover-trend`, import |
 | **Debts** | `GET /debts` (hisobot/eksport) |
 | **Dashboard** | `GET /dashboard`, top-clients, revenue-trend |
 | **Service types** | CRUD, stats |
 | **Users** | CRUD (admin) |
 | **Settings** | monthly-plan, company-profile |
 | **Notifications** | expiring-contracts, overdue-debts |
-| **Audit** | `GET /audit/log`, login-history |
+| **Audit** | `GET /audit/log`, login-history; tarixdan tiklash (UI) |
 | **Export** | `GET /export/{resource}?format=xlsx\|pdf` |
 | **Health** | `GET /health` |
 
@@ -404,7 +409,15 @@ Eski Excel jadvalingizdagi tarixni bir yo'la ko'chirish. **Ustunlar tartibi muhi
 
 ### 3) Moliya tarixi — `Finance` sahifasi
 
-Sana, tur (kirim/chiqim), nom, summa, kategoriya, izoh.
+Sana, tur (kirim/chiqim), summa, kategoriya, izoh. Shablon yuklab olish mumkin.
+
+### Moliya oborot API (qisqacha)
+
+| Parametr | Qiymat | Ma'nosi |
+|----------|--------|---------|
+| `year` | `2026` yoki `all` | Yil yoki barcha yillar (2019–2035) |
+| `period` | `full`, `q1`–`q4` | Butun yil yoki chorak |
+| `year_from` / `year_to` | `2019` / joriy yil | Yillik daromad diagrammasi oralig'i |
 
 ---
 
@@ -418,7 +431,7 @@ Sana, tur (kirim/chiqim), nom, summa, kategoriya, izoh.
 | Amal | Admin | Menejer |
 |------|-------|---------|
 | Mijoz/kontrakt/to'lov yaratish | ✅ | ✅ |
-| Tahrirlash | ✅ | ✅ |
+| To'lov / kirim / chiqim tahrirlash | ✅ | ✅ |
 | Arxivga o'tkazish (delete) | ✅ | ❌ |
 | Xizmat turlari CRUD | ✅ | ❌ |
 | Xodimlar boshqaruvi | ✅ | ❌ |
@@ -443,8 +456,13 @@ Til/mavzu `localStorage`da saqlanadi.
 
 ### Tezkor verify (tavsiya)
 
+```bash
+# Repo ildizidan (Linux/macOS)
+bash .cursor/skills/wtma-verify/scripts/verify.sh
+```
+
 ```powershell
-# Repo ildizidan (Windows)
+# Windows
 powershell -NoProfile -ExecutionPolicy Bypass -File .cursor/skills/wtma-verify/scripts/verify.ps1
 ```
 
@@ -458,7 +476,7 @@ docker compose exec api python -m pytest -q
 cd backend && pip install -r requirements-dev.txt && pytest -q
 ```
 
-~**83 test**: auth, clients, contracts, import, payments, debts, dashboard, expenses, incomes, finance, documents, soft-delete/audit, debt filters.
+~**102 test**: auth, clients, contracts, import, payments (tahrirlash + audit), debts, dashboard, expenses, incomes, finance (oborot), documents, soft-delete/audit, debt filters.
 
 ### Frontend build
 
@@ -535,56 +553,47 @@ Batafsil: [`AGENTS.md`](./AGENTS.md) · Ish tarixi: [`PLAN.md`](./PLAN.md)
 
 ## Keyingi qadamlar — nima yetishmayapti
 
-Loyiha **ishchi MVP+** darajasida. Quyidagilar keyingi rivojlantirish uchun mantiqiy navbat:
+Loyiha **ishchi production** darajasida. Quyidagilar keyingi rivojlantirish uchun mantiqiy navbat:
 
-### Yuqori ustuvorlik (yaqin rejada)
-
-| # | Vazifa | Sabab |
-|---|--------|-------|
-| 1 | **Commit qilinmagan o'zgarishlar** | Toast bildirishnomalar, kengaytirilgan qarz filtri (4 variant), holat faqat modalda, dashboard «Jami» label — hali commit/push qilinmagan |
-| 2 | **E2E testlarni yangilash** | `/debts` olib tashlandi, Finance/qarz filtrlari va toast uchun Playwright senariylari yo'q |
-| 3 | **README/PLAN sinxronizatsiyasi** | `PLAN.md` ga 42-bo'lim qo'shish (qarz konsolidatsiyasi, toast, UI fixlar) |
-| 4 | **Production smoke-test** | Haqiqiy domen + Let's Encrypt bilan bir marta to'liq sinov |
-
-### O'rta ustuvorlik (foydalanuvchi tajribasi)
+### Yuqori ustuvorlik
 
 | # | Vazifa | Tavsif |
 |---|--------|--------|
-| 5 | **Email / Telegram bildirishnomalar** | Hozir faqat panel ichidagi bell + toast; tashqi kanal yo'q |
-| 6 | **Qarzdorlik eslatmalari** | Muddati o'tgan qarzlar ro'yxati bor, lekin avtomatik eslatma yuborilmaydi |
-| 7 | **Hisobotlar va rejalashtirilgan eksport** | Oylik PDF/Excel avtomatik yuborish |
-| 8 | **Kengaytirilgan RBAC** | Masalan: faqat o'z mijozlari, faqat ko'rish rejimi |
-| 9 | **Bulk to'lov kiritish** | Bir nechta shartnoma uchun bir vaqtda |
-| 10 | **Kontrakt PDF shablon sozlash** | Kompaniya profili bor, lekin shablon dizayni cheklangan |
+| 1 | **Email / Telegram bildirishnomalar** | Hozir faqat panel ichidagi bell + toast; tashqi kanal yo'q |
+| 2 | **Qarzdorlik eslatmalari** | Muddati o'tgan qarzlar ro'yxati bor, avtomatik eslatma yuborilmaydi |
+| 3 | **Hisobotlar va rejalashtirilgan eksport** | Oylik PDF/Excel avtomatik yuborish |
+| 4 | **E2E testlarni kengaytirish** | Moliya oborot, to'lov tahriri, audit tiklash senariylari |
+
+### O'rta ustuvorlik
+
+| # | Vazifa | Tavsif |
+|---|--------|--------|
+| 5 | **Kengaytirilgan RBAC** | Masalan: faqat o'z mijozlari, faqat ko'rish rejimi |
+| 6 | **Bulk to'lov kiritish** | Bir nechta shartnoma uchun bir vaqtda |
+| 7 | **Kontrakt PDF shablon sozlash** | Kompaniya profili bor, shablon dizayni cheklangan |
+| 8 | **Audit orqali versiya qaytarish** | Hozir faqat arxivdan tiklash; maydon qiymatini eski holatga qaytarish yo'q |
 
 ### Texnik qarorlar (uzoq muddat)
 
 | # | Vazifa | Tavsif |
 |---|--------|--------|
-| 11 | **Monitoring / logging** | Sentry, Prometheus, markazlashtirilgan loglar |
-| 12 | **DB backup avtomatizatsiyasi** | `pg_dump` cron + restore hujjati |
-| 13 | **2FA (TOTP)** | Admin hisoblar uchun |
-| 14 | **WebSocket** | Bildirishnomalar uchun polling o'rniga real-time |
-| 15 | ~~**PWA / mobil**~~ | ✅ Qo'shildi — o'rnatish, offline shell, safe-area |
-| 16 | **Multi-filial / multi-kompaniya** | Hozir bitta kompaniya profili |
-| 17 | **API rate limit kengaytirish** | Hozir asosan login endpointlarida |
-| 18 | **Performance profil** | 10k+ mijoz/shartnoma hajmida SQL optimizatsiya |
-
-### PWA / mobil (qo'shildi)
-
-- `vite-plugin-pwa` — service worker, manifest, offline statik kesh
-- Mobil o'rnatish banneri (`PwaInstallBanner`)
-- iOS safe-area (`viewport-fit=cover`, header padding)
-- Production nginx: `sw.js` va manifest uchun `no-cache`
+| 9 | **Monitoring / logging** | Sentry, Prometheus, markazlashtirilgan loglar |
+| 10 | **DB backup avtomatizatsiyasi** | `pg_dump` cron + restore hujjati |
+| 11 | **2FA (TOTP)** | Admin hisoblar uchun |
+| 12 | **WebSocket** | Bildirishnomalar uchun polling o'rniga real-time |
+| 13 | **Multi-filial / multi-kompaniya** | Hozir bitta kompaniya profili |
+| 14 | **Performance profil** | 10k+ mijoz/shartnoma hajmida SQL optimizatsiya |
 
 ### Hozir **bor** deb hisoblash mumkin
 
 - To'liq mijoz → shartnoma → to'lov → qarz hisoblash zanjiri
-- Moliya moduli (kirim/chiqim ledger)
+- Moliya oborot: yillik diagramma, yil/chorak filtrlari, xarajatlar taqsimoti
+- To'lov tahrirlash va audit jurnalida o'zgarishlar diff
+- O'zgarishlar tarixidan arxiv tiklash
 - Soft-delete, arxiv, audit
 - Excel import (3 oqim), Excel/PDF eksport
-- Dashboard analitikasi
-- i18n, dark mode, mobil layout
+- Dashboard analitikasi (barcha xizmat turlari)
+- i18n, dark mode, mobil layout, PWA
 - Docker dev + prod + HTTPS
 - CI pipeline
 - RBAC (admin/menejer)
@@ -597,7 +606,7 @@ Loyiha **ishchi MVP+** darajasida. Quyidagilar keyingi rivojlantirish uchun mant
 |--------|--------|
 | `docker compose` ishlamaydi | Docker Desktop ochilganini tekshiring |
 | API 500, jadval yo'q | `docker compose exec api alembic upgrade head` |
-| Port band (3000/8002/5433) | `docker-compose.yml` portlarini o'zgartiring |
+| Port band (5173/8002/5433) | `docker-compose.yml` portlarini o'zgartiring |
 | Frontend o'zgarish ko'rinmaydi | `docker compose restart web` |
 | Excel import ustun topilmadi | 1-qator sarlavhasida Kompaniya, Xizmat, Summa bo'lishi kerak |
 | Toast chiqmayapti | Faqat POST/PATCH/DELETE muvaffaqiyatli bo'lganda; login/export da chiqmaydi |
