@@ -92,7 +92,7 @@ def test_dashboard_reflects_net_profit(client, auth_headers, sample_contract):
         json={
             "contract_id": sample_contract.id,
             "amount": "2000000.00",
-            "paid_at": "2026-03-01",
+            "paid_at": "2027-03-01",
         },
     )
     assert payment_resp.status_code == 201
@@ -102,14 +102,14 @@ def test_dashboard_reflects_net_profit(client, auth_headers, sample_contract):
         auth_headers,
         category="salary",
         amount="700000.00",
-        expense_date="2026-03-05",
+        expense_date="2027-03-05",
         title="Ish haqi",
     )
 
     dashboard = client.get(
         "/api/v1/dashboard",
         headers=auth_headers,
-        params={"date_from": "2026-03-01", "date_to": "2026-03-31"},
+        params={"date_from": "2027-03-01", "date_to": "2027-03-31"},
     )
     assert dashboard.status_code == 200
     data = dashboard.json()

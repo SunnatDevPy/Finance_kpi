@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 def test_dashboard_stats(client, auth_headers, app_settings, sample_contract):
     response = client.get("/api/v1/dashboard", headers=auth_headers)
     assert response.status_code == 200
@@ -68,9 +70,14 @@ def test_top_clients_ltv_empty_when_no_payments(client, auth_headers, sample_con
 
 def test_revenue_trend_default_12_months(client, auth_headers, sample_contract):
     client.post(
-        "/api/v1/payments",
+        "/api/v1/incomes",
         headers=auth_headers,
-        json={"contract_id": sample_contract.id, "amount": "500000.00", "paid_at": "2026-03-15"},
+        json={
+            "category": "sale",
+            "title": "Qo'lda tushum",
+            "amount": "500000.00",
+            "income_date": "2026-03-15",
+        },
     )
     response = client.get("/api/v1/dashboard/revenue-trend", headers=auth_headers)
     assert response.status_code == 200
@@ -81,9 +88,14 @@ def test_revenue_trend_default_12_months(client, auth_headers, sample_contract):
 
 def test_revenue_trend_6_months(client, auth_headers, sample_contract):
     client.post(
-        "/api/v1/payments",
+        "/api/v1/incomes",
         headers=auth_headers,
-        json={"contract_id": sample_contract.id, "amount": "500000.00", "paid_at": "2026-03-15"},
+        json={
+            "category": "sale",
+            "title": "Qo'lda tushum",
+            "amount": "500000.00",
+            "income_date": "2026-03-15",
+        },
     )
     response = client.get(
         "/api/v1/dashboard/revenue-trend", headers=auth_headers, params={"months": 6}
@@ -101,6 +113,73 @@ def test_revenue_trend_validates_months_range(client, auth_headers):
     assert response.status_code == 422
 
 
+def test_dashboard_manual_income_before_auto_payments_year(client, auth_headers, sample_contract):
+    client.post(
+        "/api/v1/payments",
+        headers=auth_headers,
+        json={"contract_id": sample_contract.id, "amount": "5000000.00", "paid_at": "2026-06-01"},
+    )
+    client.post(
+        "/api/v1/incomes",
+        headers=auth_headers,
+        json={
+            "category": "sale",
+            "title": "Qo'lda kirim",
+            "amount": "1200000.00",
+            "income_date": "2026-06-10",
+        },
+    )
+    client.post(
+        "/api/v1/expenses",
+        headers=auth_headers,
+        json={
+            "category": "rent",
+            "title": "Ijara",
+            "amount": "200000.00",
+            "expense_date": "2026-06-15",
+        },
+    )
+
+    response = client.get(
+        "/api/v1/dashboard",
+        headers=auth_headers,
+        params={"date_from": "2026-06-01", "date_to": "2026-06-30"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert Decimal(data["monthly_revenue"]) == Decimal("1200000.00")
+    assert Decimal(data["period_expenses"]) == Decimal("200000.00")
+    assert Decimal(data["net_profit"]) == Decimal("1000000.00")
+
+
+def test_dashboard_includes_payments_from_auto_year(client, auth_headers, sample_contract):
+    client.post(
+        "/api/v1/payments",
+        headers=auth_headers,
+        json={"contract_id": sample_contract.id, "amount": "3000000.00", "paid_at": "2027-04-01"},
+    )
+    client.post(
+        "/api/v1/incomes",
+        headers=auth_headers,
+        json={
+            "category": "investment",
+            "title": "Investitsiya",
+            "amount": "500000.00",
+            "income_date": "2027-04-05",
+        },
+    )
+
+    response = client.get(
+        "/api/v1/dashboard",
+        headers=auth_headers,
+        params={"date_from": "2027-04-01", "date_to": "2027-04-30"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert Decimal(data["monthly_revenue"]) == Decimal("3500000.00")
+    assert Decimal(data["net_profit"]) == Decimal("3500000.00")
+
+
 def test_clients_by_region(client, auth_headers, sample_contract):
     response = client.get("/api/v1/dashboard/clients-by-region", headers=auth_headers)
     assert response.status_code == 200
@@ -108,4 +187,4 @@ def test_clients_by_region(client, auth_headers, sample_contract):
     assert len(data) == 1
     assert data[0]["city"] == "Toshkent"
     assert data[0]["clients_count"] == 1
-    assert float(data[0]["total_amount"]) == 1_500_000.0
+    assert float(data[0]["total_amount"]) == 1_000_000.0
