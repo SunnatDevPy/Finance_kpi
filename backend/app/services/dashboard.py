@@ -30,8 +30,9 @@ from app.schemas.dashboard import (
     TopClientLtvItem,
 )
 
-from app.services.app_settings import get_monthly_plan
+from app.services.app_settings import get_finance_auto_payments_from, get_monthly_plan
 from app.services.cancelled_stats import sum_cancelled_line_items
+from app.services.finance_period import payment_counting_start
 from app.services.helpers import client_total_amount, client_total_paid
 
 MONTH_LABELS = [
@@ -98,6 +99,111 @@ def _growth_pct(current: Decimal, previous: Decimal) -> float | None:
     return float(((current - previous) / previous) * 100)
 
 
+def _sum_manual_income(
+    db: Session,
+    *,
+    date_from: date,
+    date_to: date,
+) -> Decimal:
+    return db.scalar(
+        select(func.coalesce(func.sum(Income.amount), 0)).where(
+            Income.deleted_at.is_(None),
+            Income.income_date >= date_from,
+            Income.income_date <= date_to,
+        )
+    ) or Decimal("0")
+
+
+def _sum_contract_payments(
+    db: Session,
+    *,
+    date_from: date,
+    date_to: date,
+    auto_from: date,
+) -> Decimal:
+    payment_from = payment_counting_start(date_from, date_to, auto_from)
+    if payment_from is None:
+        return Decimal("0")
+    return db.scalar(
+        select(func.coalesce(func.sum(Payment.amount), 0))
+        .select_from(Payment)
+        .join(Contract, Contract.id == Payment.contract_id)
+        .where(
+            Payment.paid_at >= payment_from,
+            Payment.paid_at <= date_to,
+            Payment.deleted_at.is_(None),
+            Contract.deleted_at.is_(None),
+        )
+    ) or Decimal("0")
+
+
+def _total_revenue(
+    db: Session,
+    *,
+    date_from: date,
+    date_to: date,
+    auto_from: date,
+) -> Decimal:
+    return _sum_contract_payments(
+        db, date_from=date_from, date_to=date_to, auto_from=auto_from
+    ) + _sum_manual_income(db, date_from=date_from, date_to=date_to)
+
+
+def _payments_by_month(
+    db: Session,
+    *,
+    chart_start: date,
+    chart_end: date,
+    auto_from: date,
+) -> dict[str, Decimal]:
+    payment_from = payment_counting_start(chart_start, chart_end, auto_from)
+    if payment_from is None:
+        return {}
+    return {
+        f"{int(year):04d}-{int(month):02d}": amount
+        for year, month, amount in db.execute(
+            select(
+                extract("year", Payment.paid_at),
+                extract("month", Payment.paid_at),
+                func.coalesce(func.sum(Payment.amount), 0),
+            )
+            .select_from(Payment)
+            .join(Contract, Contract.id == Payment.contract_id)
+            .where(
+                Payment.paid_at >= payment_from,
+                Payment.paid_at <= chart_end,
+                Payment.deleted_at.is_(None),
+                Contract.deleted_at.is_(None),
+            )
+            .group_by(extract("year", Payment.paid_at), extract("month", Payment.paid_at))
+        ).all()
+    }
+
+
+def _income_by_month(
+    db: Session,
+    *,
+    chart_start: date,
+    chart_end: date,
+) -> dict[str, Decimal]:
+    return {
+        f"{int(year):04d}-{int(month):02d}": amount
+        for year, month, amount in db.execute(
+            select(
+                extract("year", Income.income_date),
+                extract("month", Income.income_date),
+                func.coalesce(func.sum(Income.amount), 0),
+            )
+            .where(
+                Income.income_date >= chart_start,
+                Income.income_date <= chart_end,
+                Income.deleted_at.is_(None),
+            )
+            .group_by(extract("year", Income.income_date), extract("month", Income.income_date))
+        ).all()
+    }
+
+
 def _months_in_range(start: date, end: date, max_months: int = 24) -> list[date]:
     month_start = _month_start(start)
     end_month = _month_start(end)
@@ -130,35 +236,22 @@ def _resolve_period(
 
 def get_revenue_trend(db: Session, months: int = 12) -> list[ChartPoint]:
     """Trailing N months of revenue, always anchored to today (ignores dashboard date filter)."""
+    auto_from = get_finance_auto_payments_from(db)
     month_list = _chart_months(date.today(), months)
     start = month_list[0]
     end = _month_end(month_list[-1])
 
-    payment_by_month = {
-        f"{int(year):04d}-{int(month):02d}": amount
-        for year, month, amount in db.execute(
-            select(
-                extract("year", Payment.paid_at),
-                extract("month", Payment.paid_at),
-                func.coalesce(func.sum(Payment.amount), 0),
-            )
-            .select_from(Payment)
-            .join(Contract, Contract.id == Payment.contract_id)
-            .where(
-                Payment.paid_at >= start,
-                Payment.paid_at <= end,
-                Payment.deleted_at.is_(None),
-                Contract.deleted_at.is_(None),
-            )
-            .group_by(extract("year", Payment.paid_at), extract("month", Payment.paid_at))
-        ).all()
-    }
+    payment_by_month = _payments_by_month(
+        db, chart_start=start, chart_end=end, auto_from=auto_from
+    )
+    income_by_month = _income_by_month(db, chart_start=start, chart_end=end)
 
     return [
         ChartPoint(
             month=_month_key(month_date),
             label=_month_label(month_date),
-            value=payment_by_month.get(_month_key(month_date), Decimal("0")),
+            value=payment_by_month.get(_month_key(month_date), Decimal("0"))
+            + income_by_month.get(_month_key(month_date), Decimal("0")),
         )
         for month_date in month_list
     ]
@@ -170,6 +263,7 @@ def get_dashboard_stats(
     date_to: date | None = None,
 ) -> DashboardStats:
     today = date.today()
+    auto_from = get_finance_auto_payments_from(db)
     monthly_plan = get_monthly_plan(db)
     period_start, period_end, months, has_custom_range = _resolve_period(date_from, date_to)
     range_start = months[0]
@@ -195,32 +289,22 @@ def get_dashboard_stats(
     ) or Decimal("0")
     total_debt = total_contract_amount - total_paid
 
-    period_revenue = db.scalar(
-        select(func.coalesce(func.sum(Payment.amount), 0))
-        .select_from(Payment)
-        .join(Contract, Contract.id == Payment.contract_id)
-        .where(
-            Payment.paid_at >= period_start,
-            Payment.paid_at <= period_end,
-            Payment.deleted_at.is_(None),
-            Contract.deleted_at.is_(None),
-        )
-    ) or Decimal("0")
+    period_revenue = _total_revenue(
+        db,
+        date_from=period_start,
+        date_to=period_end,
+        auto_from=auto_from,
+    )
 
     duration_days = (period_end - period_start).days + 1
     prev_period_end = period_start - timedelta(days=1)
     prev_period_start = prev_period_end - timedelta(days=duration_days - 1)
-    prev_period_revenue = db.scalar(
-        select(func.coalesce(func.sum(Payment.amount), 0))
-        .select_from(Payment)
-        .join(Contract, Contract.id == Payment.contract_id)
-        .where(
-            Payment.paid_at >= prev_period_start,
-            Payment.paid_at <= prev_period_end,
-            Payment.deleted_at.is_(None),
-            Contract.deleted_at.is_(None),
-        )
-    ) or Decimal("0")
+    prev_period_revenue = _total_revenue(
+        db,
+        date_from=prev_period_start,
+        date_to=prev_period_end,
+        auto_from=auto_from,
+    )
     revenue_growth_pct = _growth_pct(period_revenue, prev_period_revenue)
 
     total_expenses = db.scalar(
@@ -239,21 +323,22 @@ def get_dashboard_stats(
         select(func.coalesce(func.sum(Income.amount), 0)).where(Income.deleted_at.is_(None))
     ) or Decimal("0")
 
-    period_other_income = db.scalar(
-        select(func.coalesce(func.sum(Income.amount), 0)).where(
-            Income.deleted_at.is_(None),
-            Income.income_date >= period_start,
-            Income.income_date <= period_end,
-        )
-    ) or Decimal("0")
+    period_other_income = _sum_manual_income(
+        db, date_from=period_start, date_to=period_end
+    )
 
+    all_time_revenue = _total_revenue(
+        db,
+        date_from=date(2000, 1, 1),
+        date_to=today,
+        auto_from=auto_from,
+    )
     net_profit = (
-        (period_revenue + period_other_income if has_custom_range else total_paid + total_other_income)
-        - (period_expenses if has_custom_range else total_expenses)
+        period_revenue - period_expenses
+        if has_custom_range
+        else all_time_revenue - total_expenses
     )
-    profit_base = (
-        period_revenue + period_other_income if has_custom_range else total_paid + total_other_income
-    )
+    profit_base = period_revenue if has_custom_range else all_time_revenue
     profit_margin_pct = float((net_profit / profit_base) * 100) if profit_base > 0 else None
 
     expenses_by_category_rows = db.execute(
@@ -281,10 +366,20 @@ def get_dashboard_stats(
     }
 
     displayed_paid = (
-        period_revenue
+        _sum_contract_payments(
+            db,
+            date_from=period_start,
+            date_to=period_end,
+            auto_from=auto_from,
+        )
         if has_custom_range
         else total_paid
     )
+
+    payment_by_month = _payments_by_month(
+        db, chart_start=chart_start, chart_end=chart_end, auto_from=auto_from
+    )
+    income_by_month = _income_by_month(db, chart_start=chart_start, chart_end=chart_end)
 
     collection_rate = (
         float((total_paid / total_contract_amount) * 100)
@@ -339,26 +434,6 @@ def get_dashboard_stats(
         tugadi=contract_status_counts[ContractWorkflowStatus.TUGADI],
         toxtatildi=contract_status_counts[ContractWorkflowStatus.TOXTATILDI],
     )
-
-    payment_by_month = {
-        f"{int(year):04d}-{int(month):02d}": amount
-        for year, month, amount in db.execute(
-            select(
-                extract("year", Payment.paid_at),
-                extract("month", Payment.paid_at),
-                func.coalesce(func.sum(Payment.amount), 0),
-            )
-            .select_from(Payment)
-            .join(Contract, Contract.id == Payment.contract_id)
-            .where(
-                Payment.paid_at >= chart_start,
-                Payment.paid_at <= chart_end,
-                Payment.deleted_at.is_(None),
-                Contract.deleted_at.is_(None),
-            )
-            .group_by(extract("year", Payment.paid_at), extract("month", Payment.paid_at))
-        ).all()
-    }
 
     clients_stmt = (
         select(
@@ -490,7 +565,7 @@ def get_dashboard_stats(
 
     for month_date in months:
         key = _month_key(month_date)
-        revenue = payment_by_month.get(key, Decimal("0"))
+        revenue = payment_by_month.get(key, Decimal("0")) + income_by_month.get(key, Decimal("0"))
         new_clients = clients_by_month.get(key, 0)
         cumulative_clients = cumulative_by_month[key]
         contracts_count = contracts_by_month.get(key, 0)

@@ -114,6 +114,7 @@ def test_dashboard_includes_other_income_in_net_profit(client, auth_headers, sam
     assert dashboard.status_code == 200
     data = dashboard.json()
     assert Decimal(data["period_other_income"]) == Decimal("1000000.00")
-    assert Decimal(data["net_profit"]) == Decimal(data["monthly_revenue"]) + Decimal(
-        "1000000.00"
-    ) - Decimal(data["period_expenses"])
+    assert Decimal(data["monthly_revenue"]) == Decimal("1000000.00")
+    assert Decimal(data["net_profit"]) == Decimal(data["monthly_revenue"]) - Decimal(
+        data["period_expenses"]
+    )
