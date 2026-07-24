@@ -472,6 +472,18 @@ export interface FinanceTurnoverTrend {
   points: FinanceTurnoverTrendPoint[];
 }
 
+export interface FinanceTurnoverMonthlyTrendPoint {
+  month: number;
+  total_revenue: string;
+  total_expense: string;
+  net_balance: string;
+}
+
+export interface FinanceTurnoverMonthlyTrend {
+  year: number;
+  points: FinanceTurnoverMonthlyTrendPoint[];
+}
+
 export interface AuditLogEntry {
   id: number;
   entity_type: string;

@@ -61,3 +61,15 @@ class FinanceTurnoverTrendRead(BaseModel):
     year_from: int
     year_to: int
     points: list[FinanceTurnoverTrendPoint]
+
+
+class FinanceTurnoverMonthlyTrendPoint(BaseModel):
+    month: int = Field(ge=1, le=12)
+    total_revenue: Decimal
+    total_expense: Decimal
+    net_balance: Decimal
+
+
+class FinanceTurnoverMonthlyTrendRead(BaseModel):
+    year: int
+    points: list[FinanceTurnoverMonthlyTrendPoint]

@@ -1,5 +1,6 @@
 from datetime import date
 from decimal import Decimal
+from calendar import monthrange
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
@@ -12,6 +13,7 @@ from app.schemas.finance import (
     FinanceLedgerPage,
     FinanceTurnoverRead,
     FinanceTurnoverTrendRead,
+    FinanceTurnoverMonthlyTrendRead,
 )
 from app.services.expenses import get_expense_summary
 from app.services.finance_period import (
@@ -24,6 +26,41 @@ from app.services.finance_period import (
     resolve_all_years_span,
     resolve_finance_period,
 )
+
+
+def _compute_turnover_for_dates(
+    db: Session,
+    *,
+    period_start: date,
+    period_end: date,
+) -> tuple[Decimal, Decimal, Decimal]:
+    client_payments = Decimal("0")
+    payment_from = payment_counting_start(period_start, period_end)
+    if payment_from is not None:
+        client_payments = db.scalar(
+            select(func.coalesce(func.sum(Payment.amount), 0))
+            .select_from(Payment)
+            .join(Contract, Contract.id == Payment.contract_id)
+            .where(
+                Payment.paid_at >= payment_from,
+                Payment.paid_at <= period_end,
+                Payment.deleted_at.is_(None),
+                Contract.deleted_at.is_(None),
+            )
+        ) or Decimal("0")
+
+    manual_income = db.scalar(
+        select(func.coalesce(func.sum(Income.amount), 0)).where(
+            Income.income_date >= period_start,
+            Income.income_date <= period_end,
+            Income.deleted_at.is_(None),
+        )
+    ) or Decimal("0")
+
+    total_revenue = manual_income + client_payments
+    expense_summary = get_expense_summary(db, date_from=period_start, date_to=period_end)
+    total_expense = expense_summary.total_expenses
+    return total_revenue, total_expense, total_revenue - total_expense
 
 
 def get_finance_ledger(
@@ -153,37 +190,12 @@ def get_finance_turnover(
     period: FinancePeriod = "full",
 ) -> FinanceTurnoverRead:
     period_start, period_end = resolve_finance_period(year, period)
-
-    client_payments = Decimal("0")
-    payment_from = payment_counting_start(period_start, period_end)
-    if payment_from is not None:
-        client_payments = db.scalar(
-            select(func.coalesce(func.sum(Payment.amount), 0))
-            .select_from(Payment)
-            .join(Contract, Contract.id == Payment.contract_id)
-            .where(
-                Payment.paid_at >= payment_from,
-                Payment.paid_at <= period_end,
-                Payment.deleted_at.is_(None),
-                Contract.deleted_at.is_(None),
-            )
-        ) or Decimal("0")
-
-    manual_income = db.scalar(
-        select(func.coalesce(func.sum(Income.amount), 0)).where(
-            Income.income_date >= period_start,
-            Income.income_date <= period_end,
-            Income.deleted_at.is_(None),
-        )
-    ) or Decimal("0")
-
-    total_revenue = manual_income + client_payments
-
-    expense_summary = get_expense_summary(
-        db, date_from=period_start, date_to=period_end
+    total_revenue, total_expense, net_balance = _compute_turnover_for_dates(
+        db,
+        period_start=period_start,
+        period_end=period_end,
     )
-    total_expense = expense_summary.total_expenses
-    net_balance = total_revenue - total_expense
+    expense_summary = get_expense_summary(db, date_from=period_start, date_to=period_end)
 
     return FinanceTurnoverRead(
         year=year,
@@ -260,3 +272,32 @@ def get_finance_turnover_trend(
         )
 
     return FinanceTurnoverTrendRead(year_from=year_from, year_to=year_to, points=points)
+
+
+def get_finance_turnover_monthly_trend(
+    db: Session,
+    *,
+    year: int,
+) -> FinanceTurnoverMonthlyTrendRead:
+    from app.schemas.finance import FinanceTurnoverMonthlyTrendPoint, FinanceTurnoverMonthlyTrendRead
+
+    points = []
+    for month in range(1, 13):
+        last_day = monthrange(year, month)[1]
+        period_start = date(year, month, 1)
+        period_end = date(year, month, last_day)
+        total_revenue, total_expense, net_balance = _compute_turnover_for_dates(
+            db,
+            period_start=period_start,
+            period_end=period_end,
+        )
+        points.append(
+            FinanceTurnoverMonthlyTrendPoint(
+                month=month,
+                total_revenue=total_revenue,
+                total_expense=total_expense,
+                net_balance=net_balance,
+            )
+        )
+
+    return FinanceTurnoverMonthlyTrendRead(year=year, points=points)
