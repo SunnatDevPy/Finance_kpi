@@ -108,6 +108,8 @@ import { cn } from "@/lib/utils";
 const TURNOVER_YEAR_START = 2019;
 const TURNOVER_YEAR_END = 2035;
 const TURNOVER_TREND_END_YEAR = new Date().getFullYear();
+const FINANCE_AUTO_PAYMENTS_YEAR = 2027;
+const financeShowsContractPayments = () => new Date().getFullYear() >= FINANCE_AUTO_PAYMENTS_YEAR;
 const TURNOVER_YEAR_ALL = "all" as const;
 const TURNOVER_PERIODS: FinancePeriod[] = ["full", "q1", "q2", "q3", "q4"];
 
@@ -472,6 +474,10 @@ export function FinancePage() {
 
       <PageError message={error} />
 
+      <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-foreground/90">
+        {t("finance.turnover.manualUntil2027")}
+      </div>
+
       <Card className="content-card">
         <CardHeader className="border-b pb-4">
           <CardTitle className="text-base">{t("finance.turnover.annualRevenue")}</CardTitle>
@@ -656,7 +662,9 @@ export function FinancePage() {
               <SelectItem value="all">{t("finance.allTypes")}</SelectItem>
               <SelectItem value="income">{t("finance.typeIncome")}</SelectItem>
               <SelectItem value="expense">{t("finance.typeExpense")}</SelectItem>
-              <SelectItem value="payment">{t("finance.typePayment")}</SelectItem>
+              {financeShowsContractPayments() ? (
+                <SelectItem value="payment">{t("finance.typePayment")}</SelectItem>
+              ) : null}
             </SelectContent>
           </Select>
           <DateRangePicker

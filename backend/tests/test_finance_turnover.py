@@ -1,7 +1,10 @@
+from datetime import date
 from decimal import Decimal
 
+from app.services.finance_period import FINANCE_AUTO_PAYMENTS_FROM
 
-def test_finance_turnover_summary(client, auth_headers, sample_contract):
+
+def test_finance_turnover_summary_manual_only_before_2027(client, auth_headers, sample_contract):
     client.post(
         "/api/v1/payments",
         headers=auth_headers,
@@ -33,23 +36,31 @@ def test_finance_turnover_summary(client, auth_headers, sample_contract):
     data = resp.json()
     assert data["year"] == 2026
     assert data["period"] == "full"
-    assert Decimal(data["total_revenue"]) == Decimal("3000000.00")
+    assert Decimal(data["total_revenue"]) == Decimal("1000000.00")
     assert Decimal(data["total_expense"]) == Decimal("500000.00")
-    assert Decimal(data["net_balance"]) == Decimal("2500000.00")
-    assert len(data["expenses_by_category"]) == 1
-    assert data["expenses_by_category"][0]["category"] == "rent"
+    assert Decimal(data["net_balance"]) == Decimal("500000.00")
 
 
-def test_finance_turnover_period_filter(client, auth_headers, sample_contract):
+def test_finance_turnover_period_filter_income_only(client, auth_headers):
     client.post(
-        "/api/v1/payments",
+        "/api/v1/incomes",
         headers=auth_headers,
-        json={"contract_id": sample_contract.id, "amount": "1000000.00", "paid_at": "2026-02-01"},
+        json={
+            "category": "sale",
+            "title": "Q1 sotuv",
+            "amount": "1000000.00",
+            "income_date": "2026-02-01",
+        },
     )
     client.post(
-        "/api/v1/payments",
+        "/api/v1/incomes",
         headers=auth_headers,
-        json={"contract_id": sample_contract.id, "amount": "2000000.00", "paid_at": "2026-05-01"},
+        json={
+            "category": "sale",
+            "title": "Q2 sotuv",
+            "amount": "2000000.00",
+            "income_date": "2026-05-01",
+        },
     )
 
     q1 = client.get(
@@ -69,16 +80,26 @@ def test_finance_turnover_period_filter(client, auth_headers, sample_contract):
     assert Decimal(q2.json()["total_revenue"]) == Decimal("2000000.00")
 
 
-def test_finance_turnover_all_years(client, auth_headers, sample_contract):
+def test_finance_turnover_all_years_manual_income(client, auth_headers):
     client.post(
-        "/api/v1/payments",
+        "/api/v1/incomes",
         headers=auth_headers,
-        json={"contract_id": sample_contract.id, "amount": "1000000.00", "paid_at": "2025-03-01"},
+        json={
+            "category": "sale",
+            "title": "2025",
+            "amount": "1000000.00",
+            "income_date": "2025-03-01",
+        },
     )
     client.post(
-        "/api/v1/payments",
+        "/api/v1/incomes",
         headers=auth_headers,
-        json={"contract_id": sample_contract.id, "amount": "2000000.00", "paid_at": "2026-05-01"},
+        json={
+            "category": "sale",
+            "title": "2026",
+            "amount": "2000000.00",
+            "income_date": "2026-05-01",
+        },
     )
 
     resp = client.get(
@@ -90,6 +111,28 @@ def test_finance_turnover_all_years(client, auth_headers, sample_contract):
     data = resp.json()
     assert data["year"] == 0
     assert Decimal(data["total_revenue"]) == Decimal("3000000.00")
+
+
+def test_finance_turnover_includes_payments_from_2027(client, auth_headers, sample_contract):
+    client.post(
+        "/api/v1/payments",
+        headers=auth_headers,
+        json={"contract_id": sample_contract.id, "amount": "3000000.00", "paid_at": "2027-03-01"},
+    )
+    client.post(
+        "/api/v1/incomes",
+        headers=auth_headers,
+        json={
+            "category": "sale",
+            "title": "Qo'lda kirim",
+            "amount": "500000.00",
+            "income_date": "2027-04-01",
+        },
+    )
+
+    resp = client.get("/api/v1/finance/turnover", headers=auth_headers, params={"year": 2027})
+    assert resp.status_code == 200
+    assert Decimal(resp.json()["total_revenue"]) == Decimal("3500000.00")
 
 
 def test_finance_turnover_plan_update(client, auth_headers):
@@ -106,9 +149,14 @@ def test_finance_turnover_plan_update(client, auth_headers):
 
 def test_finance_turnover_trend(client, auth_headers, sample_contract):
     client.post(
-        "/api/v1/payments",
+        "/api/v1/incomes",
         headers=auth_headers,
-        json={"contract_id": sample_contract.id, "amount": "1000000.00", "paid_at": "2026-03-01"},
+        json={
+            "category": "sale",
+            "title": "2026 kirim",
+            "amount": "1000000.00",
+            "income_date": "2026-03-01",
+        },
     )
 
     resp = client.get(
@@ -123,3 +171,7 @@ def test_finance_turnover_trend(client, auth_headers, sample_contract):
     assert len(data["points"]) == 7
     point_2026 = next(item for item in data["points"] if item["year"] == 2026)
     assert Decimal(point_2026["total_revenue"]) == Decimal("1000000.00")
+
+
+def test_finance_auto_payments_cutover_date():
+    assert FINANCE_AUTO_PAYMENTS_FROM == date(2027, 1, 1)

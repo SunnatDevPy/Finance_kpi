@@ -18,6 +18,9 @@ from app.services.finance_period import (
     FinancePeriod,
     TURNOVER_YEAR_END,
     TURNOVER_YEAR_START,
+    ledger_includes_payments,
+    ledger_payment_date_from,
+    payment_counting_start,
     resolve_all_years_span,
     resolve_finance_period,
 )
@@ -33,9 +36,8 @@ def get_finance_ledger(
     skip: int = 0,
     limit: int = 20,
 ) -> FinanceLedgerPage:
-    """Payment (shartnoma kirimi) + Income (boshqa kirim) + Expense (chiqim) — hammasi
-    bitta xronologik ro'yxatga birlashtiriladi. Hajm katta bo'lmagani sababli (odatiy
-    moliyaviy hisobot ko'lami) Python darajasida birlashtirish yetarli darajada tez."""
+    """Income (kirim) + Expense (chiqim) birlashgan ko'rinish.
+    Shartnoma to'lovlari faqat FINANCE_AUTO_PAYMENTS_FROM sanasidan boshlab qo'shiladi."""
 
     items: list[FinanceLedgerItem] = []
     search_pattern = search.lower().strip() if search else None
@@ -62,10 +64,13 @@ def get_finance_ledger(
                 )
             )
 
-    if entry_type in (None, "payment"):
-        filters = [Payment.deleted_at.is_(None), Contract.deleted_at.is_(None)]
-        if date_from is not None:
-            filters.append(Payment.paid_at >= date_from)
+    if entry_type in (None, "payment") and ledger_includes_payments(date_from, date_to):
+        payment_from = ledger_payment_date_from(date_from)
+        filters = [
+            Payment.deleted_at.is_(None),
+            Contract.deleted_at.is_(None),
+            Payment.paid_at >= payment_from,
+        ]
         if date_to is not None:
             filters.append(Payment.paid_at <= date_to)
         stmt = (
@@ -149,19 +154,22 @@ def get_finance_turnover(
 ) -> FinanceTurnoverRead:
     period_start, period_end = resolve_finance_period(year, period)
 
-    client_payments = db.scalar(
-        select(func.coalesce(func.sum(Payment.amount), 0))
-        .select_from(Payment)
-        .join(Contract, Contract.id == Payment.contract_id)
-        .where(
-            Payment.paid_at >= period_start,
-            Payment.paid_at <= period_end,
-            Payment.deleted_at.is_(None),
-            Contract.deleted_at.is_(None),
-        )
-    ) or Decimal("0")
+    client_payments = Decimal("0")
+    payment_from = payment_counting_start(period_start, period_end)
+    if payment_from is not None:
+        client_payments = db.scalar(
+            select(func.coalesce(func.sum(Payment.amount), 0))
+            .select_from(Payment)
+            .join(Contract, Contract.id == Payment.contract_id)
+            .where(
+                Payment.paid_at >= payment_from,
+                Payment.paid_at <= period_end,
+                Payment.deleted_at.is_(None),
+                Contract.deleted_at.is_(None),
+            )
+        ) or Decimal("0")
 
-    other_income = db.scalar(
+    manual_income = db.scalar(
         select(func.coalesce(func.sum(Income.amount), 0)).where(
             Income.income_date >= period_start,
             Income.income_date <= period_end,
@@ -169,7 +177,7 @@ def get_finance_turnover(
         )
     ) or Decimal("0")
 
-    total_revenue = client_payments + other_income
+    total_revenue = manual_income + client_payments
 
     expense_summary = get_expense_summary(
         db, date_from=period_start, date_to=period_end

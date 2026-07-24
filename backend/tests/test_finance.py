@@ -4,7 +4,7 @@ from io import BytesIO
 from openpyxl import Workbook
 
 
-def test_finance_ledger_combines_income_expense_and_payments(
+def test_finance_ledger_manual_income_expense_before_2027(
     client, auth_headers, sample_contract
 ):
     client.post(
@@ -41,13 +41,39 @@ def test_finance_ledger_combines_income_expense_and_payments(
     assert resp.status_code == 200
     data = resp.json()
     types = {item["type"] for item in data["items"]}
-    assert types == {"payment", "income", "expense"}
-    assert Decimal(data["total_income"]) == Decimal("3000000.00")
+    assert types == {"income", "expense"}
+    assert Decimal(data["total_income"]) == Decimal("1000000.00")
     assert Decimal(data["total_expense"]) == Decimal("500000.00")
-    assert Decimal(data["net_balance"]) == Decimal("2500000.00")
+    assert Decimal(data["net_balance"]) == Decimal("500000.00")
 
-    expense_item = next(item for item in data["items"] if item["type"] == "expense")
-    assert Decimal(expense_item["amount"]) == Decimal("-500000.00")
+
+def test_finance_ledger_includes_payments_from_2027(client, auth_headers, sample_contract):
+    client.post(
+        "/api/v1/payments",
+        headers=auth_headers,
+        json={"contract_id": sample_contract.id, "amount": "2000000.00", "paid_at": "2027-04-01"},
+    )
+    client.post(
+        "/api/v1/incomes",
+        headers=auth_headers,
+        json={
+            "category": "sale",
+            "title": "Qo'lda kirim",
+            "amount": "1000000.00",
+            "income_date": "2027-04-02",
+        },
+    )
+
+    resp = client.get(
+        "/api/v1/finance/ledger",
+        headers=auth_headers,
+        params={"date_from": "2027-04-01", "date_to": "2027-04-30"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    types = {item["type"] for item in data["items"]}
+    assert types == {"payment", "income"}
+    assert Decimal(data["total_income"]) == Decimal("3000000.00")
 
 
 def test_finance_ledger_filters_by_type(client, auth_headers, sample_contract):
