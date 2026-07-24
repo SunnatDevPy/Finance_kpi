@@ -607,7 +607,6 @@ export const ru: TranslationDict = {
     turnover: {
       title: "Оборот",
       subtitle: "Доходы, расходы и чистый баланс за выбранный год и период",
-      manualUntilYear: "До {year} года финансы вводятся вручную. Платежи по контрактам с {year} года учитываются автоматически.",
       year: "Год",
       allYears: "Все годы",
       period: "Период",
