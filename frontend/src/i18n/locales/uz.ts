@@ -590,7 +590,7 @@ export const uz = {
       other: "Boshqa",
     },
     importFromExcel: "Excel'dan import",
-    importDesc: "Eski kirim-chiqim hisobotingizni Excel fayl orqali yuklang. Ustunlar tartibi shablon bilan bir xil bo'lishi shart emas — tizim sarlavhalar nomiga qarab (Sana, Turi, Nomi, Summa, Kategoriya, Izoh) avtomatik aniqlaydi. \"Turi\" ustuniga Kirim yoki Chiqim deb yozing.",
+    importDesc: "Eski kirim-chiqim hisobotingizni Excel fayl orqali yuklang. Ustunlar tartibi muhim emas — tizim sarlavhalarni avtomatik aniqlaydi (Sana, Turi, Summa, Kategoriya, Izoh). Eski fayllardagi «Nomi» ustuni ham qo'llab-quvvatlanadi. Shablon namuna qatorlarini import qilmaydi.",
     downloadTemplate: "Shablonni yuklab olish",
     chooseFile: "Faylni tanlang yoki shu yerga tashlang",
     xlsxOnly: "Faqat .xlsx format",

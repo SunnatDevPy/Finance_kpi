@@ -14,15 +14,26 @@ from app.schemas.finance_import import FinanceImportError, FinanceImportResult
 TEMPLATE_HEADERS = [
     "Sana* / Дата",
     "Turi* (Kirim/Chiqim) / Тип",
-    "Nomi / Tavsif / Название",
     "Summa* / Сумма",
     "Kategoriya / Категория",
     "Izoh / Комментарий",
 ]
 
 EXAMPLE_ROWS = [
-    ["23.01.2026", "Kirim", "Mijozdan naqd tushum", "5 000 000", "Sotuv", "Eski hisobotdan"],
-    ["24.01.2026", "Chiqim", "Ofis ijarasi", "3 000 000", "Ijara", ""],
+    [
+        "23.01.2026",
+        "Kirim",
+        "5 000 000",
+        "Sotuv",
+        "Mijozdan naqd tushum (bu qatorni o'chirib, o'z ma'lumotingizni kiriting)",
+    ],
+    [
+        "24.01.2026",
+        "Chiqim",
+        "3 000 000",
+        "Ijara",
+        "Ofis ijarasi — namuna qator",
+    ],
 ]
 
 # Ustunlarni sarlavha matnidan (o'zbek/rus, turli formatlar) avtomatik aniqlash uchun
@@ -31,10 +42,10 @@ EXAMPLE_ROWS = [
 _HEADER_ALIASES: dict[str, list[str]] = {
     "date": ["sana", "дата", "date"],
     "type": ["turi", "тип", "type"],
-    "title": ["nomi", "tavsif", "название", "наименование", "title", "izoh nomi"],
+    "title": ["nomi", "tavsif", "название", "наименование", "title"],
     "amount": ["сумма", "summa", "amount"],
     "category": ["kategoriya", "категория", "category"],
-    "note": ["izoh", "коммент", "eslatma", "note"],
+    "note": ["izoh", "коммент", "eslatma", "note", "comment"],
 }
 
 _REQUIRED_FIELD_LABELS: dict[str, str] = {
@@ -44,6 +55,35 @@ _REQUIRED_FIELD_LABELS: dict[str, str] = {
 
 _INCOME_MARKERS = ("kirim", "приход", "income", "tushum", "keldi", "доход")
 _EXPENSE_MARKERS = ("chiqim", "расход", "expense", "xarajat", "chiqdi")
+
+_SKIP_ROW_MARKERS = (
+    "bu qatorni o'chirib",
+    "удалите эту строку",
+    "namuna qator",
+    "пример строки",
+)
+
+_INCOME_DEFAULT_TITLES: dict[IncomeCategory, str] = {
+    IncomeCategory.SALE: "Sotuv",
+    IncomeCategory.SERVICE: "Xizmat",
+    IncomeCategory.INVESTMENT: "Investitsiya",
+    IncomeCategory.LOAN: "Kredit",
+    IncomeCategory.GRANT: "Grant",
+    IncomeCategory.REFUND: "Qaytarma",
+    IncomeCategory.OTHER: "Boshqa kirim",
+}
+
+_EXPENSE_DEFAULT_TITLES: dict[ExpenseCategory, str] = {
+    ExpenseCategory.SALARY: "Ish haqi",
+    ExpenseCategory.RENT: "Ijara",
+    ExpenseCategory.MARKETING: "Marketing",
+    ExpenseCategory.UTILITIES: "Kommunal",
+    ExpenseCategory.TRANSPORT: "Transport",
+    ExpenseCategory.OFFICE: "Ofis",
+    ExpenseCategory.TAX: "Soliq",
+    ExpenseCategory.BANK_FEE: "Bank to'lovi",
+    ExpenseCategory.OTHER: "Boshqa xarajat",
+}
 
 _EXPENSE_CATEGORY_ALIASES: dict[ExpenseCategory, list[str]] = {
     ExpenseCategory.SALARY: ["ish haqi", "oylik", "zarplata", "зарплат", "salary"],
@@ -201,6 +241,32 @@ def _resolve_income_category(raw: Any) -> IncomeCategory:
     return IncomeCategory.OTHER
 
 
+def _is_skip_row(row: tuple[Any, ...]) -> bool:
+    for raw in row:
+        if raw is None:
+            continue
+        text = str(raw).strip().lower()
+        if any(marker in text for marker in _SKIP_ROW_MARKERS):
+            return True
+    return False
+
+
+def _resolve_entry_content(
+    *,
+    note_raw: str | None,
+    legacy_title: str | None,
+    entry_type: Literal["income", "expense"],
+    income_category: IncomeCategory,
+    expense_category: ExpenseCategory,
+) -> tuple[str, str | None]:
+    text = (note_raw or legacy_title or "").strip()
+    if text:
+        return text[:255], text
+    if entry_type == "income":
+        return _INCOME_DEFAULT_TITLES.get(income_category, "Kirim")[:255], None
+    return _EXPENSE_DEFAULT_TITLES.get(expense_category, "Xarajat")[:255], None
+
+
 def import_finance_from_xlsx(db: Session, content: bytes) -> FinanceImportResult:
     wb = load_workbook(BytesIO(content), read_only=True, data_only=True)
     ws = wb.active
@@ -231,6 +297,8 @@ def import_finance_from_xlsx(db: Session, content: bytes) -> FinanceImportResult
     for index, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
         if row is None or all(c is None or str(c).strip() == "" for c in row):
             continue
+        if _is_skip_row(row):
+            continue
 
         amount = _parse_amount(cell(row, "amount"))
         if amount is None or amount == 0:
@@ -248,14 +316,21 @@ def import_finance_from_xlsx(db: Session, content: bytes) -> FinanceImportResult
             continue
 
         entry_date = _parse_date(cell(row, "date"), today)
-        title = _clean(cell(row, "title")) or ("Kirim" if entry_type == "income" else "Xarajat")
-        note = _clean(cell(row, "note"))
+        income_category = _resolve_income_category(cell(row, "category"))
+        expense_category = _resolve_expense_category(cell(row, "category"))
+        title, note = _resolve_entry_content(
+            note_raw=_clean(cell(row, "note")),
+            legacy_title=_clean(cell(row, "title")),
+            entry_type=entry_type,
+            income_category=income_category,
+            expense_category=expense_category,
+        )
         magnitude = abs(amount)
 
         if entry_type == "income":
             new_incomes.append(
                 Income(
-                    category=_resolve_income_category(cell(row, "category")),
+                    category=income_category,
                     title=title,
                     amount=magnitude,
                     income_date=entry_date,
@@ -265,7 +340,7 @@ def import_finance_from_xlsx(db: Session, content: bytes) -> FinanceImportResult
         else:
             new_expenses.append(
                 Expense(
-                    category=_resolve_expense_category(cell(row, "category")),
+                    category=expense_category,
                     title=title,
                     amount=magnitude,
                     expense_date=entry_date,
