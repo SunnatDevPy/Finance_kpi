@@ -4,7 +4,7 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import Client, Contract, ContractLineItem, ContractWorkflowStatus, Expense, Income, Payment
+from app.models import Client, Contract, ContractLineItem, ContractWorkflowStatus, Expense, Income, Payment, User
 
 EXPENSE_CATEGORY_NAMES: dict[str, str] = {
     "salary": "Ish haqi",
@@ -214,6 +214,27 @@ def fetch_incomes_rows(
     ]
 
 
+def fetch_employees_rows(db: Session) -> list[list[str]]:
+    employees = list(db.scalars(select(User).order_by(User.full_name)).all())
+    return [
+        [
+            employee.full_name,
+            employee.username,
+            USER_ROLE_LABELS.get(employee.role.value, employee.role.value),
+            "Faol" if employee.is_active else "Nofaol",
+            employee.created_at.strftime("%d.%m.%Y"),
+        ]
+        for employee in employees
+    ]
+
+
+USER_ROLE_LABELS = {
+    "admin": "Administrator",
+    "menejer": "Menejer",
+}
+
+EMPLOYEE_HEADERS = ["F.I.Sh.", "Login", "Rol", "Holat", "Qo'shilgan sana"]
+
 CLIENT_HEADERS = ["Korxona", "Mas'ul", "Telefon", "Shahar", "Holat"]
 CONTRACT_HEADERS = [
     "Mijoz",
@@ -318,6 +339,39 @@ def fetch_client_payments_rows(db: Session, client_id: int) -> list[list[str]]:
             payment.note or "",
         ]
         for payment in payments
+    ]
+
+
+def fetch_full_export_sheets(
+    db: Session,
+    date_from: date | None = None,
+    date_to: date | None = None,
+) -> list[tuple[str, list[str], list[list[str]]]]:
+    """All manually + system tracked data, grouped into one workbook's sheets."""
+    return [
+        (EXPORT_TITLES["clients"], CLIENT_HEADERS, fetch_clients_rows(db)),
+        (
+            EXPORT_TITLES["contracts"],
+            CONTRACT_HEADERS,
+            fetch_contracts_rows(db, date_from=date_from, date_to=date_to),
+        ),
+        (
+            EXPORT_TITLES["payments"],
+            PAYMENT_HEADERS,
+            fetch_payments_rows(db, date_from=date_from, date_to=date_to),
+        ),
+        (
+            EXPORT_TITLES["incomes"],
+            INCOME_HEADERS,
+            fetch_incomes_rows(db, date_from=date_from, date_to=date_to),
+        ),
+        (
+            EXPORT_TITLES["expenses"],
+            EXPENSE_HEADERS,
+            fetch_expenses_rows(db, date_from=date_from, date_to=date_to),
+        ),
+        (EXPORT_TITLES["debts"], DEBT_HEADERS, fetch_debts_rows(db)),
+        ("Xodimlar", EMPLOYEE_HEADERS, fetch_employees_rows(db)),
     ]
 
 

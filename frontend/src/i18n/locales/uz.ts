@@ -402,6 +402,10 @@ export const uz = {
     financeAutoPaymentsYearHint:
       "Tanlangan yildan boshlab shartnoma to'lovlari moliya oborotiga avtomatik qo'shiladi. Undan oldin faqat qo'lda kiritilgan kirim/chiqim hisoblanadi.",
     financeAutoPaymentsYearSaved: "Moliya avtomatik yili saqlandi",
+    exportAll: "Barcha ma'lumotlarni yuklab olish",
+    exportAllHint:
+      "Mijozlar, shartnomalar, to'lovlar, kirim-xarajat, qarzdorlik va xodimlar — bitta Excel faylida.",
+    exportAllButton: "Excelga yuklash",
     systemSettings: "Tizim sozlamalari",
     systemSettingsDesc: "Faqat admin uchun umumiy parametrlar",
     companyProfile: "Kompaniya rekvizitlari",

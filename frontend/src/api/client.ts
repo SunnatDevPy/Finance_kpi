@@ -321,6 +321,16 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify({ finance_auto_payments_from_year }),
       }),
+    exportAll: (params?: { date_from?: string; date_to?: string }) => {
+      const q = new URLSearchParams();
+      if (params?.date_from) q.set("date_from", params.date_from);
+      if (params?.date_to) q.set("date_to", params.date_to);
+      const qs = q.toString();
+      return download(
+        `/settings/export-all${qs ? `?${qs}` : ""}`,
+        `barcha_malumotlar.xlsx`,
+      );
+    },
   },
 
   audit: {
