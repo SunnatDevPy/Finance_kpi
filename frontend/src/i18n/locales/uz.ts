@@ -605,7 +605,7 @@ export const uz = {
       allYears: "Barcha yillar",
       period: "Davr",
       annualRevenue: "Yillik daromad",
-      trendDesc: "{from}–{to} yillar bo'yicha mijoz to'lovlari va chiqimlar",
+      trendDesc: "{from}–{to} yillar bo'yicha tushum (to'lovlar + kirimlar) va chiqimlar",
       totalInflow: "Jami tushum",
       totalExpense: "Jami chiqim",
       netBalance: "Sof balans",

@@ -33,9 +33,9 @@ def test_finance_turnover_summary(client, auth_headers, sample_contract):
     data = resp.json()
     assert data["year"] == 2026
     assert data["period"] == "full"
-    assert Decimal(data["total_revenue"]) == Decimal("2000000.00")
+    assert Decimal(data["total_revenue"]) == Decimal("3000000.00")
     assert Decimal(data["total_expense"]) == Decimal("500000.00")
-    assert Decimal(data["net_balance"]) == Decimal("1500000.00")
+    assert Decimal(data["net_balance"]) == Decimal("2500000.00")
     assert len(data["expenses_by_category"]) == 1
     assert data["expenses_by_category"][0]["category"] == "rent"
 

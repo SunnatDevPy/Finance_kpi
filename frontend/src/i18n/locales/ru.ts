@@ -607,7 +607,7 @@ export const ru: TranslationDict = {
       allYears: "Все годы",
       period: "Период",
       annualRevenue: "Годовой доход",
-      trendDesc: "Платежи клиентов и расходы за {from}–{to}",
+      trendDesc: "Поступления (платежи + прочие доходы) и расходы за {from}–{to}",
       totalInflow: "Всего поступлений",
       totalExpense: "Всего расходов",
       netBalance: "Чистый баланс",

@@ -149,7 +149,7 @@ def get_finance_turnover(
 ) -> FinanceTurnoverRead:
     period_start, period_end = resolve_finance_period(year, period)
 
-    total_revenue = db.scalar(
+    client_payments = db.scalar(
         select(func.coalesce(func.sum(Payment.amount), 0))
         .select_from(Payment)
         .join(Contract, Contract.id == Payment.contract_id)
@@ -160,6 +160,16 @@ def get_finance_turnover(
             Contract.deleted_at.is_(None),
         )
     ) or Decimal("0")
+
+    other_income = db.scalar(
+        select(func.coalesce(func.sum(Income.amount), 0)).where(
+            Income.income_date >= period_start,
+            Income.income_date <= period_end,
+            Income.deleted_at.is_(None),
+        )
+    ) or Decimal("0")
+
+    total_revenue = client_payments + other_income
 
     expense_summary = get_expense_summary(
         db, date_from=period_start, date_to=period_end

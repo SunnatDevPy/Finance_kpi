@@ -75,7 +75,7 @@ Mijozlar, shartnomalar, to'lovlar, qarzdorlik, moliya (kirim/chiqim) va biznes s
 |-----------|--------|
 | **Yillik daromad** | Tepada alohida chiziqli diagramma (2019 — joriy yil): mijoz to'lovlari va chiqimlar |
 | **Oborot** | Yil filtri (2019–2035, **Barcha yillar**), davr (butun yil / 1–4 chorak) |
-| KPI kartalar | **Jami tushum** (faqat mijoz to'lovlari), **Jami chiqim**, **Sof balans** |
+| KPI kartalar | **Jami tushum** (mijoz to'lovlari + boshqa kirimlar), **Jami chiqim**, **Sof balans** |
 | Xarajatlar taqsimoti | Qaysi kategoriya ko'p ekanligi (bar chart) |
 | Birlashgan ledger | Mijoz to'lovlari + boshqa kirimlar + xarajatlar bitta jadvalda |
 | Kirim / chiqim | Izoh orqali kiritiladi (alohida "Nomi" maydoni yo'q) |
