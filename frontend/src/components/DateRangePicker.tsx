@@ -398,12 +398,13 @@ export function DateRangePicker({ from, to, onChange, onClear, className, onDark
                         onMouseLeave={() => setHoverDate(null)}
                         className={cn(
                           "relative flex size-9 items-center justify-center rounded-lg text-sm transition-colors",
-                          !inMonth && "text-muted-foreground/40",
+                          !inMonth && "text-muted-foreground/30 opacity-40",
                           inMonth && "text-foreground",
-                          inRange && "bg-primary/10 text-foreground",
+                          inRange && inMonth && "bg-primary/10 text-foreground",
+                          inRange && !inMonth && "bg-primary/5 text-muted-foreground/40",
                           (isStart || isEnd) &&
-                            "bg-primary font-semibold text-primary-foreground shadow-sm",
-                          isToday && !isStart && !isEnd && "ring-1 ring-primary/40",
+                            "bg-primary font-semibold text-primary-foreground opacity-100 shadow-sm",
+                          isToday && !isStart && !isEnd && inMonth && "ring-1 ring-primary/40",
                           inMonth && !isStart && !isEnd && "hover:bg-muted",
                         )}
                       >

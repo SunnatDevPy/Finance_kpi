@@ -207,10 +207,10 @@ export function FloatingLabelDatePicker({
                       onClick={() => handleDayClick(day)}
                       className={cn(
                         "relative flex size-9 items-center justify-center rounded-lg text-sm transition-colors",
-                        !inMonth && "text-muted-foreground/40",
+                        !inMonth && "text-muted-foreground/30 opacity-40",
                         inMonth && "text-foreground",
-                        isSelected && "bg-primary font-semibold text-primary-foreground shadow-sm",
-                        isToday && !isSelected && "ring-1 ring-primary/40",
+                        isSelected && "bg-primary font-semibold text-primary-foreground opacity-100 shadow-sm",
+                        isToday && !isSelected && inMonth && "ring-1 ring-primary/40",
                         inMonth && !isSelected && !disabled && "hover:bg-muted",
                         disabled && "cursor-not-allowed opacity-30",
                       )}
