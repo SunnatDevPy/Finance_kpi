@@ -1,5 +1,6 @@
 from datetime import date
 from decimal import Decimal
+from calendar import monthrange
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
@@ -12,7 +13,9 @@ from app.schemas.finance import (
     FinanceLedgerPage,
     FinanceTurnoverRead,
     FinanceTurnoverTrendRead,
+    FinanceTurnoverMonthlyTrendRead,
 )
+from app.services.app_settings import get_finance_auto_payments_from
 from app.services.expenses import get_expense_summary
 from app.services.finance_period import (
     FinancePeriod,
@@ -26,6 +29,42 @@ from app.services.finance_period import (
 )
 
 
+def _compute_turnover_for_dates(
+    db: Session,
+    *,
+    period_start: date,
+    period_end: date,
+) -> tuple[Decimal, Decimal, Decimal]:
+    auto_from = get_finance_auto_payments_from(db)
+    client_payments = Decimal("0")
+    payment_from = payment_counting_start(period_start, period_end, auto_from)
+    if payment_from is not None:
+        client_payments = db.scalar(
+            select(func.coalesce(func.sum(Payment.amount), 0))
+            .select_from(Payment)
+            .join(Contract, Contract.id == Payment.contract_id)
+            .where(
+                Payment.paid_at >= payment_from,
+                Payment.paid_at <= period_end,
+                Payment.deleted_at.is_(None),
+                Contract.deleted_at.is_(None),
+            )
+        ) or Decimal("0")
+
+    manual_income = db.scalar(
+        select(func.coalesce(func.sum(Income.amount), 0)).where(
+            Income.income_date >= period_start,
+            Income.income_date <= period_end,
+            Income.deleted_at.is_(None),
+        )
+    ) or Decimal("0")
+
+    total_revenue = manual_income + client_payments
+    expense_summary = get_expense_summary(db, date_from=period_start, date_to=period_end)
+    total_expense = expense_summary.total_expenses
+    return total_revenue, total_expense, total_revenue - total_expense
+
+
 def get_finance_ledger(
     db: Session,
     *,
@@ -37,8 +76,9 @@ def get_finance_ledger(
     limit: int = 20,
 ) -> FinanceLedgerPage:
     """Income (kirim) + Expense (chiqim) birlashgan ko'rinish.
-    Shartnoma to'lovlari faqat FINANCE_AUTO_PAYMENTS_FROM sanasidan boshlab qo'shiladi."""
+    Shartnoma to'lovlari faqat sozlamadagi yildan boshlab qo'shiladi."""
 
+    auto_from = get_finance_auto_payments_from(db)
     items: list[FinanceLedgerItem] = []
     search_pattern = search.lower().strip() if search else None
 
@@ -64,8 +104,10 @@ def get_finance_ledger(
                 )
             )
 
-    if entry_type in (None, "payment") and ledger_includes_payments(date_from, date_to):
-        payment_from = ledger_payment_date_from(date_from)
+    if entry_type in (None, "payment") and ledger_includes_payments(
+        date_from, date_to, auto_from
+    ):
+        payment_from = ledger_payment_date_from(date_from, auto_from)
         filters = [
             Payment.deleted_at.is_(None),
             Contract.deleted_at.is_(None),
@@ -153,37 +195,12 @@ def get_finance_turnover(
     period: FinancePeriod = "full",
 ) -> FinanceTurnoverRead:
     period_start, period_end = resolve_finance_period(year, period)
-
-    client_payments = Decimal("0")
-    payment_from = payment_counting_start(period_start, period_end)
-    if payment_from is not None:
-        client_payments = db.scalar(
-            select(func.coalesce(func.sum(Payment.amount), 0))
-            .select_from(Payment)
-            .join(Contract, Contract.id == Payment.contract_id)
-            .where(
-                Payment.paid_at >= payment_from,
-                Payment.paid_at <= period_end,
-                Payment.deleted_at.is_(None),
-                Contract.deleted_at.is_(None),
-            )
-        ) or Decimal("0")
-
-    manual_income = db.scalar(
-        select(func.coalesce(func.sum(Income.amount), 0)).where(
-            Income.income_date >= period_start,
-            Income.income_date <= period_end,
-            Income.deleted_at.is_(None),
-        )
-    ) or Decimal("0")
-
-    total_revenue = manual_income + client_payments
-
-    expense_summary = get_expense_summary(
-        db, date_from=period_start, date_to=period_end
+    total_revenue, total_expense, net_balance = _compute_turnover_for_dates(
+        db,
+        period_start=period_start,
+        period_end=period_end,
     )
-    total_expense = expense_summary.total_expenses
-    net_balance = total_revenue - total_expense
+    expense_summary = get_expense_summary(db, date_from=period_start, date_to=period_end)
 
     return FinanceTurnoverRead(
         year=year,
@@ -260,3 +277,32 @@ def get_finance_turnover_trend(
         )
 
     return FinanceTurnoverTrendRead(year_from=year_from, year_to=year_to, points=points)
+
+
+def get_finance_turnover_monthly_trend(
+    db: Session,
+    *,
+    year: int,
+) -> FinanceTurnoverMonthlyTrendRead:
+    from app.schemas.finance import FinanceTurnoverMonthlyTrendPoint, FinanceTurnoverMonthlyTrendRead
+
+    points = []
+    for month in range(1, 13):
+        last_day = monthrange(year, month)[1]
+        period_start = date(year, month, 1)
+        period_end = date(year, month, last_day)
+        total_revenue, total_expense, net_balance = _compute_turnover_for_dates(
+            db,
+            period_start=period_start,
+            period_end=period_end,
+        )
+        points.append(
+            FinanceTurnoverMonthlyTrendPoint(
+                month=month,
+                total_revenue=total_revenue,
+                total_expense=total_expense,
+                net_balance=net_balance,
+            )
+        )
+
+    return FinanceTurnoverMonthlyTrendRead(year=year, points=points)

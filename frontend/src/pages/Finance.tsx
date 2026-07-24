@@ -91,6 +91,7 @@ import type {
   FinanceTurnoverYear,
   FinanceTurnover,
   FinanceTurnoverTrend,
+  FinanceTurnoverMonthlyTrend,
   IncomeCategory,
   Payment,
 } from "../types";
@@ -108,8 +109,7 @@ import { cn } from "@/lib/utils";
 const TURNOVER_YEAR_START = 2019;
 const TURNOVER_YEAR_END = 2035;
 const TURNOVER_TREND_END_YEAR = new Date().getFullYear();
-const FINANCE_AUTO_PAYMENTS_YEAR = 2027;
-const financeShowsContractPayments = () => new Date().getFullYear() >= FINANCE_AUTO_PAYMENTS_YEAR;
+const DEFAULT_FINANCE_AUTO_PAYMENTS_YEAR = 2027;
 const TURNOVER_YEAR_ALL = "all" as const;
 const TURNOVER_PERIODS: FinancePeriod[] = ["full", "q1", "q2", "q3", "q4"];
 
@@ -176,6 +176,8 @@ export function FinancePage() {
   const [items, setItems] = useState<FinanceLedgerItem[]>([]);
   const [turnover, setTurnover] = useState<FinanceTurnover | null>(null);
   const [turnoverTrend, setTurnoverTrend] = useState<FinanceTurnoverTrend | null>(null);
+  const [turnoverMonthlyTrend, setTurnoverMonthlyTrend] =
+    useState<FinanceTurnoverMonthlyTrend | null>(null);
   const [turnoverLoading, setTurnoverLoading] = useState(true);
   const [turnoverYear, setTurnoverYear] = usePersistedState(
     "wtma.finance.turnoverYear",
@@ -208,6 +210,12 @@ export function FinancePage() {
   const [importError, setImportError] = useState("");
   const [importResult, setImportResult] = useState<FinanceImportResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [autoPaymentsFromYear, setAutoPaymentsFromYear] = useState(
+    DEFAULT_FINANCE_AUTO_PAYMENTS_YEAR,
+  );
+
+  const financeShowsContractPayments =
+    new Date().getFullYear() >= autoPaymentsFromYear;
 
   const yearOptions = useMemo(() => {
     const years: number[] = [];
@@ -232,15 +240,27 @@ export function FinancePage() {
     [t],
   );
 
-  const annualChartData = useMemo(
-    () =>
-      (turnoverTrend?.points ?? []).map((point) => ({
-        year: String(point.year),
+  const selectedYear: FinanceTurnoverYear =
+    turnoverYear === TURNOVER_YEAR_ALL
+      ? TURNOVER_YEAR_ALL
+      : Number.parseInt(turnoverYear, 10) || new Date().getFullYear();
+
+  const isMonthlyChart = selectedYear !== TURNOVER_YEAR_ALL;
+
+  const annualChartData = useMemo(() => {
+    if (isMonthlyChart) {
+      return (turnoverMonthlyTrend?.points ?? []).map((point) => ({
+        label: t(`finance.turnover.monthShort.${point.month}`),
         total_revenue: toNumber(point.total_revenue),
         total_expense: toNumber(point.total_expense),
-      })),
-    [turnoverTrend],
-  );
+      }));
+    }
+    return (turnoverTrend?.points ?? []).map((point) => ({
+      label: String(point.year),
+      total_revenue: toNumber(point.total_revenue),
+      total_expense: toNumber(point.total_expense),
+    }));
+  }, [isMonthlyChart, turnoverMonthlyTrend, turnoverTrend, t]);
 
   const expenseBreakdown = useMemo(() => {
     const items = (turnover?.expenses_by_category ?? []).map((item) => ({
@@ -251,23 +271,30 @@ export function FinancePage() {
     return { items, max };
   }, [turnover]);
 
-  const selectedYear: FinanceTurnoverYear =
-    turnoverYear === TURNOVER_YEAR_ALL
-      ? TURNOVER_YEAR_ALL
-      : Number.parseInt(turnoverYear, 10) || new Date().getFullYear();
-
   const loadTurnover = (
     year: FinanceTurnoverYear = selectedYear,
     period: FinancePeriod = turnoverPeriod,
   ) => {
     setTurnoverLoading(true);
-    Promise.all([
-      api.finance.turnover(year, period),
-      api.finance.turnoverTrend(TURNOVER_YEAR_START, TURNOVER_TREND_END_YEAR),
-    ])
-      .then(([summary, trend]) => {
+    const chartRequest =
+      year === TURNOVER_YEAR_ALL
+        ? api.finance
+            .turnoverTrend(TURNOVER_YEAR_START, TURNOVER_TREND_END_YEAR)
+            .then((trend) => ({ kind: "yearly" as const, trend }))
+        : api.finance
+            .turnoverMonthlyTrend(year)
+            .then((trend) => ({ kind: "monthly" as const, trend }));
+
+    Promise.all([api.finance.turnover(year, period), chartRequest])
+      .then(([summary, chart]) => {
         setTurnover(summary);
-        setTurnoverTrend(trend);
+        if (chart.kind === "yearly") {
+          setTurnoverTrend(chart.trend);
+          setTurnoverMonthlyTrend(null);
+        } else {
+          setTurnoverMonthlyTrend(chart.trend);
+          setTurnoverTrend(null);
+        }
         setDateFrom(summary.date_from);
         setDateTo(summary.date_to);
       })
@@ -308,6 +335,15 @@ export function FinancePage() {
       .catch((e) => setError(e.message))
       .finally(() => finish());
   };
+
+  useEffect(() => {
+    api.settings
+      .get()
+      .then((data) => setAutoPaymentsFromYear(data.finance_auto_payments_from_year))
+      .catch(() => {
+        setAutoPaymentsFromYear(DEFAULT_FINANCE_AUTO_PAYMENTS_YEAR);
+      });
+  }, []);
 
   useEffect(() => {
     loadTurnover(selectedYear, turnoverPeriod);
@@ -474,27 +510,57 @@ export function FinancePage() {
 
       <PageError message={error} />
 
-      <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-foreground/90">
-        {t("finance.turnover.manualUntil2027")}
-      </div>
-
       <Card className="content-card">
         <CardHeader className="border-b pb-4">
-          <CardTitle className="text-base">{t("finance.turnover.annualRevenue")}</CardTitle>
-          <CardDescription className="text-xs">
-            {t("finance.turnover.trendDesc")
-              .replace("{from}", String(TURNOVER_YEAR_START))
-              .replace("{to}", String(TURNOVER_TREND_END_YEAR))}
-          </CardDescription>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <CardTitle className="text-base">
+                {isMonthlyChart
+                  ? t("finance.turnover.monthlyRevenue")
+                  : t("finance.turnover.annualRevenue")}
+              </CardTitle>
+              <CardDescription className="text-xs">
+                {isMonthlyChart
+                  ? t("finance.turnover.monthlyTrendDesc").replace(
+                      "{year}",
+                      String(selectedYear),
+                    )
+                  : t("finance.turnover.trendDesc")
+                      .replace("{from}", String(TURNOVER_YEAR_START))
+                      .replace("{to}", String(TURNOVER_TREND_END_YEAR))}
+              </CardDescription>
+            </div>
+            <Select
+              value={turnoverYear}
+              onValueChange={handleYearChange}
+              className="w-full sm:w-44"
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={t("finance.turnover.year")} />
+              </SelectTrigger>
+              <SelectContent className="max-h-60">
+                <SelectGroup>
+                  <SelectItem value={TURNOVER_YEAR_ALL}>
+                    {t("finance.turnover.allYears")}
+                  </SelectItem>
+                  {yearOptions.map((year) => (
+                    <SelectItem key={year} value={String(year)}>
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
         </CardHeader>
-        <CardContent className="pt-5">
+        <CardContent className={cn("pt-5", turnoverLoading && "opacity-60")}>
           {annualChartData.length === 0 ? (
             <p className="py-10 text-center text-sm text-muted-foreground">{t("common.noData")}</p>
           ) : (
             <ChartContainer config={annualChartConfig} className="h-[300px] w-full">
               <LineChart data={annualChartData} margin={{ left: 8, right: 8, top: 8, bottom: 0 }}>
                 <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={8} />
+                <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
                 <YAxis
                   tickLine={false}
                   axisLine={false}
@@ -536,21 +602,6 @@ export function FinancePage() {
               <CardDescription className="text-xs">{t("finance.turnover.subtitle")}</CardDescription>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-              <Select value={turnoverYear} onValueChange={handleYearChange} className="w-full sm:w-44">
-                <SelectTrigger>
-                  <SelectValue placeholder={t("finance.turnover.year")} />
-                </SelectTrigger>
-                <SelectContent className="max-h-60">
-                  <SelectGroup>
-                    <SelectItem value={TURNOVER_YEAR_ALL}>{t("finance.turnover.allYears")}</SelectItem>
-                    {yearOptions.map((year) => (
-                      <SelectItem key={year} value={String(year)}>
-                        {year}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
               <Select value={turnoverPeriod} onValueChange={handlePeriodChange} className="w-full sm:w-52">
                 <SelectTrigger>
                   <SelectValue placeholder={t("finance.turnover.period")} />
@@ -662,7 +713,7 @@ export function FinancePage() {
               <SelectItem value="all">{t("finance.allTypes")}</SelectItem>
               <SelectItem value="income">{t("finance.typeIncome")}</SelectItem>
               <SelectItem value="expense">{t("finance.typeExpense")}</SelectItem>
-              {financeShowsContractPayments() ? (
+              {financeShowsContractPayments ? (
                 <SelectItem value="payment">{t("finance.typePayment")}</SelectItem>
               ) : null}
             </SelectContent>

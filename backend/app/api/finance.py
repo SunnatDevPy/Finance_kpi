@@ -12,6 +12,7 @@ from app.schemas.finance import (
     FinanceTurnoverPlanUpdate,
     FinanceTurnoverRead,
     FinanceTurnoverTrendRead,
+    FinanceTurnoverMonthlyTrendRead,
 )
 from app.schemas.finance_import import FinanceImportResult
 from app.services.app_settings import set_yearly_plan
@@ -19,6 +20,7 @@ from app.services.finance import (
     get_finance_ledger,
     get_finance_turnover,
     get_finance_turnover_all_years,
+    get_finance_turnover_monthly_trend,
     get_finance_turnover_trend,
 )
 from app.services.finance_import import build_finance_import_template, import_finance_from_xlsx
@@ -78,6 +80,14 @@ def finance_turnover_trend(
     year_to: int = Query(default=date.today().year, ge=2000, le=2035),
 ) -> FinanceTurnoverTrendRead:
     return get_finance_turnover_trend(db, year_from=year_from, year_to=year_to)
+
+
+@router.get("/turnover-monthly-trend", response_model=FinanceTurnoverMonthlyTrendRead)
+def finance_turnover_monthly_trend(
+    db: Session = Depends(get_db),
+    year: int = Query(default=date.today().year, ge=2000, le=2035),
+) -> FinanceTurnoverMonthlyTrendRead:
+    return get_finance_turnover_monthly_trend(db, year=year)
 
 
 @router.patch("/turnover-plan", response_model=FinanceTurnoverRead)

@@ -26,6 +26,7 @@ import type {
   FinanceTurnoverYear,
   FinanceTurnover,
   FinanceTurnoverTrend,
+  FinanceTurnoverMonthlyTrend,
   Income,
   IncomeCategory,
   IncomeSummary,
@@ -297,6 +298,11 @@ export const api = {
       request<AppSettings>("/settings/company-profile", {
         method: "PATCH",
         body: JSON.stringify(data),
+      }),
+    updateFinanceAutoPaymentsYear: (finance_auto_payments_from_year: number) =>
+      request<AppSettings>("/settings/finance-auto-payments-year", {
+        method: "PATCH",
+        body: JSON.stringify({ finance_auto_payments_from_year }),
       }),
   },
 
@@ -716,6 +722,8 @@ export const api = {
       request<FinanceTurnoverTrend>(
         `/finance/turnover-trend?year_from=${yearFrom}&year_to=${yearTo}`,
       ),
+    turnoverMonthlyTrend: (year: number) =>
+      request<FinanceTurnoverMonthlyTrend>(`/finance/turnover-monthly-trend?year=${year}`),
     updateTurnoverPlan: (year: number, yearly_plan: number) =>
       request<FinanceTurnover>("/finance/turnover-plan", {
         method: "PATCH",

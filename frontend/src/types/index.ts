@@ -22,6 +22,7 @@ export interface CompanyProfile {
 export interface AppSettings {
   monthly_plan: string;
   company: CompanyProfile;
+  finance_auto_payments_from_year: number;
 }
 
 export interface Paginated<T> {
@@ -470,6 +471,18 @@ export interface FinanceTurnoverTrend {
   year_from: number;
   year_to: number;
   points: FinanceTurnoverTrendPoint[];
+}
+
+export interface FinanceTurnoverMonthlyTrendPoint {
+  month: number;
+  total_revenue: string;
+  total_expense: string;
+  net_balance: string;
+}
+
+export interface FinanceTurnoverMonthlyTrend {
+  year: number;
+  points: FinanceTurnoverMonthlyTrendPoint[];
 }
 
 export interface AuditLogEntry {

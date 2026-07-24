@@ -1,7 +1,7 @@
 from datetime import date
 from decimal import Decimal
 
-from app.services.finance_period import FINANCE_AUTO_PAYMENTS_FROM
+from app.services.finance_period import DEFAULT_FINANCE_AUTO_PAYMENTS_FROM
 
 
 def test_finance_turnover_summary_manual_only_before_2027(client, auth_headers, sample_contract):
@@ -147,6 +147,56 @@ def test_finance_turnover_plan_update(client, auth_headers):
     assert "total_revenue" in data
 
 
+def test_finance_turnover_monthly_trend(client, auth_headers):
+    client.post(
+        "/api/v1/incomes",
+        headers=auth_headers,
+        json={
+            "category": "sale",
+            "title": "Mart kirim",
+            "amount": "1000000.00",
+            "income_date": "2026-03-15",
+        },
+    )
+    client.post(
+        "/api/v1/incomes",
+        headers=auth_headers,
+        json={
+            "category": "sale",
+            "title": "May kirim",
+            "amount": "2000000.00",
+            "income_date": "2026-05-10",
+        },
+    )
+    client.post(
+        "/api/v1/expenses",
+        headers=auth_headers,
+        json={
+            "category": "rent",
+            "title": "Mart ijara",
+            "amount": "300000.00",
+            "expense_date": "2026-03-20",
+        },
+    )
+
+    resp = client.get(
+        "/api/v1/finance/turnover-monthly-trend",
+        headers=auth_headers,
+        params={"year": 2026},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["year"] == 2026
+    assert len(data["points"]) == 12
+    march = next(item for item in data["points"] if item["month"] == 3)
+    may = next(item for item in data["points"] if item["month"] == 5)
+    january = next(item for item in data["points"] if item["month"] == 1)
+    assert Decimal(january["total_revenue"]) == Decimal("0")
+    assert Decimal(march["total_revenue"]) == Decimal("1000000.00")
+    assert Decimal(march["total_expense"]) == Decimal("300000.00")
+    assert Decimal(may["total_revenue"]) == Decimal("2000000.00")
+
+
 def test_finance_turnover_trend(client, auth_headers, sample_contract):
     client.post(
         "/api/v1/incomes",
@@ -173,5 +223,26 @@ def test_finance_turnover_trend(client, auth_headers, sample_contract):
     assert Decimal(point_2026["total_revenue"]) == Decimal("1000000.00")
 
 
-def test_finance_auto_payments_cutover_date():
-    assert FINANCE_AUTO_PAYMENTS_FROM == date(2027, 1, 1)
+def test_finance_auto_payments_cutover_default_year():
+    assert DEFAULT_FINANCE_AUTO_PAYMENTS_FROM == date(2027, 1, 1)
+
+
+def test_finance_auto_payments_year_setting(client, auth_headers, sample_contract):
+    client.patch(
+        "/api/v1/settings/finance-auto-payments-year",
+        headers=auth_headers,
+        json={"finance_auto_payments_from_year": 2025},
+    )
+    client.post(
+        "/api/v1/payments",
+        headers=auth_headers,
+        json={"contract_id": sample_contract.id, "amount": "1500000.00", "paid_at": "2025-06-01"},
+    )
+
+    resp = client.get("/api/v1/finance/turnover", headers=auth_headers, params={"year": 2025})
+    assert resp.status_code == 200
+    assert Decimal(resp.json()["total_revenue"]) == Decimal("1500000.00")
+
+    settings = client.get("/api/v1/settings", headers=auth_headers)
+    assert settings.status_code == 200
+    assert settings.json()["finance_auto_payments_from_year"] == 2025
