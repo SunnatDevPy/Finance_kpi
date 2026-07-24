@@ -20,7 +20,6 @@ import {
   ArrowUpIcon,
   BanknoteIcon,
   MapPinIcon,
-  CheckCircle2Icon,
   CrownIcon,
   ScaleIcon,
   TrendingUpIcon,
@@ -69,9 +68,18 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-import type { ChartPoint, ClientRegionStatsItem, DashboardStats, TopClientItem, TopClientLtvItem } from "../types";
+import type { ClientRegionStatsItem, DashboardStats, TopClientItem, TopClientLtvItem } from "../types";
 import { useI18n } from "../context/I18nContext";
-import { formatAmount, formatCompactMoney, formatMoney, formatPercent, toNumber } from "../utils/format";
+import {
+  chartMonthsYearLabel,
+  formatAmount,
+  formatChartMonthTick,
+  formatCompactMoney,
+  formatMoney,
+  formatPercent,
+  sortByMonthKey,
+  toNumber,
+} from "../utils/format";
 import { cn } from "@/lib/utils";
 import { CONTRACT_WORKFLOW_STATUSES } from "@/data/contractWorkflow";
 
@@ -186,9 +194,6 @@ export function DashboardPage() {
   const [ltvLoading, setLtvLoading] = useState(true);
   const [ltvError, setLtvError] = useState("");
   const [trendMonths, setTrendMonths] = useState<(typeof TREND_MONTH_OPTIONS)[number]>(12);
-  const [trendPoints, setTrendPoints] = useState<ChartPoint[]>([]);
-  const [trendLoading, setTrendLoading] = useState(true);
-  const [trendError, setTrendError] = useState("");
 
   const revenueConfig = useMemo(
     () =>
@@ -279,29 +284,28 @@ export function DashboardPage() {
       .finally(() => setLtvLoading(false));
   }, [ltvLimit, ltvOrder]);
 
-  useEffect(() => {
-    setTrendLoading(true);
-    setTrendError("");
-    api
-      .dashboardRevenueTrend(trendMonths)
-      .then(setTrendPoints)
-      .catch((e) => setTrendError(e.message))
-      .finally(() => setTrendLoading(false));
-  }, [trendMonths]);
-
   const chartData = useMemo(() => {
     if (!stats) return null;
 
-    const revenueTrend = trendPoints.map((point) => ({
-      label: point.label,
-      revenue: toNumber(point.value),
-    }));
+    const monthlyRevenueSorted = sortByMonthKey(
+      stats.charts.monthly_revenue.map((point) => ({
+        month: point.month,
+        revenue: toNumber(point.value),
+      })),
+    );
+    const revenueTrend = monthlyRevenueSorted.slice(-trendMonths);
+    const revenueYearLabel = chartMonthsYearLabel(revenueTrend.map((point) => point.month));
 
-    const planComparison = stats.charts.revenue_vs_plan.map((point) => ({
-      label: point.label,
-      revenue: toNumber(point.revenue),
-      plan: toNumber(point.plan),
-    }));
+    const planComparisonSorted = sortByMonthKey(
+      stats.charts.revenue_vs_plan.map((point) => ({
+        month: point.month,
+        revenue: toNumber(point.revenue),
+        plan: toNumber(point.plan),
+      })),
+    );
+    const planYearLabel = chartMonthsYearLabel(planComparisonSorted.map((point) => point.month));
+
+    const planComparison = planComparisonSorted;
 
     const byServiceSorted = [...stats.charts.revenue_by_service]
       .map((item) => ({ name: item.name, amount: toNumber(item.amount) }))
@@ -343,14 +347,18 @@ export function DashboardPage() {
         : topExpenseCategories;
     const expensesByCategoryMax = Math.max(1, ...expensesByCategory.map((item) => item.amount));
 
-    const profitTrend = stats.charts.profit_by_month.map((point) => ({
-      label: point.label,
-      profit: toNumber(point.value),
-    }));
+    const profitTrend = sortByMonthKey(
+      stats.charts.profit_by_month.map((point) => ({
+        month: point.month,
+        profit: toNumber(point.value),
+      })),
+    );
 
     return {
       revenueTrend,
+      revenueYearLabel,
       planComparison,
+      planYearLabel,
       byService,
       byServiceMax,
       clientStatus,
@@ -366,7 +374,7 @@ export function DashboardPage() {
       expensesByCategoryMax,
       profitTrend,
     };
-  }, [stats, t, trendPoints]);
+  }, [stats, t, trendMonths]);
 
   if (error) {
     return <div className="text-red-600 dark:text-red-400">{t("common.error")}: {error}</div>;
@@ -390,8 +398,6 @@ export function DashboardPage() {
 
   const hasDateRange = Boolean(dateFrom || dateTo);
   const financeRevenue = hasDateRange ? stats.monthly_revenue : stats.total_revenue;
-  const manualIncome = hasDateRange ? stats.period_other_income : stats.total_other_income;
-  const contractRevenue = Math.max(0, toNumber(financeRevenue) - toNumber(manualIncome));
 
   return (
     <PageShell className={cn(loading && "pointer-events-none opacity-60")}>
@@ -466,18 +472,7 @@ export function DashboardPage() {
         </StaggerItem>
       </StaggerContainer>
 
-      <StaggerContainer className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
-        <StaggerItem>
-          <StatCard
-            title={t("dashboard.totalPaid")}
-            value={formatMoney(stats.total_paid)}
-            numericValue={toNumber(stats.total_paid)}
-            formatValue={formatMoney}
-            subtitle={t("dashboard.contractShare")}
-            accent="violet"
-            icon={CheckCircle2Icon}
-          />
-        </StaggerItem>
+      <StaggerContainer className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
         <StaggerItem>
           <StatCard
             title={t("dashboard.cancelledAmount")}
@@ -489,28 +484,15 @@ export function DashboardPage() {
             icon={XCircleIcon}
           />
         </StaggerItem>
-        <StaggerItem>
-          <StatCard
-            title={t("dashboard.periodCancelledAmount")}
-            value={formatMoney(stats.period_cancelled_amount)}
-            numericValue={toNumber(stats.period_cancelled_amount)}
-            formatValue={formatMoney}
-            accent="red"
-            icon={XCircleIcon}
-          />
-        </StaggerItem>
       </StaggerContainer>
 
       <StaggerContainer className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
         <StaggerItem>
           <StatCard
-            title={hasDateRange ? t("dashboard.periodRevenue") : t("dashboard.totalRevenue")}
+            title={t("dashboard.totalRevenue")}
             value={formatMoney(financeRevenue)}
             numericValue={toNumber(financeRevenue)}
             formatValue={formatMoney}
-            subtitle={t("dashboard.revenueBreakdown")
-              .replace("{manual}", formatMoney(manualIncome))
-              .replace("{contract}", formatMoney(contractRevenue))}
             accent="green"
             icon={TrendingUpIcon}
             to="/finance"
@@ -875,7 +857,14 @@ export function DashboardPage() {
           <CardHeader className="border-b">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <CardTitle className="text-base">{t("dashboard.charts.revenueTrend")}</CardTitle>
+                <div className="flex flex-wrap items-baseline gap-2">
+                  <CardTitle className="text-base">{t("dashboard.charts.revenueTrend")}</CardTitle>
+                  {chartData.revenueYearLabel && (
+                    <span className="text-sm font-semibold tabular-nums text-muted-foreground">
+                      {chartData.revenueYearLabel}
+                    </span>
+                  )}
+                </div>
                 <CardDescription className="text-xs">{t("dashboard.charts.revenueTrendDesc")}</CardDescription>
               </div>
               <div className="segmented-control">
@@ -894,12 +883,7 @@ export function DashboardPage() {
               </div>
             </div>
           </CardHeader>
-          <CardContent className={cn("pt-4", trendLoading && "pointer-events-none opacity-60")}>
-            {trendError && (
-              <p className="mb-3 text-sm text-red-600 dark:text-red-400">
-                {t("common.error")}: {trendError}
-              </p>
-            )}
+          <CardContent className="pt-4">
             <ChartContainer config={revenueConfig} className="h-[260px] w-full">
               <AreaChart data={chartData.revenueTrend} margin={{ left: 8, right: 8, top: 4, bottom: 0 }}>
                 <defs>
@@ -909,7 +893,13 @@ export function DashboardPage() {
                   </linearGradient>
                 </defs>
                 <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border/60" />
-                <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
+                <XAxis
+                  dataKey="month"
+                  tickFormatter={formatChartMonthTick}
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fontSize: 11 }}
+                />
                 <YAxis
                   tickFormatter={formatCompactMoney}
                   tickLine={false}
@@ -940,14 +930,27 @@ export function DashboardPage() {
         <RevealCard>
         <Card className="content-card">
           <CardHeader className="border-b">
-            <CardTitle className="text-base">{t("dashboard.charts.planVsFact")}</CardTitle>
+            <div className="flex flex-wrap items-baseline gap-2">
+              <CardTitle className="text-base">{t("dashboard.charts.planVsFact")}</CardTitle>
+              {chartData.planYearLabel && (
+                <span className="text-sm font-semibold tabular-nums text-muted-foreground">
+                  {chartData.planYearLabel}
+                </span>
+              )}
+            </div>
             <CardDescription className="text-xs">{t("dashboard.charts.planVsFactDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="pt-4">
             <ChartContainer config={revenueConfig} className="h-[260px] w-full">
               <ComposedChart data={chartData.planComparison} margin={{ left: 8, right: 8, top: 4, bottom: 0 }}>
                 <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border/60" />
-                <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
+                <XAxis
+                  dataKey="month"
+                  tickFormatter={formatChartMonthTick}
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fontSize: 11 }}
+                />
                 <YAxis
                   tickFormatter={formatCompactMoney}
                   tickLine={false}
@@ -1035,7 +1038,13 @@ export function DashboardPage() {
                   </linearGradient>
                 </defs>
                 <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border/60" />
-                <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
+                <XAxis
+                  dataKey="month"
+                  tickFormatter={formatChartMonthTick}
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fontSize: 11 }}
+                />
                 <YAxis
                   tickFormatter={formatCompactMoney}
                   tickLine={false}

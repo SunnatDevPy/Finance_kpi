@@ -48,6 +48,42 @@ export function toNumber(value: string | number): number {
   return typeof value === "string" ? parseFloat(value) : value;
 }
 
+const CHART_MONTH_SHORT = [
+  "Yan",
+  "Fev",
+  "Mar",
+  "Apr",
+  "May",
+  "Iyn",
+  "Iyl",
+  "Avg",
+  "Sen",
+  "Okt",
+  "Noy",
+  "Dek",
+] as const;
+
+/** Chart X-axis: YYYY-MM → short month name (chronological order via dataKey=month). */
+export function formatChartMonthTick(monthKey: string): string {
+  const parts = monthKey.split("-");
+  if (parts.length < 2) return monthKey;
+  const month = Number(parts[1]);
+  if (!Number.isFinite(month) || month < 1 || month > 12) return monthKey;
+  return CHART_MONTH_SHORT[month - 1];
+}
+
+/** Year or year range for chart header from sorted month keys. */
+export function chartMonthsYearLabel(monthKeys: string[]): string {
+  const years = [...new Set(monthKeys.map((key) => key.slice(0, 4)))].sort();
+  if (years.length === 0) return "";
+  if (years.length === 1) return years[0];
+  return `${years[0]} — ${years[years.length - 1]}`;
+}
+
+export function sortByMonthKey<T extends { month: string }>(points: T[]): T[] {
+  return [...points].sort((a, b) => a.month.localeCompare(b.month));
+}
+
 /**
  * Normalizes a possibly-decimal amount (e.g. "1500000.00" from the API)
  * into a clean whole-number digit string (e.g. "1500000") suitable for
