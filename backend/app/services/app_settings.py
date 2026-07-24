@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal, InvalidOperation
 
 from sqlalchemy import select
@@ -5,9 +6,12 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models import AppSetting
+from app.services.finance_period import TURNOVER_YEAR_END, TURNOVER_YEAR_START
 
 MONTHLY_PLAN_KEY = "monthly_plan"
 YEARLY_PLAN_KEY_PREFIX = "yearly_plan_"
+FINANCE_AUTO_PAYMENTS_FROM_YEAR_KEY = "finance_auto_payments_from_year"
+DEFAULT_FINANCE_AUTO_PAYMENTS_FROM_YEAR = 2027
 
 
 def yearly_plan_key(year: int) -> str:
@@ -87,3 +91,35 @@ def set_company_profile(db: Session, data: dict[str, str]) -> dict[str, str]:
             row.value = value or ""
     db.commit()
     return get_company_profile(db)
+
+
+def get_finance_auto_payments_from_year(db: Session) -> int:
+    row = db.get(AppSetting, FINANCE_AUTO_PAYMENTS_FROM_YEAR_KEY)
+    if row is None:
+        return DEFAULT_FINANCE_AUTO_PAYMENTS_FROM_YEAR
+    try:
+        year = int(row.value)
+    except (TypeError, ValueError):
+        return DEFAULT_FINANCE_AUTO_PAYMENTS_FROM_YEAR
+    if year < TURNOVER_YEAR_START or year > TURNOVER_YEAR_END:
+        return DEFAULT_FINANCE_AUTO_PAYMENTS_FROM_YEAR
+    return year
+
+
+def get_finance_auto_payments_from(db: Session) -> date:
+    return date(get_finance_auto_payments_from_year(db), 1, 1)
+
+
+def set_finance_auto_payments_from_year(db: Session, year: int) -> int:
+    if year < TURNOVER_YEAR_START or year > TURNOVER_YEAR_END:
+        raise ValueError(
+            f"Year must be between {TURNOVER_YEAR_START} and {TURNOVER_YEAR_END}"
+        )
+    row = db.get(AppSetting, FINANCE_AUTO_PAYMENTS_FROM_YEAR_KEY)
+    value = str(year)
+    if row is None:
+        db.add(AppSetting(key=FINANCE_AUTO_PAYMENTS_FROM_YEAR_KEY, value=value))
+    else:
+        row.value = value
+    db.commit()
+    return year
