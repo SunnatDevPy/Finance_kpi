@@ -28,6 +28,20 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, MoneyInput } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+const FINANCE_YEAR_START = 2019;
+const FINANCE_YEAR_END = 2035;
+const FINANCE_YEAR_OPTIONS = Array.from(
+  { length: FINANCE_YEAR_END - FINANCE_YEAR_START + 1 },
+  (_, index) => FINANCE_YEAR_START + index,
+);
 
 export function ProfilePage() {
   const { user, isAdmin } = useAuth();
@@ -39,6 +53,10 @@ export function ProfilePage() {
   const [planError, setPlanError] = useState("");
   const [planSuccess, setPlanSuccess] = useState("");
   const [planLoading, setPlanLoading] = useState(false);
+  const [financeAutoPaymentsYear, setFinanceAutoPaymentsYear] = useState("2027");
+  const [financeYearSuccess, setFinanceYearSuccess] = useState("");
+  const [financeYearError, setFinanceYearError] = useState("");
+  const [financeYearLoading, setFinanceYearLoading] = useState(false);
   const [companyForm, setCompanyForm] = useState<CompanyProfile>({
     company_name: "",
     company_address: "",
@@ -64,6 +82,7 @@ export function ProfilePage() {
       .get()
       .then((data) => {
         setMonthlyPlanInput(toWholeAmountDigits(data.monthly_plan));
+        setFinanceAutoPaymentsYear(String(data.finance_auto_payments_from_year));
         setCompanyForm({
           ...data.company,
           company_phone: parsePhoneNational(data.company.company_phone || ""),
@@ -131,6 +150,31 @@ export function ProfilePage() {
       setPlanError(err instanceof Error ? err.message : t("common.error"));
     } finally {
       setPlanLoading(false);
+    }
+  };
+
+  const handleFinanceYearSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setFinanceYearError("");
+    setFinanceYearSuccess("");
+    const year = Number.parseInt(financeAutoPaymentsYear, 10);
+    if (
+      Number.isNaN(year) ||
+      year < FINANCE_YEAR_START ||
+      year > FINANCE_YEAR_END
+    ) {
+      setFinanceYearError(t("common.error"));
+      return;
+    }
+    setFinanceYearLoading(true);
+    try {
+      const data = await api.settings.updateFinanceAutoPaymentsYear(year);
+      setFinanceAutoPaymentsYear(String(data.finance_auto_payments_from_year));
+      setFinanceYearSuccess(t("profile.financeAutoPaymentsYearSaved"));
+    } catch (err) {
+      setFinanceYearError(err instanceof Error ? err.message : t("common.error"));
+    } finally {
+      setFinanceYearLoading(false);
     }
   };
 
@@ -228,6 +272,53 @@ export function ProfilePage() {
               </div>
               <Button type="submit" disabled={planLoading}>
                 {planLoading ? (
+                  <>
+                    <LoadingIconBtn />
+                    {t("common.loading")}
+                  </>
+                ) : (
+                  <>
+                    <SaveIconBtn />
+                    {t("common.save")}
+                  </>
+                )}
+              </Button>
+            </form>
+            <div className="my-6 h-px bg-border" />
+            {financeYearError && (
+              <p className="mb-4 text-sm text-red-600 dark:text-red-400">{financeYearError}</p>
+            )}
+            {financeYearSuccess && (
+              <p className="mb-4 text-sm text-emerald-600 dark:text-emerald-400">
+                {financeYearSuccess}
+              </p>
+            )}
+            <form onSubmit={handleFinanceYearSubmit} className="flex flex-col gap-4 sm:flex-row sm:items-end">
+              <div className="flex flex-1 flex-col gap-2">
+                <Label htmlFor="finance_auto_payments_year">
+                  {t("profile.financeAutoPaymentsYear")}
+                </Label>
+                <Select
+                  value={financeAutoPaymentsYear}
+                  onValueChange={(value) => value && setFinanceAutoPaymentsYear(value)}
+                >
+                  <SelectTrigger id="finance_auto_payments_year" className="w-full sm:max-w-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {FINANCE_YEAR_OPTIONS.map((year) => (
+                      <SelectItem key={year} value={String(year)}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {t("profile.financeAutoPaymentsYearHint")}
+                </p>
+              </div>
+              <Button type="submit" disabled={financeYearLoading}>
+                {financeYearLoading ? (
                   <>
                     <LoadingIconBtn />
                     {t("common.loading")}

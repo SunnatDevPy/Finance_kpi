@@ -108,8 +108,7 @@ import { cn } from "@/lib/utils";
 const TURNOVER_YEAR_START = 2019;
 const TURNOVER_YEAR_END = 2035;
 const TURNOVER_TREND_END_YEAR = new Date().getFullYear();
-const FINANCE_AUTO_PAYMENTS_YEAR = 2027;
-const financeShowsContractPayments = () => new Date().getFullYear() >= FINANCE_AUTO_PAYMENTS_YEAR;
+const DEFAULT_FINANCE_AUTO_PAYMENTS_YEAR = 2027;
 const TURNOVER_YEAR_ALL = "all" as const;
 const TURNOVER_PERIODS: FinancePeriod[] = ["full", "q1", "q2", "q3", "q4"];
 
@@ -208,6 +207,12 @@ export function FinancePage() {
   const [importError, setImportError] = useState("");
   const [importResult, setImportResult] = useState<FinanceImportResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [autoPaymentsFromYear, setAutoPaymentsFromYear] = useState(
+    DEFAULT_FINANCE_AUTO_PAYMENTS_YEAR,
+  );
+
+  const financeShowsContractPayments =
+    new Date().getFullYear() >= autoPaymentsFromYear;
 
   const yearOptions = useMemo(() => {
     const years: number[] = [];
@@ -308,6 +313,15 @@ export function FinancePage() {
       .catch((e) => setError(e.message))
       .finally(() => finish());
   };
+
+  useEffect(() => {
+    api.settings
+      .get()
+      .then((data) => setAutoPaymentsFromYear(data.finance_auto_payments_from_year))
+      .catch(() => {
+        setAutoPaymentsFromYear(DEFAULT_FINANCE_AUTO_PAYMENTS_YEAR);
+      });
+  }, []);
 
   useEffect(() => {
     loadTurnover(selectedYear, turnoverPeriod);
@@ -475,7 +489,10 @@ export function FinancePage() {
       <PageError message={error} />
 
       <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-foreground/90">
-        {t("finance.turnover.manualUntil2027")}
+        {t("finance.turnover.manualUntilYear").replace(
+          /\{year\}/g,
+          String(autoPaymentsFromYear),
+        )}
       </div>
 
       <Card className="content-card">
@@ -662,7 +679,7 @@ export function FinancePage() {
               <SelectItem value="all">{t("finance.allTypes")}</SelectItem>
               <SelectItem value="income">{t("finance.typeIncome")}</SelectItem>
               <SelectItem value="expense">{t("finance.typeExpense")}</SelectItem>
-              {financeShowsContractPayments() ? (
+              {financeShowsContractPayments ? (
                 <SelectItem value="payment">{t("finance.typePayment")}</SelectItem>
               ) : null}
             </SelectContent>

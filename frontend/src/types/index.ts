@@ -22,6 +22,7 @@ export interface CompanyProfile {
 export interface AppSettings {
   monthly_plan: string;
   company: CompanyProfile;
+  finance_auto_payments_from_year: number;
 }
 
 export interface Paginated<T> {
