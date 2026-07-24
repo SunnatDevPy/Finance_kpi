@@ -199,6 +199,7 @@ def test_dashboard_manual_income_before_auto_payments_year(client, auth_headers,
     assert response.status_code == 200
     data = response.json()
     assert Decimal(data["monthly_revenue"]) == Decimal("1200000.00")
+    assert Decimal(data["total_revenue"]) == Decimal("1200000.00")
     assert Decimal(data["period_expenses"]) == Decimal("200000.00")
     assert Decimal(data["net_profit"]) == Decimal("1000000.00")
 

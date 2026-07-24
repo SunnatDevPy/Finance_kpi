@@ -609,6 +609,7 @@ def get_dashboard_stats(
         total_other_income=total_other_income,
         net_profit=net_profit,
         profit_margin_pct=profit_margin_pct,
+        total_revenue=all_time_revenue,
     )
 
 

@@ -97,3 +97,4 @@ class DashboardStats(BaseModel):
     total_other_income: Decimal
     net_profit: Decimal
     profit_margin_pct: float | None
+    total_revenue: Decimal

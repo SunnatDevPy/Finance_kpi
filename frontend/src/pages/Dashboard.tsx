@@ -388,6 +388,11 @@ export function DashboardPage() {
       ? Math.round((toNumber(stats.monthly_revenue) / toNumber(stats.monthly_plan)) * 100)
       : 0;
 
+  const hasDateRange = Boolean(dateFrom || dateTo);
+  const financeRevenue = hasDateRange ? stats.monthly_revenue : stats.total_revenue;
+  const manualIncome = hasDateRange ? stats.period_other_income : stats.total_other_income;
+  const contractRevenue = Math.max(0, toNumber(financeRevenue) - toNumber(manualIncome));
+
   return (
     <PageShell className={cn(loading && "pointer-events-none opacity-60")}>
 
@@ -475,17 +480,6 @@ export function DashboardPage() {
         </StaggerItem>
         <StaggerItem>
           <StatCard
-            title={t("dashboard.collectionRate")}
-            value={`${Math.round(stats.collection_rate)}%`}
-            numericValue={stats.collection_rate}
-            formatValue={(n) => `${Math.round(n)}%`}
-            subtitle={t("dashboard.contractShare")}
-            accent="cyan"
-            icon={ScaleIcon}
-          />
-        </StaggerItem>
-        <StaggerItem>
-          <StatCard
             title={t("dashboard.cancelledAmount")}
             value={formatMoney(stats.cancelled_amount)}
             numericValue={toNumber(stats.cancelled_amount)}
@@ -507,7 +501,21 @@ export function DashboardPage() {
         </StaggerItem>
       </StaggerContainer>
 
-      <StaggerContainer className="grid grid-cols-1 gap-5 md:grid-cols-3">
+      <StaggerContainer className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+        <StaggerItem>
+          <StatCard
+            title={hasDateRange ? t("dashboard.periodRevenue") : t("dashboard.totalRevenue")}
+            value={formatMoney(financeRevenue)}
+            numericValue={toNumber(financeRevenue)}
+            formatValue={formatMoney}
+            subtitle={t("dashboard.revenueBreakdown")
+              .replace("{manual}", formatMoney(manualIncome))
+              .replace("{contract}", formatMoney(contractRevenue))}
+            accent="green"
+            icon={TrendingUpIcon}
+            to="/finance"
+          />
+        </StaggerItem>
         <StaggerItem>
           <StatCard
             title={t("dashboard.totalExpenses")}

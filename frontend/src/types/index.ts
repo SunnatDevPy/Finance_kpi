@@ -219,6 +219,7 @@ export interface DashboardStats {
   total_other_income: string;
   net_profit: string;
   profit_margin_pct: number | null;
+  total_revenue: string;
 }
 
 export interface ClientFormData {
