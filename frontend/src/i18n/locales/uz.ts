@@ -396,6 +396,10 @@ export const uz = {
     monthlyPlanHint: "Barcha foydalanuvchilar uchun qo'llaniladi",
     monthlyPlanInvalid: "Reja summasi 0 dan katta bo'lishi kerak",
     monthlyPlanSaved: "Oylik reja saqlandi",
+    financeAutoPaymentsYear: "Shartnoma to'lovlari avtomatik yili",
+    financeAutoPaymentsYearHint:
+      "Tanlangan yildan boshlab shartnoma to'lovlari moliya oborotiga avtomatik qo'shiladi. Undan oldin faqat qo'lda kiritilgan kirim/chiqim hisoblanadi.",
+    financeAutoPaymentsYearSaved: "Moliya avtomatik yili saqlandi",
     systemSettings: "Tizim sozlamalari",
     systemSettingsDesc: "Faqat admin uchun umumiy parametrlar",
     companyProfile: "Kompaniya rekvizitlari",
@@ -601,7 +605,6 @@ export const uz = {
     turnover: {
       title: "Oborot",
       subtitle: "Tanlangan yil va davr bo'yicha kirim, chiqim va sof balans",
-      manualUntil2027: "2027-yilgacha moliya faqat qo'lda kiritiladi. Shartnoma to'lovlari 2027-yildan avtomatik hisoblanadi.",
       year: "Yil",
       allYears: "Barcha yillar",
       period: "Davr",

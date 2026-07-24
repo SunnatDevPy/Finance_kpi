@@ -398,6 +398,10 @@ export const ru: TranslationDict = {
     monthlyPlanHint: "Применяется для всех пользователей",
     monthlyPlanInvalid: "Сумма плана должна быть больше 0",
     monthlyPlanSaved: "Месячный план сохранён",
+    financeAutoPaymentsYear: "Год автоматического учёта платежей",
+    financeAutoPaymentsYearHint:
+      "С выбранного года платежи по контрактам автоматически включаются в финансовый оборот. До этого учитываются только вручную введённые доходы и расходы.",
+    financeAutoPaymentsYearSaved: "Год автоматического учёта сохранён",
     systemSettings: "Системные настройки",
     systemSettingsDesc: "Общие параметры только для администратора",
     companyProfile: "Реквизиты компании",
@@ -603,7 +607,7 @@ export const ru: TranslationDict = {
     turnover: {
       title: "Оборот",
       subtitle: "Доходы, расходы и чистый баланс за выбранный год и период",
-      manualUntil2027: "До 2027 года финансы вводятся вручную. Платежи по контрактам с 2027 года учитываются автоматически.",
+      manualUntilYear: "До {year} года финансы вводятся вручную. Платежи по контрактам с {year} года учитываются автоматически.",
       year: "Год",
       allYears: "Все годы",
       period: "Период",

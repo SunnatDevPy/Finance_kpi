@@ -15,6 +15,7 @@ from app.schemas.finance import (
     FinanceTurnoverTrendRead,
     FinanceTurnoverMonthlyTrendRead,
 )
+from app.services.app_settings import get_finance_auto_payments_from
 from app.services.expenses import get_expense_summary
 from app.services.finance_period import (
     FinancePeriod,
@@ -34,8 +35,9 @@ def _compute_turnover_for_dates(
     period_start: date,
     period_end: date,
 ) -> tuple[Decimal, Decimal, Decimal]:
+    auto_from = get_finance_auto_payments_from(db)
     client_payments = Decimal("0")
-    payment_from = payment_counting_start(period_start, period_end)
+    payment_from = payment_counting_start(period_start, period_end, auto_from)
     if payment_from is not None:
         client_payments = db.scalar(
             select(func.coalesce(func.sum(Payment.amount), 0))
@@ -74,8 +76,9 @@ def get_finance_ledger(
     limit: int = 20,
 ) -> FinanceLedgerPage:
     """Income (kirim) + Expense (chiqim) birlashgan ko'rinish.
-    Shartnoma to'lovlari faqat FINANCE_AUTO_PAYMENTS_FROM sanasidan boshlab qo'shiladi."""
+    Shartnoma to'lovlari faqat sozlamadagi yildan boshlab qo'shiladi."""
 
+    auto_from = get_finance_auto_payments_from(db)
     items: list[FinanceLedgerItem] = []
     search_pattern = search.lower().strip() if search else None
 
@@ -101,8 +104,10 @@ def get_finance_ledger(
                 )
             )
 
-    if entry_type in (None, "payment") and ledger_includes_payments(date_from, date_to):
-        payment_from = ledger_payment_date_from(date_from)
+    if entry_type in (None, "payment") and ledger_includes_payments(
+        date_from, date_to, auto_from
+    ):
+        payment_from = ledger_payment_date_from(date_from, auto_from)
         filters = [
             Payment.deleted_at.is_(None),
             Contract.deleted_at.is_(None),

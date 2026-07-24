@@ -299,6 +299,11 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify(data),
       }),
+    updateFinanceAutoPaymentsYear: (finance_auto_payments_from_year: number) =>
+      request<AppSettings>("/settings/finance-auto-payments-year", {
+        method: "PATCH",
+        body: JSON.stringify({ finance_auto_payments_from_year }),
+      }),
   },
 
   audit: {
