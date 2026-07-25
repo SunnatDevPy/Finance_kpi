@@ -31,3 +31,32 @@ API runs `alembic upgrade head` → `python -m app.seed` → `uvicorn --reload` 
 ## Default admin
 
 `ADMIN_USERNAME=admin`, `ADMIN_PASSWORD=admin123` (dev only).
+
+## Docker status tekshiruvchi
+
+Servislar holati, health va HTTP probe:
+
+```bash
+bash .cursor/skills/wtma-docker/scripts/docker-status.sh
+```
+
+Production server:
+
+```bash
+bash .cursor/skills/wtma-docker/scripts/docker-status.sh --prod --env-file .env.prod
+```
+
+Doimiy kuzatish (`--watch`, 5s interval):
+
+```bash
+bash .cursor/skills/wtma-docker/scripts/docker-status.sh --watch
+```
+
+Windows:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .cursor/skills/wtma-docker/scripts/docker-status.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .cursor/skills/wtma-docker/scripts/docker-status.ps1 -Prod -EnvFile .env.prod
+```
+
+Chiqish kodi: `0` — OK, `1` — muammo bor, `2` — Docker yo'q.
