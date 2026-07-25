@@ -16,13 +16,17 @@ export function BulkActionBar({ count, onClear, children, className }: BulkActio
   const { t } = useI18n();
 
   return (
-    <AnimatePresence>
+    <AnimatePresence initial={false}>
       {count > 0 && (
         <motion.div
-          initial={{ opacity: 0, y: -8, height: 0 }}
-          animate={{ opacity: 1, y: 0, height: "auto" }}
-          exit={{ opacity: 0, y: -8, height: 0 }}
-          transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+          // Height ni animatsiya qilish katta jadval ostida har bir kadrda
+          // butun sahifa layout'ini qayta hisoblashga majbur qiladi ("qotib
+          // qolish" hissi) — shu sabab faqat GPU-friendly transform/opacity
+          // animatsiya qilinadi, height o'zgarishi bir martalik (animatsiyasiz).
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
           className={className}
         >
           <div className="mx-4 mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-primary/30 bg-primary/[0.06] px-4 py-3 sm:mx-6">
