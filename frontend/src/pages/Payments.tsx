@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArchiveIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { api } from "../api/client";
 import { ExportButtons } from "../components/ExportButtons";
@@ -6,6 +6,7 @@ import { BulkActionBar } from "../components/BulkActionBar";
 import { PaymentEditModal } from "../components/PaymentEditModal";
 import { CancelIcon, DeleteIconBtn, LoadingIconBtn, SaveIconBtn } from "../components/ButtonIcons";
 import { DateRangePicker } from "../components/DateRangePicker";
+import { SearchableSelect } from "@/components/SearchableSelect";
 import { Modal } from "../components/Modal";
 import { PageError } from "../components/PageError";
 import { Pagination } from "../components/Pagination";
@@ -44,20 +45,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Label } from "@/components/ui/label";
 import { MotionButton, motionTap } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FloatingLabelDatePicker } from "@/components/ui/date-picker";
 import { FloatingLabelInput, FloatingLabelMoneyInput } from "@/components/ui/floating-label-input";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import type { Client, Contract, PaymentListItem } from "../types";
 import { formatDateWithWeekday, formatMoney, toNumber } from "../utils/format";
 
@@ -103,6 +95,23 @@ export function PaymentsPage() {
     note: "",
   });
   const { submitting: paySubmitting, guard: guardPay } = useSubmitGuard();
+
+  const clientOptions = useMemo(
+    () =>
+      [...clients]
+        .sort((a, b) => a.company_name.localeCompare(b.company_name, "uz"))
+        .map((client) => ({ value: String(client.id), label: client.company_name })),
+    [clients],
+  );
+
+  const contractOptions = useMemo(
+    () =>
+      clientContracts.map((contract) => ({
+        value: String(contract.id),
+        label: `${contract.contract_number ? `№${contract.contract_number} — ` : ""}${formatMoney(contract.debt_amount)} ${t("common.debt").toLowerCase()}`,
+      })),
+    [clientContracts, t],
+  );
 
   const load = (silent = true) => {
     start(silent);
@@ -172,7 +181,7 @@ export function PaymentsPage() {
     setPayModalOpen(true);
     if (clients.length === 0) {
       api.clients
-        .list({ limit: 200 })
+        .list({ limit: 1000 })
         .then((data) => setClients(data.items))
         .catch(() => setClients([]));
     }
@@ -430,54 +439,32 @@ export function PaymentsPage() {
 
       <Modal title={t("clients.addPayment")} open={payModalOpen} onClose={closePayModal}>
         <form onSubmit={handleAddPayment} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="pay-client">{t("contracts.selectClientLabel")} *</Label>
-            <Select value={payForm.client_id} onValueChange={(v) => v && handleClientChange(v)}>
-              <SelectTrigger id="pay-client" className="h-12 w-full">
-                <SelectValue placeholder={t("contracts.selectClient")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {clients.map((c) => (
-                    <SelectItem key={c.id} value={String(c.id)}>
-                      {c.company_name}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
+          <SearchableSelect
+            id="pay-client"
+            label={t("contracts.selectClientLabel")}
+            required
+            value={payForm.client_id}
+            options={clientOptions}
+            placeholder={t("contracts.selectClient")}
+            onValueChange={handleClientChange}
+          />
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="pay-contract">{t("common.contract")} *</Label>
-            <Select
-              value={payForm.contract_id}
-              onValueChange={(v) => v && setPayForm((prev) => ({ ...prev, contract_id: v }))}
-              disabled={!payForm.client_id || contractsLoading}
-            >
-              <SelectTrigger id="pay-contract" className="h-12 w-full">
-                <SelectValue
-                  placeholder={
-                    contractsLoading
-                      ? t("common.loading")
-                      : !payForm.client_id
-                        ? t("contracts.selectClient")
-                        : t("common.contract")
-                  }
-                />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {clientContracts.map((contract) => (
-                    <SelectItem key={contract.id} value={String(contract.id)}>
-                      {contract.contract_number ? `№${contract.contract_number} — ` : ""}
-                      {formatMoney(contract.debt_amount)} {t("common.debt").toLowerCase()}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
+          <SearchableSelect
+            id="pay-contract"
+            label={t("common.contract")}
+            required
+            value={payForm.contract_id}
+            options={contractOptions}
+            disabled={!payForm.client_id || contractsLoading}
+            placeholder={
+              contractsLoading
+                ? t("common.loading")
+                : !payForm.client_id
+                  ? t("contracts.selectClient")
+                  : t("common.contract")
+            }
+            onValueChange={(value) => setPayForm((prev) => ({ ...prev, contract_id: value }))}
+          />
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FloatingLabelDatePicker

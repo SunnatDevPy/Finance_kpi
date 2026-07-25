@@ -5,19 +5,11 @@ import { Modal } from "@/components/Modal";
 import { MotionButton, motionTap } from "@/components/ui/button";
 import { FloatingLabelDatePicker } from "@/components/ui/date-picker";
 import { FloatingLabelInput, FloatingLabelMoneyInput } from "@/components/ui/floating-label-input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { SearchableSelect } from "@/components/SearchableSelect";
 import { useI18n } from "@/context/I18nContext";
 import { useSubmitGuard } from "@/hooks/useSubmitGuard";
 import type { Client, Contract } from "@/types";
-import { formatAmount, toNumber, toWholeAmountDigits } from "@/utils/format";
+import { formatMoney, toNumber, toWholeAmountDigits } from "@/utils/format";
 
 export type QuickPaymentTarget =
   | { kind: "client"; clientId: number }
@@ -56,6 +48,22 @@ export function QuickPaymentModal({ target, onClose, onSuccess }: QuickPaymentMo
     [contracts],
   );
 
+  const clientOptions = useMemo(
+    () =>
+      [...clients]
+        .sort((a, b) => a.company_name.localeCompare(b.company_name, "uz"))
+        .map((client) => ({ value: String(client.id), label: client.company_name })),
+    [clients],
+  );
+
+  const contractOptions = useMemo(() => {
+    const source = lockContract ? contracts : debtContracts;
+    return source.map((contract) => ({
+      value: String(contract.id),
+      label: `${contract.contract_number ? `№${contract.contract_number} — ` : ""}${formatMoney(contract.debt_amount)} ${t("clients.debtShort").toLowerCase()}`,
+    }));
+  }, [contracts, debtContracts, lockContract, t]);
+
   useEffect(() => {
     if (!target) return;
 
@@ -77,7 +85,7 @@ export function QuickPaymentModal({ target, onClose, onSuccess }: QuickPaymentMo
     });
 
     api.clients
-      .list({ limit: 200 })
+      .list({ limit: 1000 })
       .then((data) => setClients(data.items))
       .catch(() => setClients([]));
 
@@ -157,60 +165,35 @@ export function QuickPaymentModal({ target, onClose, onSuccess }: QuickPaymentMo
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="quick-pay-client">{t("contracts.selectClientLabel")} *</Label>
-          <Select
-            value={form.client_id}
-            onValueChange={(value) => value && handleClientChange(value)}
-            disabled={lockClient}
-          >
-            <SelectTrigger id="quick-pay-client" className="h-12 w-full">
-              <SelectValue placeholder={t("contracts.selectClient")} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {clients.map((client) => (
-                  <SelectItem key={client.id} value={String(client.id)}>
-                    {client.company_name}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </div>
+        <SearchableSelect
+          id="quick-pay-client"
+          label={t("contracts.selectClientLabel")}
+          required
+          value={form.client_id}
+          options={clientOptions}
+          placeholder={t("contracts.selectClient")}
+          disabled={lockClient}
+          onValueChange={handleClientChange}
+        />
 
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="quick-pay-contract">{t("common.contract")} *</Label>
-          <Select
-            value={form.contract_id}
-            onValueChange={(value) => value && handleContractChange(value)}
-            disabled={!form.client_id || contractsLoading || lockContract}
-          >
-            <SelectTrigger id="quick-pay-contract" className="h-12 w-full">
-              <SelectValue
-                placeholder={
-                  contractsLoading
-                    ? t("common.loading")
-                    : !form.client_id
-                      ? t("contracts.selectClient")
-                      : debtContracts.length === 0
-                        ? t("clients.noDebtContracts")
-                        : t("common.contract")
-                }
-              />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {(lockContract ? contracts : debtContracts).map((contract) => (
-                  <SelectItem key={contract.id} value={String(contract.id)}>
-                    {contract.contract_number ? `№${contract.contract_number} — ` : ""}
-                    {formatAmount(contract.debt_amount)} {t("clients.debtShort").toLowerCase()}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </div>
+        <SearchableSelect
+          id="quick-pay-contract"
+          label={t("common.contract")}
+          required
+          value={form.contract_id}
+          options={contractOptions}
+          disabled={!form.client_id || contractsLoading || lockContract}
+          placeholder={
+            contractsLoading
+              ? t("common.loading")
+              : !form.client_id
+                ? t("contracts.selectClient")
+                : debtContracts.length === 0
+                  ? t("clients.noDebtContracts")
+                  : t("common.contract")
+          }
+          onValueChange={handleContractChange}
+        />
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <FloatingLabelDatePicker

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -25,6 +25,7 @@ import { FloatingLabelDatePicker } from "@/components/ui/date-picker";
 import { ExportButtons } from "../components/ExportButtons";
 import { Modal } from "../components/Modal";
 import { QuickPaymentModal, type QuickPaymentTarget } from "../components/QuickPaymentModal";
+import { SearchableSelect } from "../components/SearchableSelect";
 import { PageError } from "../components/PageError";
 import { Pagination } from "../components/Pagination";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -57,11 +58,10 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { MotionButton, motionTap } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FloatingLabelInput, FloatingLabelMoneyInput, FloatingLabelTextarea, floatedLabel, labelPeer } from "@/components/ui/floating-label-input";
+import { FloatingLabelInput, FloatingLabelMoneyInput, FloatingLabelTextarea } from "@/components/ui/floating-label-input";
 import { FloatingLabelStatusSelect } from "@/components/FloatingLabelStatusSelect";
 import { CONTRACT_WORKFLOW_STATUSES, contractRowTint, DEFAULT_CONTRACT_WORKFLOW_STATUS } from "@/data/contractWorkflow";
 import type { ContractWorkflowStatus } from "@/data/contractWorkflow";
-import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -182,7 +182,7 @@ export function ContractsPage() {
           serviceTypeFilter === "all" ? undefined : parseInt(serviceTypeFilter, 10),
         debtFilter: debtFilter === "all" ? undefined : debtFilter,
       }),
-      api.clients.list({ limit: 200 }),
+      api.clients.list({ limit: 1000 }),
       api.serviceTypes.list(true),
     ])
       .then(([c, cl, st]) => {
@@ -220,6 +220,23 @@ export function ContractsPage() {
 
   const clientName = (id: number) =>
     clients.find((c) => c.id === id)?.company_name || `#${id}`;
+
+  const clientOptions = useMemo(
+    () =>
+      [...clients]
+        .sort((a, b) => a.company_name.localeCompare(b.company_name, "uz"))
+        .map((client) => ({ value: String(client.id), label: client.company_name })),
+    [clients],
+  );
+
+  const serviceTypeOptions = useMemo(
+    () =>
+      serviceTypes.map((serviceType) => ({
+        value: String(serviceType.id),
+        label: serviceType.name,
+      })),
+    [serviceTypes],
+  );
 
   const emptyForm = () => ({
     client_id: "",
@@ -739,7 +756,6 @@ export function ContractsPage() {
         >
           <motion.div variants={formSectionReveal} className="form-section space-y-4">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="client">{t("contracts.selectClientLabel")} *</Label>
               {editing ? (
                 <FloatingLabelInput
                   id="client"
@@ -750,23 +766,15 @@ export function ContractsPage() {
                   className="bg-muted"
                 />
               ) : (
-                <Select
+                <SearchableSelect
+                  id="client"
+                  label={t("contracts.selectClientLabel")}
+                  required
                   value={form.client_id}
-                  onValueChange={(value) => value && handleClientChange(value)}
-                >
-                  <SelectTrigger id="client" className="h-12 w-full">
-                    <SelectValue placeholder={t("contracts.selectClient")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {clients.map((c) => (
-                        <SelectItem key={c.id} value={String(c.id)}>
-                          {c.company_name}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+                  options={clientOptions}
+                  placeholder={t("contracts.selectClient")}
+                  onValueChange={handleClientChange}
+                />
               )}
             </div>
 
@@ -839,34 +847,20 @@ export function ContractsPage() {
               >
               <div className="pt-2 pb-1">
               <div className="grid grid-cols-1 gap-2 rounded-xl border border-border/50 bg-background/90 p-3 shadow-sm sm:grid-cols-[minmax(0,1fr)_minmax(12.5rem,14rem)_auto] sm:items-end sm:gap-3">
-                <div className="relative min-w-0 pt-3">
-                  <Select
-                    className="min-w-0"
+                <div className="relative min-w-0">
+                  <SearchableSelect
+                    variant="floating"
+                    label={t("clients.service")}
+                    required
                     value={String(item.service_type_id)}
+                    options={serviceTypeOptions}
+                    containerClassName="min-w-0"
                     onValueChange={(value) => {
-                      if (!value) return;
                       const items = [...form.line_items];
-                      items[index].service_type_id = parseInt(value);
+                      items[index].service_type_id = parseInt(value, 10);
                       setForm({ ...form, line_items: items });
                     }}
-                  >
-                    <SelectTrigger size="form" className="peer w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {serviceTypes.map((st) => (
-                          <SelectItem key={st.id} value={String(st.id)}>
-                            {st.name}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  <label className={cn(labelPeer, floatedLabel)}>
-                    {t("clients.service")}
-                    <span className="text-brand-500"> *</span>
-                  </label>
+                  />
                 </div>
                 <FloatingLabelMoneyInput
                   containerClassName="w-full min-w-0"

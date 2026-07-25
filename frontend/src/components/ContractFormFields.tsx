@@ -1,6 +1,8 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { PlusIcon } from "lucide-react";
+import { useMemo } from "react";
 import { FloatingLabelStatusSelect } from "./FloatingLabelStatusSelect";
+import { SearchableSelect } from "./SearchableSelect";
 import { RemoveIconBtn } from "./ButtonIcons";
 import { DEFAULT_CONTRACT_WORKFLOW_STATUS } from "@/data/contractWorkflow";
 import type { ContractWorkflowStatus } from "@/data/contractWorkflow";
@@ -10,18 +12,7 @@ import {
   FloatingLabelInput,
   FloatingLabelMoneyInput,
   FloatingLabelTextarea,
-  labelPeer,
-  floatedLabel,
 } from "@/components/ui/floating-label-input";
-import { cn } from "@/lib/utils";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useI18n } from "@/context/I18nContext";
 import type { ContractFormLineItem, ServiceType } from "@/types";
 
@@ -74,6 +65,15 @@ export function ContractFormFields({
 }: ContractFormFieldsProps) {
   const { t } = useI18n();
   const contractDate = form.start_date || form.end_date;
+
+  const serviceTypeOptions = useMemo(
+    () =>
+      serviceTypes.map((serviceType) => ({
+        value: String(serviceType.id),
+        label: serviceType.name,
+      })),
+    [serviceTypes],
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -145,35 +145,19 @@ export function ContractFormFields({
             >
               <div className="pt-2 pb-1">
                 <div className="grid grid-cols-1 gap-2 rounded-xl border border-border/50 bg-background/90 p-3 shadow-sm sm:grid-cols-[minmax(0,1fr)_minmax(12.5rem,14rem)_auto] sm:items-end sm:gap-3">
-                  <div className="relative min-w-0 pt-3">
-                    <Select
-                      className="min-w-0"
-                      value={String(item.service_type_id)}
-                      onValueChange={(value) => {
-                        if (!value) return;
-                        const items = [...form.line_items];
-                        items[index] = { ...items[index], service_type_id: parseInt(value, 10) };
-                        onChange({ line_items: items });
-                      }}
-                    >
-                      <SelectTrigger size="form" className="peer w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          {serviceTypes.map((st) => (
-                            <SelectItem key={st.id} value={String(st.id)}>
-                              {st.name}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                    <label className={cn(labelPeer, floatedLabel)}>
-                      {t("clients.service")}
-                      <span className="text-brand-500"> *</span>
-                    </label>
-                  </div>
+                  <SearchableSelect
+                    variant="floating"
+                    label={t("clients.service")}
+                    required
+                    value={String(item.service_type_id)}
+                    options={serviceTypeOptions}
+                    containerClassName="min-w-0"
+                    onValueChange={(value) => {
+                      const items = [...form.line_items];
+                      items[index] = { ...items[index], service_type_id: parseInt(value, 10) };
+                      onChange({ line_items: items });
+                    }}
+                  />
                   <FloatingLabelMoneyInput
                     containerClassName="w-full min-w-0"
                     className="tabular-nums"
