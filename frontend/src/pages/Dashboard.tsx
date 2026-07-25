@@ -571,6 +571,7 @@ export function DashboardPage() {
           </Card>
           </RevealCard>
 
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:col-span-2 2xl:col-span-2">
           {/* Client status donut */}
           <RevealCard>
           <Card className="content-card">
@@ -670,6 +671,7 @@ export function DashboardPage() {
             </CardContent>
           </Card>
           </RevealCard>
+          </div>
 
           {/* Paid vs debt balance */}
           <RevealCard>
