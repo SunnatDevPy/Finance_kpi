@@ -488,6 +488,7 @@ export const api = {
     update: (
       id: number,
       data: {
+        client_id?: number;
         start_date?: string;
         end_date?: string;
         notes?: string;

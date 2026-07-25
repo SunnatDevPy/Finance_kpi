@@ -121,3 +121,32 @@ def test_next_contract_number_increments_per_client(
     data = response.json()
     assert data["last_number"] == "5"
     assert data["next_number"] == "6"
+
+
+def test_update_closed_contract_client_id(
+    client, auth_headers, sample_contract, sample_client, db_session
+):
+    from app.models import Client, ClientStatus
+
+    other_client = Client(company_name="Beta Corp", status=ClientStatus.FAOL, city="Samarqand")
+    db_session.add(other_client)
+    db_session.commit()
+    db_session.refresh(other_client)
+
+    client.post(f"/api/v1/contracts/{sample_contract.id}/confirm", headers=auth_headers)
+    complete = client.post(
+        f"/api/v1/contracts/{sample_contract.id}/complete",
+        headers=auth_headers,
+    )
+    assert complete.status_code == 200
+    assert complete.json()["status"] == "tugadi"
+
+    response = client.patch(
+        f"/api/v1/contracts/{sample_contract.id}",
+        headers=auth_headers,
+        json={"client_id": other_client.id},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["client_id"] == other_client.id
+    assert data["status"] == "tugadi"

@@ -325,7 +325,7 @@ export function ContractsPage() {
   const handleSubmit = guard(async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (!editing && !form.client_id) {
+    if (!form.client_id) {
       setError(t("contracts.selectClientError"));
       return;
     }
@@ -335,6 +335,7 @@ export function ContractsPage() {
     }
     const contractDate = form.start_date;
     const payload = {
+      client_id: parseInt(form.client_id, 10),
       start_date: contractDate,
       end_date: contractDate,
       status: form.status,
@@ -351,10 +352,7 @@ export function ContractsPage() {
         const updated = await api.contracts.update(editing.id, payload);
         setContracts((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
       } else {
-        await api.contracts.create({
-          client_id: parseInt(form.client_id),
-          ...payload,
-        });
+        await api.contracts.create(payload);
         load(true);
       }
       closeModal();
@@ -756,26 +754,15 @@ export function ContractsPage() {
         >
           <motion.div variants={formSectionReveal} className="form-section space-y-4">
             <div className="flex flex-col gap-2">
-              {editing ? (
-                <FloatingLabelInput
-                  id="client"
-                  label={t("contracts.selectClientLabel")}
-                  required
-                  readOnly
-                  value={clientName(editing.client_id)}
-                  className="bg-muted"
-                />
-              ) : (
-                <SearchableSelect
-                  id="client"
-                  label={t("contracts.selectClientLabel")}
-                  required
-                  value={form.client_id}
-                  options={clientOptions}
-                  placeholder={t("contracts.selectClient")}
-                  onValueChange={handleClientChange}
-                />
-              )}
+              <SearchableSelect
+                id="client"
+                label={t("contracts.selectClientLabel")}
+                required
+                value={form.client_id}
+                options={clientOptions}
+                placeholder={t("contracts.selectClient")}
+                onValueChange={handleClientChange}
+              />
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_11.5rem]">

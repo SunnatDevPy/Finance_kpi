@@ -357,6 +357,7 @@ def update_contract(
         )
 
     before = {
+        "client_id": contract.client_id,
         "start_date": contract.start_date,
         "end_date": contract.end_date,
         "notes": contract.notes,
@@ -376,6 +377,10 @@ def update_contract(
                     price=item.price,
                 )
             )
+
+    if payload.client_id is not None:
+        get_client_or_404(db, payload.client_id)
+        contract.client_id = payload.client_id
 
     if payload.start_date is not None:
         contract.start_date = payload.start_date
@@ -401,6 +406,7 @@ def update_contract(
     db.refresh(contract)
 
     after = {
+        "client_id": contract.client_id,
         "start_date": contract.start_date,
         "end_date": contract.end_date,
         "notes": contract.notes,

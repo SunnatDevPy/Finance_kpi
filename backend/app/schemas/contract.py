@@ -52,6 +52,7 @@ class ContractCreate(ContractBase):
 
 
 class ContractUpdate(BaseModel):
+    client_id: int | None = None
     start_date: date | None = None
     end_date: date | None = None
     notes: str | None = None
