@@ -67,7 +67,7 @@ def list_clients(
     debt_filter: DebtFilter | None = Query(default=None),
     has_debt: bool | None = Query(default=None),
     skip: int = Query(default=0, ge=0),
-    limit: int = Query(default=20, ge=1, le=200),
+    limit: int = Query(default=20, ge=1, le=1000),
 ) -> Page[ClientRead]:
     filters = [Client.deleted_at.is_(None)]
     if status_filter is not None:

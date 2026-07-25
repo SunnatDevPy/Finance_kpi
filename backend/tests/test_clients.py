@@ -49,6 +49,16 @@ def test_create_and_list_client(client, auth_headers):
     assert empty.json()["total"] == 0
 
 
+def test_list_clients_accepts_select_limit(client, auth_headers):
+    response = client.get(
+        "/api/v1/clients",
+        headers=auth_headers,
+        params={"limit": 1000},
+    )
+    assert response.status_code == 200
+    assert response.json()["limit"] == 1000
+
+
 _PNG_1X1 = bytes.fromhex(
     "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4"
     "890000000a4944415478da6360000002000105f01ee20000000049454e44ae42"
