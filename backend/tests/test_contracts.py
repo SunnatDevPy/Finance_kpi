@@ -124,7 +124,7 @@ def test_next_contract_number_increments_per_client(
 
 
 def test_update_closed_contract_client_id(
-    client, auth_headers, sample_contract, sample_client, db_session
+    client, auth_headers, sample_contract, sample_client, db_session, sample_service_type
 ):
     from app.models import Client, ClientStatus
 
@@ -150,3 +150,26 @@ def test_update_closed_contract_client_id(
     data = response.json()
     assert data["client_id"] == other_client.id
     assert data["status"] == "tugadi"
+
+
+def test_update_closed_contract_without_line_items(
+    client, auth_headers, sample_contract, sample_client, db_session
+):
+    from app.models import Client, ClientStatus
+
+    other_client = Client(company_name="Gamma LLC", status=ClientStatus.FAOL, city="Buxoro")
+    db_session.add(other_client)
+    db_session.commit()
+    db_session.refresh(other_client)
+
+    client.post(f"/api/v1/contracts/{sample_contract.id}/confirm", headers=auth_headers)
+    client.post(f"/api/v1/contracts/{sample_contract.id}/complete", headers=auth_headers)
+
+    response = client.patch(
+        f"/api/v1/contracts/{sample_contract.id}",
+        headers=auth_headers,
+        json={"client_id": other_client.id},
+    )
+    assert response.status_code == 200
+    assert response.json()["client_id"] == other_client.id
+    assert response.json()["status"] == "tugadi"

@@ -334,25 +334,52 @@ export function ContractsPage() {
       return;
     }
     const contractDate = form.start_date;
-    const payload = {
-      client_id: parseInt(form.client_id, 10),
+    const clientId = parseInt(form.client_id, 10);
+    if (!Number.isFinite(clientId) || clientId < 1) {
+      setError(t("contracts.selectClientError"));
+      return;
+    }
+
+    const lineItemsPayload = form.line_items.map((item) => {
+      const price = parseFloat(item.price);
+      if (!Number.isFinite(price) || price <= 0) {
+        return null;
+      }
+      return {
+        service_type_id: item.service_type_id,
+        price,
+      };
+    });
+    if (lineItemsPayload.some((item) => item === null)) {
+      setError(t("contracts.lineItemPriceError"));
+      return;
+    }
+
+    const basePayload = {
+      client_id: clientId,
       start_date: contractDate,
       end_date: contractDate,
       status: form.status,
       notes: form.notes || undefined,
       contract_number: form.contract_number || undefined,
       invoice_number: form.invoice_number || undefined,
-      line_items: form.line_items.map((item) => ({
-        service_type_id: item.service_type_id,
-        price: parseFloat(item.price),
-      })),
     };
     try {
       if (editing) {
-        const updated = await api.contracts.update(editing.id, payload);
+        const updatePayload =
+          editing.status === "tugadi"
+            ? basePayload
+            : {
+                ...basePayload,
+                line_items: lineItemsPayload as { service_type_id: number; price: number }[],
+              };
+        const updated = await api.contracts.update(editing.id, updatePayload);
         setContracts((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
       } else {
-        await api.contracts.create(payload);
+        await api.contracts.create({
+          ...basePayload,
+          line_items: lineItemsPayload as { service_type_id: number; price: number }[],
+        });
         load(true);
       }
       closeModal();

@@ -272,6 +272,7 @@ export const ru: TranslationDict = {
     selectClient: "Выберите...",
     selectClientLabel: "Клиент",
     selectClientError: "Выберите клиента",
+    lineItemPriceError: "Укажите корректную цену для каждой услуги",
     addService: "Добавить",
     client: "Клиент",
     notFound: "Контрактов нет",

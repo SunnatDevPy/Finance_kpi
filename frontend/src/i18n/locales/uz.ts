@@ -270,6 +270,7 @@ export const uz = {
     selectClient: "Tanlang...",
     selectClientLabel: "Mijoz",
     selectClientError: "Mijozni tanlang",
+    lineItemPriceError: "Har bir xizmat uchun to'g'ri narx kiriting",
     addService: "Qo'shish",
     client: "Mijoz",
     notFound: "Kontraktlar yo'q",
