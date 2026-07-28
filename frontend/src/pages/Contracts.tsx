@@ -366,14 +366,10 @@ export function ContractsPage() {
     };
     try {
       if (editing) {
-        const updatePayload =
-          editing.status === "tugadi"
-            ? basePayload
-            : {
-                ...basePayload,
-                line_items: lineItemsPayload as { service_type_id: number; price: number }[],
-              };
-        const updated = await api.contracts.update(editing.id, updatePayload);
+        const updated = await api.contracts.update(editing.id, {
+          ...basePayload,
+          line_items: lineItemsPayload as { service_type_id: number; price: number }[],
+        });
         setContracts((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
       } else {
         await api.contracts.create({
@@ -770,6 +766,7 @@ export function ContractsPage() {
         open={modalOpen}
         onClose={closeModal}
         wide
+        initialFocus={false}
       >
         <motion.form
           onSubmit={handleSubmit}
