@@ -769,6 +769,9 @@ export const uz = {
     restore: "Tiklash",
     restoreConfirm: "Ushbu yozuv arxivdan tiklanadi. Davom etasizmi?",
     restoreFailed: "Tiklab bo'lmadi — yozuv allaqachon tiklangan yoki butunlay o'chirilgan bo'lishi mumkin",
+    undoCreate: "Bekor qilish",
+    undoCreateConfirm: "Yaratilgan yozuv arxivga o'tkaziladi (yaratish bekor qilinadi). Davom etasizmi?",
+    undoCreateFailed: "Bekor qilib bo'lmadi — yozuv allaqachon arxivga o'tkazilgan bo'lishi mumkin",
   },
   trash: {
     title: "Arxiv",

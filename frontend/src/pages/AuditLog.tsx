@@ -114,6 +114,27 @@ function canRestoreFromAudit(entry: AuditLogEntry): boolean {
   return entry.action === "delete" && RESTORABLE_ENTITY_TYPES.includes(entry.entity_type as AuditEntityType);
 }
 
+function canUndoCreateFromAudit(entry: AuditLogEntry): boolean {
+  return entry.action === "create" && RESTORABLE_ENTITY_TYPES.includes(entry.entity_type as AuditEntityType);
+}
+
+async function archiveEntity(entry: AuditLogEntry) {
+  switch (entry.entity_type) {
+    case "client":
+      return api.clients.delete(entry.entity_id);
+    case "contract":
+      return api.contracts.delete(entry.entity_id);
+    case "payment":
+      return api.payments.delete(entry.entity_id);
+    case "expense":
+      return api.expenses.delete(entry.entity_id);
+    case "income":
+      return api.incomes.delete(entry.entity_id);
+    default:
+      throw new Error("Unsupported entity");
+  }
+}
+
 function actionLabel(action: AuditAction, t: (key: string) => string): string {
   if (action === "create") return t("auditLog.actionCreate");
   if (action === "update") return t("auditLog.actionUpdate");
@@ -137,7 +158,9 @@ export function AuditLogPage() {
   const [total, setTotal] = useState(0);
   const [clearOpen, setClearOpen] = useState(false);
   const [restoreTarget, setRestoreTarget] = useState<AuditLogEntry | null>(null);
+  const [undoTarget, setUndoTarget] = useState<AuditLogEntry | null>(null);
   const [restoring, setRestoring] = useState(false);
+  const [undoing, setUndoing] = useState(false);
 
   const parsedEntityId = entityId.trim() && /^\d+$/.test(entityId.trim()) ? Number(entityId.trim()) : undefined;
   const hasFilters = entityType !== "all" || Boolean(parsedEntityId) || Boolean(dateFrom) || Boolean(dateTo);
@@ -225,6 +248,22 @@ export function AuditLogPage() {
     }
   };
 
+  const handleUndoCreate = async () => {
+    if (!undoTarget) return;
+    const entry = undoTarget;
+    setUndoTarget(null);
+    setUndoing(true);
+    try {
+      await archiveEntity(entry);
+      load(false);
+      setError("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t("auditLog.undoCreateFailed"));
+    } finally {
+      setUndoing(false);
+    }
+  };
+
   return (
     <PageShell>
       <PageHeader title={t("auditLog.title")} subtitle={t("auditLog.subtitle")} />
@@ -302,7 +341,7 @@ export function AuditLogPage() {
             loading={loading}
             empty={!loading && entries.length === 0}
             emptyMessage={t("auditLog.empty")}
-            skeletonCols={1 + visibleCount}
+            skeletonCols={2 + visibleCount}
             footer={
               <Pagination
                 embedded
@@ -374,6 +413,19 @@ export function AuditLogPage() {
                         {t("auditLog.restore")}
                       </MotionButton>
                     ) : null}
+                    {canUndoCreateFromAudit(entry) ? (
+                      <MotionButton
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        className="h-8"
+                        onClick={() => setUndoTarget(entry)}
+                        {...motionTap}
+                      >
+                        <Trash2Icon data-icon="inline-start" />
+                        {t("auditLog.undoCreate")}
+                      </MotionButton>
+                    ) : null}
                   </TableCellActions>
                 </MotionTableRow>
               ))}
@@ -412,6 +464,28 @@ export function AuditLogPage() {
             <AlertDialogCancel disabled={restoring}>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction disabled={restoring} onClick={handleRestore}>
               {t("auditLog.restore")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={undoTarget !== null}
+        onOpenChange={(open) => !open && !undoing && setUndoTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("auditLog.undoCreate")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("auditLog.undoCreateConfirm")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={undoing}>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={undoing}
+              onClick={handleUndoCreate}
+            >
+              {t("auditLog.undoCreate")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
