@@ -123,6 +123,55 @@ def test_next_contract_number_increments_per_client(
     assert data["next_number"] == "6"
 
 
+def test_create_contract_preserves_alphanumeric_number(
+    client, auth_headers, sample_client, sample_service_type
+):
+    response = client.post(
+        "/api/v1/contracts",
+        headers=auth_headers,
+        json={
+            "client_id": sample_client.id,
+            "start_date": "2026-01-01",
+            "end_date": "2026-12-31",
+            "contract_number": "No39-1",
+            "line_items": [
+                {"service_type_id": sample_service_type.id, "price": "1000000.00"},
+            ],
+        },
+    )
+    assert response.status_code == 201
+    assert response.json()["contract_number"] == "No39-1"
+
+
+def test_next_contract_number_increments_suffix_format(
+    client, auth_headers, sample_client, sample_service_type
+):
+    for number in ("No39-1", "No39-2"):
+        client.post(
+            "/api/v1/contracts",
+            headers=auth_headers,
+            json={
+                "client_id": sample_client.id,
+                "start_date": "2026-01-01",
+                "end_date": "2026-12-31",
+                "contract_number": number,
+                "line_items": [
+                    {"service_type_id": sample_service_type.id, "price": "1000000.00"},
+                ],
+            },
+        )
+
+    response = client.get(
+        "/api/v1/contracts/next-number",
+        headers=auth_headers,
+        params={"client_id": sample_client.id},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["last_number"] == "No39-2"
+    assert data["next_number"] == "No39-3"
+
+
 def test_update_closed_contract_client_id(
     client, auth_headers, sample_contract, sample_client, db_session, sample_service_type
 ):

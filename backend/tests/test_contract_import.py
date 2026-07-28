@@ -244,6 +244,21 @@ def test_import_contracts_parses_sana_with_contract_number_prefix(client, auth_h
     assert paid["status"] == "tugadi"
 
 
+def test_import_contracts_preserves_alphanumeric_contract_number(client, auth_headers):
+    content = _build_xlsx(
+        [
+            ["Mijoz C", "SMM", "No39-1  15.08.2026", "1 000 000", "", "", ""],
+        ]
+    )
+    response = _upload(client, auth_headers, content)
+    assert response.status_code == 200
+    assert response.json()["created_contracts"] == 1
+
+    contracts = client.get("/api/v1/contracts", headers=auth_headers, params={"limit": 50}).json()["items"]
+    contract = next(c for c in contracts if c["contract_number"] == "No39-1")
+    assert contract["start_date"] == "2026-08-15"
+
+
 def test_import_real_2019_workbook_when_available(client, auth_headers):
     if not REAL_2019_WORKBOOK.is_file():
         return

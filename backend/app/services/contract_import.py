@@ -210,21 +210,19 @@ def _parse_contract_number_and_date(raw: Any, fallback: date) -> tuple[str | Non
             parsed_date = fallback
         remainder = text[: date_match.start()] + text[date_match.end() :]
 
-    for word in ("dan", "от", "from", "-", ":"):
+    remainder = re.sub(r"-(dan|от)\b", " ", remainder, flags=re.IGNORECASE)
+    for word in ("dan", "от", "from", ":"):
         remainder = remainder.replace(word, " ")
     remainder = re.sub(r"\s+", " ", remainder).strip()
 
     contract_number: str | None = None
-    prefix_match = _NUMBER_FROM_PREFIX_RE.search(remainder)
-    if prefix_match:
-        contract_number = prefix_match.group(1)
+    number_match = _NUMBER_TOKEN_RE.search(remainder)
+    if number_match:
+        contract_number = number_match.group(1).strip()
     else:
-        number_match = _NUMBER_TOKEN_RE.search(remainder)
-        if number_match:
-            contract_number = number_match.group(1).strip()
-            digit_match = re.search(r"\d+", contract_number)
-            if digit_match:
-                contract_number = digit_match.group(0)
+        prefix_match = _NUMBER_FROM_PREFIX_RE.search(remainder)
+        if prefix_match:
+            contract_number = prefix_match.group(1)
 
     return (contract_number or None), parsed_date
 

@@ -232,32 +232,21 @@ async def import_contracts(
 
 
 def _next_contract_number_for_client(db: Session, client_id: int) -> ContractNextNumber:
+    from app.services.contract_numbers import suggest_next_contract_number
+
     get_client_or_404(db, client_id)
     numbers = db.scalars(
-        select(Contract.contract_number).where(
+        select(Contract.contract_number)
+        .where(
             Contract.client_id == client_id,
             Contract.deleted_at.is_(None),
             Contract.contract_number.is_not(None),
         )
+        .order_by(Contract.id.desc())
     ).all()
 
-    max_num = 0
-    last_number: str | None = None
-    for raw in numbers:
-        if not raw:
-            continue
-        stripped = raw.strip()
-        if not stripped.isdigit():
-            continue
-        value = int(stripped)
-        if value > max_num:
-            max_num = value
-            last_number = stripped
-
-    return ContractNextNumber(
-        last_number=last_number,
-        next_number=str(max_num + 1) if max_num > 0 else "1",
-    )
+    last_number, next_number = suggest_next_contract_number(list(numbers))
+    return ContractNextNumber(last_number=last_number, next_number=next_number)
 
 
 @router.get("/next-number", response_model=ContractNextNumber)
