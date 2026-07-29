@@ -172,6 +172,145 @@ function RevealCard({ children, className }: { children: ReactNode; className?: 
   );
 }
 
+function CategoryBarListCard({
+  title,
+  description,
+  items,
+  maxAmount,
+}: {
+  title: string;
+  description: string;
+  items: { name: string; amount: number }[];
+  maxAmount: number;
+}) {
+  const { t } = useI18n();
+
+  return (
+    <RevealCard className="h-full">
+      <Card className="content-card h-full">
+        <CardHeader className="border-b">
+          <CardTitle className="text-base">{title}</CardTitle>
+          <CardDescription className="text-xs">{description}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 pt-4">
+          {items.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">{t("common.noData")}</p>
+          ) : (
+            items.map((item, index) => (
+              <div key={item.name} className="flex flex-col gap-1">
+                <div className="flex items-center justify-between gap-2 text-sm">
+                  <span className="truncate font-medium text-foreground">{item.name}</span>
+                  <span className="shrink-0 font-semibold tabular-nums text-foreground/90">
+                    {formatCompactMoney(item.amount)}
+                  </span>
+                </div>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                  <motion.div
+                    className={cn(
+                      "h-full rounded-full",
+                      SERVICE_BAR_COLORS[index % SERVICE_BAR_COLORS.length],
+                    )}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${Math.max(4, (item.amount / maxAmount) * 100)}%` }}
+                    transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: index * 0.05 }}
+                  />
+                </div>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+    </RevealCard>
+  );
+}
+
+function PaidVsDebtCard({
+  paidPercent,
+  cancelledPercent,
+  debtPercent,
+  totalPaid,
+  totalDebt,
+  cancelledAmount,
+}: {
+  paidPercent: number;
+  cancelledPercent: number;
+  debtPercent: number;
+  totalPaid: number;
+  totalDebt: number;
+  cancelledAmount: number;
+}) {
+  const { t } = useI18n();
+
+  return (
+    <RevealCard className="h-full">
+      <Card className="content-card h-full">
+        <CardHeader className="border-b">
+          <CardTitle className="text-base">{t("dashboard.charts.balance")}</CardTitle>
+          <CardDescription className="text-xs">{t("dashboard.charts.balanceDesc")}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex h-full flex-col justify-center gap-5 pt-6">
+          <div className="flex h-3.5 w-full overflow-hidden rounded-full bg-muted">
+            <motion.div
+              className="h-full bg-emerald-500"
+              initial={{ width: 0 }}
+              animate={{ width: `${paidPercent}%` }}
+              transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+            />
+            {cancelledPercent > 0 && (
+              <motion.div
+                className="h-full bg-amber-400"
+                initial={{ width: 0 }}
+                animate={{ width: `${cancelledPercent}%` }}
+                transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+              />
+            )}
+            <motion.div
+              className="h-full bg-red-400"
+              initial={{ width: 0 }}
+              animate={{ width: `${debtPercent}%` }}
+              transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <div className="flex flex-col gap-1">
+              <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <span className="size-2 rounded-full bg-emerald-500" />
+                {t("common.paid")}
+              </span>
+              <span className="text-lg font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+                {formatCompactMoney(totalPaid)}
+              </span>
+            </div>
+            {cancelledAmount > 0 && (
+              <div className="flex flex-col gap-1">
+                <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                  <span className="size-2 rounded-full bg-amber-400" />
+                  {t("clients.cancelledAmount")}
+                </span>
+                <span className="text-lg font-bold tabular-nums text-amber-600 dark:text-amber-400">
+                  {formatCompactMoney(cancelledAmount)}
+                </span>
+              </div>
+            )}
+            <div className="flex flex-col gap-1 sm:text-right">
+              <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:justify-end">
+                {t("common.debt")}
+                <span className="size-2 rounded-full bg-red-400" />
+              </span>
+              <span className="text-lg font-bold tabular-nums text-red-600 dark:text-red-400">
+                {formatCompactMoney(totalDebt)}
+              </span>
+            </div>
+          </div>
+          <p className="text-center text-xs text-muted-foreground">
+            {t("dashboard.collectionRate")}: <strong className="text-foreground">{paidPercent}%</strong>
+          </p>
+        </CardContent>
+      </Card>
+    </RevealCard>
+  );
+}
+
 export function DashboardPage() {
   const { t } = useI18n();
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -208,6 +347,15 @@ export function DashboardPage() {
     () =>
       ({
         profit: { label: t("dashboard.charts.profit"), color: "hsl(160 72% 38%)" },
+      }) satisfies ChartConfig,
+    [t],
+  );
+
+  const yearlyGrowthConfig = useMemo(
+    () =>
+      ({
+        revenue: { label: t("dashboard.charts.revenue"), color: "hsl(220 70% 50%)" },
+        growth: { label: t("dashboard.charts.growth"), color: "hsl(38 92% 50%)" },
       }) satisfies ChartConfig,
     [t],
   );
@@ -354,6 +502,24 @@ export function DashboardPage() {
       })),
     );
 
+    const yearlyTotals = new Map<string, number>();
+    for (const point of sortByMonthKey(
+      stats.charts.monthly_revenue.map((item) => ({ month: item.month, value: toNumber(item.value) })),
+    )) {
+      const year = point.month.slice(0, 4);
+      yearlyTotals.set(year, (yearlyTotals.get(year) ?? 0) + point.value);
+    }
+    const yearlyYears = [...yearlyTotals.keys()].sort();
+    const yearlyGrowth = yearlyYears.map((year, index) => {
+      const revenue = yearlyTotals.get(year) ?? 0;
+      const prevRevenue = index > 0 ? yearlyTotals.get(yearlyYears[index - 1]) ?? 0 : null;
+      const growth =
+        prevRevenue && prevRevenue > 0
+          ? Math.round(((revenue - prevRevenue) / prevRevenue) * 1000) / 10
+          : null;
+      return { year, revenue, growth };
+    });
+
     return {
       revenueTrend,
       revenueYearLabel,
@@ -373,6 +539,7 @@ export function DashboardPage() {
       expensesByCategory,
       expensesByCategoryMax,
       profitTrend,
+      yearlyGrowth,
     };
   }, [stats, t, trendMonths]);
 
@@ -530,220 +697,130 @@ export function DashboardPage() {
         </StaggerItem>
       </StaggerContainer>
 
-      {/* ── Insights: services / client status / balance ── */}
+      {/* ── Insights: services + expenses ── */}
       <section className="page-section">
         <SectionHeader title={t("dashboard.insights")} description={t("dashboard.insightsDesc")} />
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2 2xl:grid-cols-4">
-          {/* Revenue by service */}
-          <RevealCard>
-          <Card className="content-card">
-            <CardHeader className="border-b">
-              <CardTitle className="text-base">{t("dashboard.charts.byService")}</CardTitle>
-              <CardDescription className="text-xs">{t("dashboard.charts.byServiceDesc")}</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3 pt-4">
-              {chartData.byService.length === 0 ? (
-                <p className="py-6 text-center text-sm text-muted-foreground">{t("common.noData")}</p>
-              ) : (
-                chartData.byService.map((item, index) => (
-                  <div key={item.name} className="flex flex-col gap-1">
-                    <div className="flex items-center justify-between gap-2 text-sm">
-                      <span className="truncate font-medium text-foreground">{item.name}</span>
-                      <span className="shrink-0 font-semibold tabular-nums text-foreground/90">
-                        {formatCompactMoney(item.amount)}
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+          <CategoryBarListCard
+            title={t("dashboard.charts.byService")}
+            description={t("dashboard.charts.byServiceDesc")}
+            items={chartData.byService}
+            maxAmount={chartData.byServiceMax}
+          />
+          <CategoryBarListCard
+            title={t("dashboard.charts.expensesByCategory")}
+            description={t("dashboard.charts.expensesByCategoryDesc")}
+            items={chartData.expensesByCategory}
+            maxAmount={chartData.expensesByCategoryMax}
+          />
+        </div>
+      </section>
+
+      {/* ── Status donuts ── */}
+      <section className="page-section">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+          <RevealCard className="h-full">
+            <Card className="content-card h-full">
+              <CardHeader className="border-b">
+                <CardTitle className="text-base">{t("dashboard.charts.clientStatus")}</CardTitle>
+                <CardDescription className="text-xs">{t("dashboard.charts.clientStatusDesc")}</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col items-center gap-2 pt-4">
+                <div className="relative h-[200px] w-full max-w-[240px]">
+                  <ChartContainer config={revenueConfig} className="h-full w-full">
+                    <PieChart>
+                      <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+                      <Pie
+                        data={chartData.clientStatus}
+                        dataKey="value"
+                        nameKey="name"
+                        innerRadius={58}
+                        outerRadius={82}
+                        paddingAngle={3}
+                        strokeWidth={0}
+                      >
+                        {chartData.clientStatus.map((entry) => (
+                          <Cell key={entry.name} fill={entry.color} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ChartContainer>
+                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-2xl font-bold tracking-tight text-foreground">
+                      {stats.clients.total}
+                    </span>
+                    <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                      {t("dashboard.totalClients")}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex w-full flex-wrap items-center justify-center gap-4 text-xs">
+                  <span className="flex items-center gap-1.5">
+                    <span className="size-2.5 rounded-full" style={{ background: "hsl(160 72% 38%)" }} />
+                    {t("status.faol")}: <strong className="text-foreground">{stats.clients.faol}</strong>
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="size-2.5 rounded-full" style={{ background: "hsl(220 13% 69%)" }} />
+                    {t("status.nofaol")}: <strong className="text-foreground">{stats.clients.nofaol}</strong>
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          </RevealCard>
+
+          <RevealCard className="h-full">
+            <Card className="content-card h-full">
+              <CardHeader className="border-b">
+                <CardTitle className="text-base">{t("dashboard.charts.contractStatus")}</CardTitle>
+                <CardDescription className="text-xs">{t("dashboard.charts.contractStatusDesc")}</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col items-center gap-2 pt-4">
+                <div className="relative h-[200px] w-full max-w-[240px]">
+                  <ChartContainer config={revenueConfig} className="h-full w-full">
+                    <PieChart>
+                      <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+                      <Pie
+                        data={chartData.contractStatus}
+                        dataKey="value"
+                        nameKey="name"
+                        innerRadius={58}
+                        outerRadius={82}
+                        paddingAngle={3}
+                        strokeWidth={0}
+                      >
+                        {chartData.contractStatus.map((entry) => (
+                          <Cell key={entry.key} fill={entry.color} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ChartContainer>
+                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-2xl font-bold tracking-tight text-foreground">
+                      {stats.contracts.total}
+                    </span>
+                    <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                      {t("dashboard.charts.totalContracts")}
+                    </span>
+                  </div>
+                </div>
+                <div className="grid w-full grid-cols-2 gap-x-3 gap-y-2 text-xs">
+                  {chartData.contractStatusAll.map((item) => (
+                    <span key={item.key} className="flex items-center gap-1.5">
+                      <span className="size-2.5 shrink-0 rounded-full" style={{ background: item.color }} />
+                      <span className="truncate">
+                        {item.name}: <strong className="text-foreground">{item.value}</strong>
                       </span>
-                    </div>
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                      <motion.div
-                        className={cn(
-                          "h-full rounded-full",
-                          SERVICE_BAR_COLORS[index % SERVICE_BAR_COLORS.length],
-                        )}
-                        initial={{ width: 0 }}
-                        animate={{ width: `${Math.max(4, (item.amount / chartData.byServiceMax) * 100)}%` }}
-                        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: index * 0.05 }}
-                      />
-                    </div>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-          </RevealCard>
-
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:col-span-2 2xl:col-span-2">
-          {/* Client status donut */}
-          <RevealCard>
-          <Card className="content-card">
-            <CardHeader className="border-b">
-              <CardTitle className="text-base">{t("dashboard.charts.clientStatus")}</CardTitle>
-              <CardDescription className="text-xs">{t("dashboard.charts.clientStatusDesc")}</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col items-center gap-2 pt-4">
-              <div className="relative h-[180px] w-full">
-                <ChartContainer config={revenueConfig} className="h-full w-full">
-                  <PieChart>
-                    <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-                    <Pie
-                      data={chartData.clientStatus}
-                      dataKey="value"
-                      nameKey="name"
-                      innerRadius={50}
-                      outerRadius={72}
-                      paddingAngle={3}
-                      strokeWidth={0}
-                    >
-                      {chartData.clientStatus.map((entry) => (
-                        <Cell key={entry.name} fill={entry.color} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ChartContainer>
-                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-2xl font-bold tracking-tight text-foreground">
-                    {stats.clients.total}
-                  </span>
-                  <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                    {t("dashboard.totalClients")}
-                  </span>
-                </div>
-              </div>
-              <div className="flex w-full flex-wrap items-center justify-center gap-4 text-xs">
-                <span className="flex items-center gap-1.5">
-                  <span className="size-2.5 rounded-full" style={{ background: "hsl(160 72% 38%)" }} />
-                  {t("status.faol")}: <strong className="text-foreground">{stats.clients.faol}</strong>
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="size-2.5 rounded-full" style={{ background: "hsl(220 13% 69%)" }} />
-                  {t("status.nofaol")}: <strong className="text-foreground">{stats.clients.nofaol}</strong>
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-          </RevealCard>
-
-          {/* Contract status donut */}
-          <RevealCard>
-          <Card className="content-card">
-            <CardHeader className="border-b">
-              <CardTitle className="text-base">{t("dashboard.charts.contractStatus")}</CardTitle>
-              <CardDescription className="text-xs">{t("dashboard.charts.contractStatusDesc")}</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col items-center gap-2 pt-4">
-              <div className="relative h-[180px] w-full">
-                <ChartContainer config={revenueConfig} className="h-full w-full">
-                  <PieChart>
-                    <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-                    <Pie
-                      data={chartData.contractStatus}
-                      dataKey="value"
-                      nameKey="name"
-                      innerRadius={50}
-                      outerRadius={72}
-                      paddingAngle={3}
-                      strokeWidth={0}
-                    >
-                      {chartData.contractStatus.map((entry) => (
-                        <Cell key={entry.key} fill={entry.color} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ChartContainer>
-                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-2xl font-bold tracking-tight text-foreground">
-                    {stats.contracts.total}
-                  </span>
-                  <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                    {t("dashboard.charts.totalContracts")}
-                  </span>
-                </div>
-              </div>
-              <div className="grid w-full grid-cols-2 gap-x-3 gap-y-2 text-xs sm:grid-cols-4">
-                {chartData.contractStatusAll.map((item) => (
-                  <span key={item.key} className="flex items-center gap-1.5">
-                    <span className="size-2.5 shrink-0 rounded-full" style={{ background: item.color }} />
-                    <span className="truncate">
-                      {item.name}: <strong className="text-foreground">{item.value}</strong>
                     </span>
-                  </span>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-          </RevealCard>
-          </div>
-
-          {/* Paid vs debt balance */}
-          <RevealCard>
-          <Card className="content-card">
-            <CardHeader className="border-b">
-              <CardTitle className="text-base">{t("dashboard.charts.balance")}</CardTitle>
-              <CardDescription className="text-xs">{t("dashboard.charts.balanceDesc")}</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-5 pt-6">
-              <div className="flex h-3.5 w-full overflow-hidden rounded-full bg-muted">
-                <motion.div
-                  className="h-full bg-emerald-500"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${chartData.paidPercent}%` }}
-                  transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-                />
-                {chartData.cancelledPercent > 0 && (
-                  <motion.div
-                    className="h-full bg-amber-400"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${chartData.cancelledPercent}%` }}
-                    transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-                  />
-                )}
-                <motion.div
-                  className="h-full bg-red-400"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${chartData.debtPercent}%` }}
-                  transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-                <div className="flex flex-col gap-1">
-                  <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                    <span className="size-2 rounded-full bg-emerald-500" />
-                    {t("common.paid")}
-                  </span>
-                  <span className="text-lg font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
-                    {formatCompactMoney(chartData.totalPaid)}
-                  </span>
+                  ))}
                 </div>
-                {chartData.cancelledAmount > 0 && (
-                  <div className="flex flex-col gap-1">
-                    <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                      <span className="size-2 rounded-full bg-amber-400" />
-                      {t("clients.cancelledAmount")}
-                    </span>
-                    <span className="text-lg font-bold tabular-nums text-amber-600 dark:text-amber-400">
-                      {formatCompactMoney(chartData.cancelledAmount)}
-                    </span>
-                  </div>
-                )}
-                <div className="flex flex-col gap-1 sm:text-right">
-                  <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:justify-end">
-                    {t("common.debt")}
-                    <span className="size-2 rounded-full bg-red-400" />
-                  </span>
-                  <span className="text-lg font-bold tabular-nums text-red-600 dark:text-red-400">
-                    {formatCompactMoney(chartData.totalDebt)}
-                  </span>
-                </div>
-              </div>
-              <p className="text-center text-xs text-muted-foreground">
-                {t("dashboard.collectionRate")}: <strong className="text-foreground">{chartData.paidPercent}%</strong>
-              </p>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
           </RevealCard>
         </div>
       </section>
 
-      {/* ── Clients by region ── */}
+      {/* ── Region + balance ── */}
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
       <Card className="content-card">
         <CardHeader className="border-b">
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -851,6 +928,16 @@ export function DashboardPage() {
           )}
         </CardContent>
       </Card>
+
+      <PaidVsDebtCard
+        paidPercent={chartData.paidPercent}
+        cancelledPercent={chartData.cancelledPercent}
+        debtPercent={chartData.debtPercent}
+        totalPaid={chartData.totalPaid}
+        totalDebt={chartData.totalDebt}
+        cancelledAmount={chartData.cancelledAmount}
+      />
+      </div>
 
       {/* ── Charts ── */}
       <div className="grid grid-cols-1 gap-8 xl:grid-cols-2">
@@ -982,48 +1069,8 @@ export function DashboardPage() {
         </RevealCard>
       </div>
 
-      {/* ── P&L charts: expenses breakdown / profit trend ── */}
+      {/* ── P&L charts: profit trend / yearly growth ── */}
       <div className="grid grid-cols-1 gap-8 xl:grid-cols-2">
-        <RevealCard>
-        <Card className="content-card">
-          <CardHeader className="border-b">
-            <CardTitle className="text-base">{t("dashboard.charts.expensesByCategory")}</CardTitle>
-            <CardDescription className="text-xs">
-              {t("dashboard.charts.expensesByCategoryDesc")}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3 pt-4">
-            {chartData.expensesByCategory.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">{t("common.noData")}</p>
-            ) : (
-              chartData.expensesByCategory.map((item, index) => (
-                <div key={item.name} className="flex flex-col gap-1">
-                  <div className="flex items-center justify-between gap-2 text-sm">
-                    <span className="truncate font-medium text-foreground">{item.name}</span>
-                    <span className="shrink-0 font-semibold tabular-nums text-foreground/90">
-                      {formatCompactMoney(item.amount)}
-                    </span>
-                  </div>
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                    <motion.div
-                      className={cn(
-                        "h-full rounded-full",
-                        SERVICE_BAR_COLORS[index % SERVICE_BAR_COLORS.length],
-                      )}
-                      initial={{ width: 0 }}
-                      animate={{
-                        width: `${Math.max(4, (item.amount / chartData.expensesByCategoryMax) * 100)}%`,
-                      }}
-                      transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: index * 0.05 }}
-                    />
-                  </div>
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
-        </RevealCard>
-
         <RevealCard>
         <Card className="content-card">
           <CardHeader className="border-b">
@@ -1066,6 +1113,79 @@ export function DashboardPage() {
                 />
               </AreaChart>
             </ChartContainer>
+          </CardContent>
+        </Card>
+        </RevealCard>
+
+        <RevealCard>
+        <Card className="content-card">
+          <CardHeader className="border-b">
+            <CardTitle className="text-base">{t("dashboard.charts.yearlyGrowth")}</CardTitle>
+            <CardDescription className="text-xs">{t("dashboard.charts.yearlyGrowthDesc")}</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-4">
+            {chartData.yearlyGrowth.length === 0 ? (
+              <p className="flex h-[260px] items-center justify-center text-sm text-muted-foreground">
+                {t("common.noData")}
+              </p>
+            ) : (
+              <ChartContainer config={yearlyGrowthConfig} className="h-[260px] w-full">
+                <ComposedChart data={chartData.yearlyGrowth} margin={{ left: 8, right: 8, top: 4, bottom: 0 }}>
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border/60" />
+                  <XAxis
+                    dataKey="year"
+                    tickLine={false}
+                    axisLine={false}
+                    tick={{ fontSize: 11 }}
+                  />
+                  <YAxis
+                    yAxisId="revenue"
+                    tickFormatter={formatCompactMoney}
+                    tickLine={false}
+                    axisLine={false}
+                    width={60}
+                    tick={{ fontSize: 11 }}
+                  />
+                  <YAxis
+                    yAxisId="growth"
+                    orientation="right"
+                    tickFormatter={(value) => `${value}%`}
+                    tickLine={false}
+                    axisLine={false}
+                    width={44}
+                    tick={{ fontSize: 11 }}
+                  />
+                  <ChartTooltip
+                    content={
+                      <ChartTooltipContent
+                        formatter={(value, name) =>
+                          name === "growth"
+                            ? (value == null ? "—" : `${Number(value)}%`)
+                            : moneyTooltip(value)
+                        }
+                      />
+                    }
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <Bar
+                    yAxisId="revenue"
+                    dataKey="revenue"
+                    fill="hsl(220 70% 50%)"
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={48}
+                  />
+                  <Line
+                    yAxisId="growth"
+                    type="monotone"
+                    dataKey="growth"
+                    stroke="hsl(38 92% 50%)"
+                    strokeWidth={2.5}
+                    dot={{ r: 4, fill: "hsl(38 92% 50%)", strokeWidth: 0 }}
+                    connectNulls={false}
+                  />
+                </ComposedChart>
+              </ChartContainer>
+            )}
           </CardContent>
         </Card>
         </RevealCard>
