@@ -725,7 +725,7 @@ export const ru: TranslationDict = {
       contractStatus: "Статус контрактов",
       contractStatusDesc: "Распределение по всем статусам",
       totalContracts: "Итого",
-      byService: "Объём по типам услуг",
+      byService: "Xizmat turlari bo'yicha",
       byServiceDesc: "Суммы контрактов по услугам",
       topPaid: "Топ клиентов — платежи",
       topPaidDesc: "Клиенты с наибольшими платежами",

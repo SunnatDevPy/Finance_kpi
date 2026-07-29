@@ -2,6 +2,7 @@ from datetime import date
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -13,6 +14,12 @@ from app.services.dashboard import (
     get_revenue_trend,
     get_top_clients_by_ltv,
     get_top_clients_ranked,
+)
+from app.services.dashboard_export import (
+    export_regions_pdf,
+    export_services_pdf,
+    export_top_clients_ltv_pdf,
+    export_top_clients_ranked_pdf,
 )
 
 router = APIRouter(prefix="/dashboard", dependencies=[Depends(get_current_user)])
@@ -70,3 +77,59 @@ def revenue_trend(
 @router.get("/clients-by-region", response_model=list[ClientRegionStatsItem])
 def clients_by_region(db: Session = Depends(get_db)) -> list[ClientRegionStatsItem]:
     return get_clients_by_region(db)
+
+
+@router.get("/export/services")
+def export_services(db: Session = Depends(get_db)) -> StreamingResponse:
+    buffer, filename, media_type = export_services_pdf(db)
+    return StreamingResponse(
+        buffer,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/export/regions")
+def export_regions(db: Session = Depends(get_db)) -> StreamingResponse:
+    buffer, filename, media_type = export_regions_pdf(db)
+    return StreamingResponse(
+        buffer,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/export/top-clients-ranked")
+def export_top_clients_ranked(
+    db: Session = Depends(get_db),
+    limit: int = Query(default=100, ge=1, le=500),
+    order: SortOrder = Query(default="desc"),
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+) -> StreamingResponse:
+    buffer, filename, media_type = export_top_clients_ranked_pdf(
+        db,
+        limit=limit,
+        order=order,
+        date_from=date_from,
+        date_to=date_to,
+    )
+    return StreamingResponse(
+        buffer,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/export/top-clients-ltv")
+def export_top_clients_ltv(
+    db: Session = Depends(get_db),
+    limit: int = Query(default=100, ge=1, le=500),
+    order: SortOrder = Query(default="desc"),
+) -> StreamingResponse:
+    buffer, filename, media_type = export_top_clients_ltv_pdf(db, limit=limit, order=order)
+    return StreamingResponse(
+        buffer,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

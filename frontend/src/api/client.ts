@@ -292,6 +292,30 @@ export const api = {
   dashboardClientsByRegion: () =>
     request<ClientRegionStatsItem[]>("/dashboard/clients-by-region"),
 
+  dashboardExportPdf: {
+    services: () => download("/dashboard/export/services", "dashboard_services.pdf"),
+    regions: () => download("/dashboard/export/regions", "dashboard_regions.pdf"),
+    topClientsRanked: (params?: {
+      limit?: number;
+      order?: "asc" | "desc";
+      date_from?: string;
+      date_to?: string;
+    }) => {
+      const q = new URLSearchParams();
+      q.set("limit", String(params?.limit ?? 100));
+      q.set("order", params?.order ?? "desc");
+      if (params?.date_from) q.set("date_from", params.date_from);
+      if (params?.date_to) q.set("date_to", params.date_to);
+      return download(`/dashboard/export/top-clients-ranked?${q.toString()}`, "dashboard_top_clients.pdf");
+    },
+    topClientsLtv: (params?: { limit?: number; order?: "asc" | "desc" }) => {
+      const q = new URLSearchParams();
+      q.set("limit", String(params?.limit ?? 100));
+      q.set("order", params?.order ?? "desc");
+      return download(`/dashboard/export/top-clients-ltv?${q.toString()}`, "dashboard_top_clients_ltv.pdf");
+    },
+  },
+
   debts: {
     list: (search?: string) =>
       request<DebtsSummary>(`/debts${search ? `?search=${encodeURIComponent(search)}` : ""}`),

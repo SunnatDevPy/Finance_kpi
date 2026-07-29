@@ -476,17 +476,7 @@ def get_dashboard_stats(
         ).all()
     }
 
-    revenue_by_service_rows = db.execute(
-        select(ServiceType.name, func.coalesce(func.sum(ContractLineItem.price), 0))
-        .join(ContractLineItem, ContractLineItem.service_type_id == ServiceType.id)
-        .join(Contract, Contract.id == ContractLineItem.contract_id)
-        .where(
-            ContractLineItem.is_cancelled.is_(False),
-            Contract.deleted_at.is_(None),
-        )
-        .group_by(ServiceType.name)
-        .order_by(func.coalesce(func.sum(ContractLineItem.price), 0).desc())
-    ).all()
+    revenue_by_service_rows = get_revenue_by_service(db)
 
     top_clients = get_top_clients_ranked(
         db,
@@ -566,7 +556,7 @@ def get_dashboard_stats(
         cumulative_clients=cumulative_client_points,
         contracts_by_month=contract_points,
         revenue_by_service=[
-            NamedAmount(name=row[0], amount=row[1]) for row in revenue_by_service_rows if row[1] > 0
+            NamedAmount(name=name, amount=amount) for name, amount in revenue_by_service_rows
         ],
         debt_vs_paid=[
             NamedAmount(name="To'langan", amount=total_paid),
@@ -614,6 +604,21 @@ def get_dashboard_stats(
 
 
 SortOrder = Literal["asc", "desc"]
+
+
+def get_revenue_by_service(db: Session) -> list[tuple[str, Decimal]]:
+    rows = db.execute(
+        select(ServiceType.name, func.coalesce(func.sum(ContractLineItem.price), 0))
+        .join(ContractLineItem, ContractLineItem.service_type_id == ServiceType.id)
+        .join(Contract, Contract.id == ContractLineItem.contract_id)
+        .where(
+            ContractLineItem.is_cancelled.is_(False),
+            Contract.deleted_at.is_(None),
+        )
+        .group_by(ServiceType.name)
+        .order_by(func.coalesce(func.sum(ContractLineItem.price), 0).desc())
+    ).all()
+    return [(row[0], Decimal(row[1])) for row in rows if row[1] > 0]
 
 
 def get_top_clients_ranked(

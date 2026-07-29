@@ -240,3 +240,35 @@ def test_clients_by_region(client, auth_headers, sample_contract):
     assert data[0]["city"] == "Toshkent"
     assert data[0]["clients_count"] == 1
     assert float(data[0]["total_amount"]) == 1_000_000.0
+
+
+def test_dashboard_export_services_pdf(client, auth_headers, sample_contract):
+    response = client.get("/api/v1/dashboard/export/services", headers=auth_headers)
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/pdf"
+
+
+def test_dashboard_export_regions_pdf(client, auth_headers, sample_client):
+    response = client.get("/api/v1/dashboard/export/regions", headers=auth_headers)
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/pdf"
+
+
+def test_dashboard_export_top_clients_ranked_pdf(client, auth_headers, sample_contract):
+    response = client.get(
+        "/api/v1/dashboard/export/top-clients-ranked",
+        headers=auth_headers,
+        params={"limit": 10, "order": "desc"},
+    )
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/pdf"
+
+
+def test_dashboard_export_top_clients_ltv_pdf(client, auth_headers, sample_contract):
+    response = client.get(
+        "/api/v1/dashboard/export/top-clients-ltv",
+        headers=auth_headers,
+        params={"limit": 10, "order": "desc"},
+    )
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/pdf"

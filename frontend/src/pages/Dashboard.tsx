@@ -19,6 +19,8 @@ import {
   ArrowDownIcon,
   ArrowUpIcon,
   BanknoteIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   MapPinIcon,
   CrownIcon,
   ScaleIcon,
@@ -29,6 +31,7 @@ import {
 } from "lucide-react";
 import { api } from "../api/client";
 import { ExportButtons } from "../components/ExportButtons";
+import { CardPdfButton } from "../components/CardPdfButton";
 import { DateRangePicker } from "../components/DateRangePicker";
 import { StatCard } from "../components/StatCard";
 import { TableViewLink } from "../components/TableViewLink";
@@ -177,27 +180,71 @@ function CategoryBarListCard({
   description,
   items,
   maxAmount,
+  paginated = false,
+  pageSize = 10,
+  onExportPdf,
 }: {
   title: string;
   description: string;
   items: { name: string; amount: number }[];
   maxAmount: number;
+  paginated?: boolean;
+  pageSize?: number;
+  onExportPdf?: () => Promise<void>;
 }) {
   const { t } = useI18n();
+  const [page, setPage] = useState(0);
+  const [reverseOrder, setReverseOrder] = useState(false);
+
+  const sortedItems = useMemo(() => {
+    const next = [...items];
+    next.sort((a, b) => (reverseOrder ? a.amount - b.amount : b.amount - a.amount));
+    return next;
+  }, [items, reverseOrder]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedItems.length / pageSize));
+  const safePage = Math.min(page, totalPages - 1);
+  const visibleItems = paginated
+    ? sortedItems.slice(safePage * pageSize, safePage * pageSize + pageSize)
+    : sortedItems;
+
+  useEffect(() => {
+    setPage(0);
+  }, [items.length, reverseOrder]);
 
   return (
     <RevealCard className="h-full">
-      <Card className="content-card h-full">
+      <Card className="content-card flex h-full flex-col">
         <CardHeader className="border-b">
-          <CardTitle className="text-base">{title}</CardTitle>
-          <CardDescription className="text-xs">{description}</CardDescription>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <CardTitle className="text-base">{title}</CardTitle>
+              <CardDescription className="text-xs">{description}</CardDescription>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              {paginated && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="size-8 p-0"
+                  onClick={() => setReverseOrder((value) => !value)}
+                  aria-label={reverseOrder ? t("common.sortDesc") : t("common.sortAsc")}
+                  title={reverseOrder ? t("common.sortDesc") : t("common.sortAsc")}
+                >
+                  {reverseOrder ? <ArrowUpIcon className="size-4" /> : <ArrowDownIcon className="size-4" />}
+                </Button>
+              )}
+              {onExportPdf && <CardPdfButton onExport={onExportPdf} />}
+            </div>
+          </div>
         </CardHeader>
-        <CardContent className="flex flex-col gap-3 pt-4">
-          {items.length === 0 ? (
+        <CardContent className="flex flex-1 flex-col gap-3 pt-4">
+          {visibleItems.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">{t("common.noData")}</p>
           ) : (
-            items.map((item, index) => (
-              <div key={item.name} className="flex flex-col gap-1">
+            visibleItems.map((item, index) => (
+              <div key={`${item.name}-${safePage}-${index}`} className="flex flex-col gap-1">
                 <div className="flex items-center justify-between gap-2 text-sm">
                   <span className="truncate font-medium text-foreground">{item.name}</span>
                   <span className="shrink-0 font-semibold tabular-nums text-foreground/90">
@@ -217,6 +264,35 @@ function CategoryBarListCard({
                 </div>
               </div>
             ))
+          )}
+          {paginated && sortedItems.length > pageSize && (
+            <div className="mt-auto flex items-center justify-between gap-2 border-t border-border/60 pt-3">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 gap-1 px-2.5"
+                disabled={safePage === 0}
+                onClick={() => setPage((value) => Math.max(0, value - 1))}
+              >
+                <ChevronLeftIcon className="size-4" />
+                {t("pagination.prev")}
+              </Button>
+              <span className="text-xs tabular-nums text-muted-foreground">
+                {safePage + 1} / {totalPages}
+              </span>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 gap-1 px-2.5"
+                disabled={safePage >= totalPages - 1}
+                onClick={() => setPage((value) => Math.min(totalPages - 1, value + 1))}
+              >
+                {t("pagination.next")}
+                <ChevronRightIcon className="size-4" />
+              </Button>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -706,6 +782,9 @@ export function DashboardPage() {
             description={t("dashboard.charts.byServiceDesc")}
             items={chartData.byService}
             maxAmount={chartData.byServiceMax}
+            paginated
+            pageSize={10}
+            onExportPdf={() => api.dashboardExportPdf.services()}
           />
           <CategoryBarListCard
             title={t("dashboard.charts.expensesByCategory")}
@@ -834,7 +913,7 @@ export function DashboardPage() {
               </div>
             </div>
             {regionCountryOptions.length > 0 && (
-              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
                 <Select
                   value={regionCountryFilter}
                   onValueChange={(value) => {
@@ -877,7 +956,11 @@ export function DashboardPage() {
                     </SelectGroup>
                   </SelectContent>
                 </Select>
+                <CardPdfButton onExport={() => api.dashboardExportPdf.regions()} />
               </div>
+            )}
+            {regionCountryOptions.length === 0 && (
+              <CardPdfButton onExport={() => api.dashboardExportPdf.regions()} />
             )}
           </div>
         </CardHeader>
@@ -1204,12 +1287,24 @@ export function DashboardPage() {
                 <CardDescription className="text-xs">{t("dashboard.topClientsTableDesc")}</CardDescription>
               </div>
             </div>
-            <TableLimitSortControls
-              limit={rankedLimit}
-              onLimitChange={setRankedLimit}
-              order={rankedOrder}
-              onOrderChange={setRankedOrder}
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              <TableLimitSortControls
+                limit={rankedLimit}
+                onLimitChange={setRankedLimit}
+                order={rankedOrder}
+                onOrderChange={setRankedOrder}
+              />
+              <CardPdfButton
+                onExport={() =>
+                  api.dashboardExportPdf.topClientsRanked({
+                    limit: rankedLimit,
+                    order: rankedOrder,
+                    date_from: dateFrom || undefined,
+                    date_to: dateTo || undefined,
+                  })
+                }
+              />
+            </div>
           </div>
         </CardHeader>
         <CardContent className={cn("p-0", rankedLoading && "pointer-events-none opacity-60")}>
@@ -1301,12 +1396,22 @@ export function DashboardPage() {
                 <CardDescription className="text-xs">{t("dashboard.topClientsLtvDesc")}</CardDescription>
               </div>
             </div>
-            <TableLimitSortControls
-              limit={ltvLimit}
-              onLimitChange={setLtvLimit}
-              order={ltvOrder}
-              onOrderChange={setLtvOrder}
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              <TableLimitSortControls
+                limit={ltvLimit}
+                onLimitChange={setLtvLimit}
+                order={ltvOrder}
+                onOrderChange={setLtvOrder}
+              />
+              <CardPdfButton
+                onExport={() =>
+                  api.dashboardExportPdf.topClientsLtv({
+                    limit: ltvLimit,
+                    order: ltvOrder,
+                  })
+                }
+              />
+            </div>
           </div>
         </CardHeader>
         <CardContent className={cn("p-0 pt-2", ltvLoading && "pointer-events-none opacity-60")}>
