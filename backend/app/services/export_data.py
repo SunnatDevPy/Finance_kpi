@@ -252,17 +252,30 @@ CONTRACT_STATUS_LABELS = {
 
 
 def fetch_client_card_profile_rows(client: Client) -> list[list[str]]:
-    return [
-        ["Korxona nomi", client.company_name],
-        ["Mas'ul shaxs", client.contact_person or ""],
-        ["Telefon", client.phone or ""],
-        ["Veb-sayt", client.website or ""],
-        ["Mamlakat", client.country or ""],
-        ["Shahar", client.city or ""],
-        ["Faoliyat turi", client.activity_type or ""],
-        ["Holat", CLIENT_STATUS_LABELS.get(client.status.value, client.status.value)],
-        ["Izohlar", client.notes or ""],
-    ]
+    rows = [["Korxona nomi", client.company_name]]
+    contacts = sorted(client.contacts, key=lambda item: item.sort_order) if client.contacts else []
+    if contacts:
+        for index, contact in enumerate(contacts, start=1):
+            rows.append([f"Mas'ul shaxs {index}", contact.name])
+            rows.append([f"Telefon {index}", contact.phone or ""])
+    else:
+        rows.extend(
+            [
+                ["Mas'ul shaxs", client.contact_person or ""],
+                ["Telefon", client.phone or ""],
+            ]
+        )
+    rows.extend(
+        [
+            ["Veb-sayt", client.website or ""],
+            ["Mamlakat", client.country or ""],
+            ["Shahar", client.city or ""],
+            ["Faoliyat turi", client.activity_type or ""],
+            ["Holat", CLIENT_STATUS_LABELS.get(client.status.value, client.status.value)],
+            ["Izohlar", client.notes or ""],
+        ]
+    )
+    return rows
 
 
 def fetch_client_contracts_rows(db: Session, client_id: int) -> list[list[str]]:

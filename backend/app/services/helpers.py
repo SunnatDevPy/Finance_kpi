@@ -11,7 +11,13 @@ from app.services.cancelled_stats import contracts_cancelled_amount
 
 def get_client_or_404(db: Session, client_id: int) -> Client:
     client = db.scalars(
-        select(Client).where(Client.id == client_id, Client.deleted_at.is_(None))
+        select(Client)
+        .options(
+            selectinload(Client.contacts),
+            selectinload(Client.contracts).selectinload(Contract.line_items),
+            selectinload(Client.contracts).selectinload(Contract.payments),
+        )
+        .where(Client.id == client_id, Client.deleted_at.is_(None))
     ).first()
     if client is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mijoz topilmadi")
@@ -33,7 +39,7 @@ def get_contract_or_404(db: Session, contract_id: int) -> Contract:
         .options(
             selectinload(Contract.line_items).selectinload(ContractLineItem.service_type),
             selectinload(Contract.payments),
-            selectinload(Contract.client),
+            selectinload(Contract.client).selectinload(Client.contacts),
         )
         .where(Contract.id == contract_id, Contract.deleted_at.is_(None))
     )

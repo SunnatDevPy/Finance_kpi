@@ -7,6 +7,7 @@ import { MotionButton, motionTap } from "@/components/ui/button";
 import { useI18n } from "@/context/I18nContext";
 import { cn } from "@/lib/utils";
 import { formatAmount, toNumber } from "@/utils/format";
+import { clientContactsFromClient } from "@/utils/clientContacts";
 import type { Client, Contract } from "@/types";
 
 interface ClientCardOverviewProps {
@@ -99,6 +100,20 @@ export function ClientCardOverview({
     };
   }, [contracts, totalDebt, cancelledAmount]);
 
+  const contactRows = useMemo(() => {
+    const contacts = clientContactsFromClient(client);
+    return contacts.flatMap((contact, index) => [
+      [
+        contacts.length > 1 ? `${t("clients.contact")} ${index + 1}` : t("clients.contact"),
+        contact.name || "—",
+      ] as const,
+      [
+        contacts.length > 1 ? `${t("clients.phone")} ${index + 1}` : t("clients.phone"),
+        contact.phone || "—",
+      ] as const,
+    ]);
+  }, [client, t]);
+
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -108,8 +123,7 @@ export function ClientCardOverview({
             <dl className="info-grid grid grid-cols-1 gap-3 sm:grid-cols-2">
               {(
                 [
-                  [t("clients.contact"), client.contact_person],
-                  [t("clients.phone"), client.phone],
+                  ...contactRows,
                   [t("clients.website"), client.website],
                   [t("clients.country"), client.country],
                   [t("clients.city"), client.city],

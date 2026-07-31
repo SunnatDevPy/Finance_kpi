@@ -110,6 +110,7 @@ export function emptyClientForm() {
     company_name: "",
     contact_person: "",
     phone: "",
+    contacts: [{ name: "", phone: "" }],
     website: "",
     country: DEFAULT_COUNTRY,
     city: "",

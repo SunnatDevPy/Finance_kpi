@@ -20,6 +20,7 @@ import { CancelIcon, LoadingIconBtn, SaveIconBtn } from "../components/ButtonIco
 import { ClientCardOverview } from "../components/ClientCardOverview";
 import { QuickPaymentModal, type QuickPaymentTarget } from "../components/QuickPaymentModal";
 import { ClientLogoUploader } from "@/components/ClientLogoUploader";
+import { ClientContactFields } from "@/components/ClientContactFields";
 import { CountryCityFields } from "../components/CountryCityFields";
 import {
   ContractFormFields,
@@ -60,7 +61,7 @@ import { useI18n } from "../context/I18nContext";
 import { useSubmitGuard } from "../hooks/useSubmitGuard";
 import { Button, MotionButton, motionTap } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FloatingLabelInput, FloatingLabelMoneyInput, FloatingLabelPhoneInput, FloatingLabelTextarea } from "@/components/ui/floating-label-input";
+import { FloatingLabelInput, FloatingLabelMoneyInput, FloatingLabelTextarea } from "@/components/ui/floating-label-input";
 import {
   Select,
   SelectContent,
@@ -72,7 +73,7 @@ import {
 import type { AuditLogEntry, ClientCard, ClientFormData, Contract, Payment, ServiceType } from "../types";
 import { ActiveStatusToggle } from "../components/ActiveStatusToggle";
 import { resolveCountryValue, resolveRegionValue } from "@/data/geoRegions";
-import { parsePhoneNational, toPhoneE164 } from "@/hooks/usePhoneInput";
+import { parsePhoneNational } from "@/hooks/usePhoneInput";
 import { cn } from "@/lib/utils";
 import {
   emptyClientForm,
@@ -83,6 +84,10 @@ import {
   toNumber,
   toWholeAmountDigits,
 } from "../utils/format";
+import {
+  buildClientContactsPayload,
+  clientContactsFromClient,
+} from "../utils/clientContacts";
 
 function activeLineItemCount(contract: Contract): number {
   return contract.line_items.filter((item) => !item.is_cancelled).length;
@@ -326,6 +331,7 @@ export function ClientCardPage() {
       company_name: card.company_name,
       contact_person: card.contact_person || "",
       phone: parsePhoneNational(card.phone || ""),
+      contacts: clientContactsFromClient(card),
       website: card.website || "",
       country: resolveCountryValue(card.country || ""),
       city: resolveRegionValue(resolveCountryValue(card.country || ""), card.city || ""),
@@ -341,10 +347,12 @@ export function ClientCardPage() {
     if (!card) return;
     setError("");
     try {
+      const contacts = buildClientContactsPayload(editForm.contacts);
       const payload = {
         ...editForm,
-        contact_person: editForm.contact_person || undefined,
-        phone: editForm.phone ? toPhoneE164(editForm.phone) : undefined,
+        contacts,
+        contact_person: contacts[0]?.name,
+        phone: contacts[0]?.phone,
         website: editForm.website || undefined,
         country: editForm.country || undefined,
         city: editForm.city || undefined,
@@ -985,17 +993,9 @@ export function ClientCardPage() {
             value={editForm.company_name}
             onChange={(e) => setEditForm((prev) => ({ ...prev, company_name: e.target.value }))}
           />
-          <FloatingLabelInput
-            id="edit_contact"
-            label={t("clients.contact")}
-            value={editForm.contact_person}
-            onChange={(e) => setEditForm((prev) => ({ ...prev, contact_person: e.target.value }))}
-          />
-          <FloatingLabelPhoneInput
-            id="edit_phone"
-            label={t("clients.phone")}
-            value={editForm.phone}
-            onValueChange={(phone) => setEditForm((prev) => ({ ...prev, phone }))}
+          <ClientContactFields
+            contacts={editForm.contacts}
+            onChange={(contacts) => setEditForm((prev) => ({ ...prev, contacts }))}
           />
           <FloatingLabelInput
             id="edit_website"

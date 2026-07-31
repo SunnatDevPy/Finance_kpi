@@ -77,10 +77,18 @@ def _company_block(company: dict[str, str], styles: dict) -> Paragraph:
 def _client_block(contract: Contract, styles: dict) -> Paragraph:
     client = contract.client
     lines = [f"<b>{client.company_name}</b>"]
-    if client.contact_person:
-        lines.append(f"Mas'ul shaxs: {client.contact_person}")
-    if client.phone:
-        lines.append(f"Tel: {client.phone}")
+    contacts = sorted(client.contacts, key=lambda item: item.sort_order) if client.contacts else []
+    if contacts:
+        for contact in contacts:
+            contact_line = f"Mas'ul shaxs: {contact.name}"
+            if contact.phone:
+                contact_line += f", tel: {contact.phone}"
+            lines.append(contact_line)
+    else:
+        if client.contact_person:
+            lines.append(f"Mas'ul shaxs: {client.contact_person}")
+        if client.phone:
+            lines.append(f"Tel: {client.phone}")
     location = ", ".join(part for part in [client.city, client.country] if part)
     if location:
         lines.append(location)

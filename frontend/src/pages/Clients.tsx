@@ -22,6 +22,7 @@ import {
   emptyContractForm,
   type ContractFormState,
 } from "../components/ContractFormFields";
+import { ClientContactFields } from "../components/ClientContactFields";
 import { CountryCityFields } from "../components/CountryCityFields";
 import { ExportButtons } from "../components/ExportButtons";
 import { CancelIcon, DeleteIconBtn, LoadingIconBtn, SaveIconBtn } from "../components/ButtonIcons";
@@ -54,8 +55,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { MotionButton, motionTap } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FloatingLabelInput, FloatingLabelPhoneInput, FloatingLabelTextarea } from "@/components/ui/floating-label-input";
-import { parsePhoneNational, toPhoneE164 } from "@/hooks/usePhoneInput";
+import { FloatingLabelInput, FloatingLabelTextarea } from "@/components/ui/floating-label-input";
+import { parsePhoneNational } from "@/hooks/usePhoneInput";
 import { resolveCountryValue, resolveRegionValue } from "@/data/geoRegions";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -71,6 +72,12 @@ import { Badge } from "@/components/ui/badge";
 import type { Client, ClientFormData, ClientImportResult, ClientDebtFilter, ServiceType } from "../types";
 import { useI18n } from "../context/I18nContext";
 import { emptyClientForm, formatAmount, toNumber } from "../utils/format";
+import {
+  buildClientContactsPayload,
+  clientContactsFromClient,
+  formatClientContactsLabel,
+  formatClientPhonesLabel,
+} from "../utils/clientContacts";
 import { PageHeader, PageShell } from "../components/PageHeader";
 import { ActiveStatusToggle } from "../components/ActiveStatusToggle";
 import { TableColumnPicker } from "../components/TableColumnPicker";
@@ -226,6 +233,7 @@ export function ClientsPage() {
       company_name: client.company_name,
       contact_person: client.contact_person || "",
       phone: parsePhoneNational(client.phone || ""),
+      contacts: clientContactsFromClient(client),
       website: client.website || "",
       country: resolveCountryValue(client.country || ""),
       city: resolveRegionValue(
@@ -243,10 +251,12 @@ export function ClientsPage() {
     e.preventDefault();
     setError("");
     try {
+      const contacts = buildClientContactsPayload(form.contacts);
       const payload = {
         ...form,
-        contact_person: form.contact_person || undefined,
-        phone: form.phone ? toPhoneE164(form.phone) : undefined,
+        contacts,
+        contact_person: contacts[0]?.name,
+        phone: contacts[0]?.phone,
         website: form.website || undefined,
         country: form.country || undefined,
         city: form.city || undefined,
@@ -526,9 +536,9 @@ export function ClientsPage() {
                     logoUrl={client.logo_url}
                   />
                   {isVisible("contact") && (
-                    <TableCellMuted>{client.contact_person}</TableCellMuted>
+                    <TableCellMuted>{formatClientContactsLabel(client)}</TableCellMuted>
                   )}
-                  {isVisible("phone") && <TableCellMuted>{client.phone}</TableCellMuted>}
+                  {isVisible("phone") && <TableCellMuted>{formatClientPhonesLabel(client)}</TableCellMuted>}
                   {isVisible("city") && <TableCellMuted>{client.city}</TableCellMuted>}
                   {isVisible("debt") && (
                     <TableCell>
@@ -650,18 +660,9 @@ export function ClientsPage() {
             value={form.company_name}
             onChange={(e) => setForm({ ...form, company_name: e.target.value })}
           />
-          <FloatingLabelInput
-            guardAutofill
-            name="wtma_client_contact"
-            label={t("clients.contact")}
-            value={form.contact_person}
-            onChange={(e) => setForm({ ...form, contact_person: e.target.value })}
-          />
-          <FloatingLabelPhoneInput
-            id="phone"
-            label={t("clients.phone")}
-            value={form.phone}
-            onValueChange={(phone) => setForm({ ...form, phone })}
+          <ClientContactFields
+            contacts={form.contacts}
+            onChange={(contacts) => setForm({ ...form, contacts })}
           />
           <FloatingLabelInput
             id="website"

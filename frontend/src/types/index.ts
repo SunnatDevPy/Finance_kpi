@@ -55,6 +55,7 @@ export interface Client {
   company_name: string;
   contact_person: string | null;
   phone: string | null;
+  contacts: ClientContact[];
   website: string | null;
   country: string | null;
   city: string | null;
@@ -220,10 +221,23 @@ export interface DashboardStats {
   profit_margin_pct: number | null;
 }
 
+export interface ClientContact {
+  id: number;
+  name: string;
+  phone: string | null;
+  sort_order: number;
+}
+
+export interface ClientContactFormItem {
+  name: string;
+  phone: string;
+}
+
 export interface ClientFormData {
   company_name: string;
   contact_person: string;
   phone: string;
+  contacts: ClientContactFormItem[];
   website: string;
   country: string;
   city: string;
