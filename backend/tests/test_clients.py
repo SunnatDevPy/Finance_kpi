@@ -101,3 +101,59 @@ def test_upload_client_logo_for_missing_client_404(client, auth_headers):
         files={"file": ("logo.png", _PNG_1X1, "image/png")},
     )
     assert response.status_code == 404
+
+
+def test_create_client_with_multiple_contacts(client, auth_headers):
+    create = client.post(
+        "/api/v1/clients",
+        headers=auth_headers,
+        json={
+            "company_name": "Multi Contact LLC",
+            "contacts": [
+                {"name": "Ali Valiyev", "phone": "+998901111111"},
+                {"name": "Dilnoza Karimova", "phone": "+998902222222"},
+            ],
+            "status": "faol",
+        },
+    )
+    assert create.status_code == 201
+    created = create.json()
+    assert created["company_name"] == "Multi Contact LLC"
+    assert created["contact_person"] == "Ali Valiyev"
+    assert created["phone"] == "+998901111111"
+    assert len(created["contacts"]) == 2
+    assert created["contacts"][0]["name"] == "Ali Valiyev"
+    assert created["contacts"][1]["name"] == "Dilnoza Karimova"
+
+    fetched = client.get(f"/api/v1/clients/{created['id']}", headers=auth_headers)
+    assert fetched.status_code == 200
+    assert len(fetched.json()["contacts"]) == 2
+
+    update = client.patch(
+        f"/api/v1/clients/{created['id']}",
+        headers=auth_headers,
+        json={
+            "contacts": [
+                {"name": "Ali Valiyev", "phone": "+998901111111"},
+                {"name": "Sardor Rahimov", "phone": "+998903333333"},
+            ],
+        },
+    )
+    assert update.status_code == 200
+    updated = update.json()
+    assert len(updated["contacts"]) == 2
+    assert updated["contacts"][1]["name"] == "Sardor Rahimov"
+    assert updated["contact_person"] == "Ali Valiyev"
+
+
+def test_create_client_rejects_contact_without_name(client, auth_headers):
+    response = client.post(
+        "/api/v1/clients",
+        headers=auth_headers,
+        json={
+            "company_name": "Invalid Contact LLC",
+            "contacts": [{"name": "", "phone": "+998901234567"}],
+            "status": "faol",
+        },
+    )
+    assert response.status_code == 422

@@ -7,11 +7,18 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import get_current_user, require_admin
 from app.database import get_db
-from app.models import AuditAction, Client, ClientStatus, Contract, ContractLineItem, User
-from app.schemas.client import ClientCardRead, ClientCreate, ClientRead, ClientUpdate
+from app.models import AuditAction, Client, ClientContact, ClientStatus, Contract, ContractLineItem, User
+from app.schemas.client import (
+    ClientCardRead,
+    ClientCreate,
+    ClientRead,
+    ClientUpdate,
+    build_client_read,
+)
 from app.schemas.client_import import ClientImportResult
 from app.schemas.pagination import Page
 from app.services.audit import diff_fields, record_audit
+from app.services.client_contacts import apply_client_contacts, normalize_contact_inputs
 from app.services.client_import import build_client_import_template, import_clients_from_xlsx
 from app.services.export_data import (
     CLIENT_CARD_CONTRACT_HEADERS,
@@ -45,6 +52,7 @@ def _load_client_card(db: Session, client_id: int) -> Client:
     stmt = (
         select(Client)
         .options(
+            selectinload(Client.contacts),
             selectinload(Client.contracts)
             .selectinload(Contract.line_items)
             .selectinload(ContractLineItem.service_type),
@@ -83,12 +91,19 @@ def list_clients(
             filters.append(Client.id.in_(client_ids_without_positive_debt()))
     if search:
         pattern = f"%{search}%"
+        contact_client_ids = select(ClientContact.client_id).where(
+            or_(
+                ClientContact.name.ilike(pattern),
+                ClientContact.phone.ilike(pattern),
+            )
+        )
         filters.append(
             or_(
                 Client.company_name.ilike(pattern),
                 Client.contact_person.ilike(pattern),
                 Client.phone.ilike(pattern),
                 Client.city.ilike(pattern),
+                Client.id.in_(contact_client_ids),
             )
         )
 
@@ -98,6 +113,7 @@ def list_clients(
     stmt = (
         select(Client)
         .options(
+            selectinload(Client.contacts),
             selectinload(Client.contracts).selectinload(Contract.line_items),
             selectinload(Client.contracts).selectinload(Contract.payments),
         )
@@ -109,10 +125,8 @@ def list_clients(
     for client in clients:
         active_contracts = [c for c in client.contracts if c.deleted_at is None]
         items.append(
-            ClientRead(
-                **ClientRead.model_validate(client).model_dump(
-                    exclude={"total_amount", "total_paid", "total_debt"}
-                ),
+            build_client_read(
+                client,
                 total_amount=client_total_amount(active_contracts),
                 total_paid=client_total_paid(active_contracts),
                 total_debt=client_total_debt(active_contracts),
@@ -166,8 +180,10 @@ def create_client(
     payload: ClientCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> Client:
-    client = Client(**payload.model_dump())
+) -> ClientRead:
+    contact_rows = normalize_contact_inputs(payload.contacts, payload.contact_person, payload.phone)
+    client = Client(**payload.model_dump(exclude={"contacts"}))
+    apply_client_contacts(client, contact_rows)
     db.add(client)
     db.commit()
     db.refresh(client)
@@ -179,7 +195,7 @@ def create_client(
         action=AuditAction.CREATE,
         summary=f"Mijoz yaratildi: {client.company_name}",
     )
-    return client
+    return build_client_read(client)
 
 
 @router.get("/import-template")
@@ -212,8 +228,9 @@ async def import_clients(
 
 
 @router.get("/{client_id}", response_model=ClientRead)
-def get_client(client_id: int, db: Session = Depends(get_db)) -> Client:
-    return get_client_or_404(db, client_id)
+def get_client(client_id: int, db: Session = Depends(get_db)) -> ClientRead:
+    client = get_client_or_404(db, client_id)
+    return build_client_read(client)
 
 
 @router.get("/{client_id}/card", response_model=ClientCardRead)
@@ -222,13 +239,13 @@ def get_client_card(client_id: int, db: Session = Depends(get_db)) -> ClientCard
     active_contracts = [c for c in client.contracts if c.deleted_at is None]
     contracts = [contract_to_read(contract) for contract in active_contracts]
     return ClientCardRead(
-        **ClientRead.model_validate(client).model_dump(
-            exclude={"total_amount", "total_paid", "total_debt"}
-        ),
+        **build_client_read(
+            client,
+            total_amount=client_total_amount(active_contracts),
+            total_paid=client_total_paid(active_contracts),
+            total_debt=client_total_debt(active_contracts),
+        ).model_dump(),
         contracts=contracts,
-        total_amount=client_total_amount(active_contracts),
-        total_paid=client_total_paid(active_contracts),
-        total_debt=client_total_debt(active_contracts),
         cancelled_amount=client_cancelled_amount(active_contracts),
     )
 
@@ -268,17 +285,24 @@ def update_client(
     payload: ClientUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> Client:
+) -> ClientRead:
     client = get_client_or_404(db, client_id)
-    before = {
-        field: getattr(client, field) for field in payload.model_dump(exclude_unset=True)
-    }
     data = payload.model_dump(exclude_unset=True)
+    contacts_payload = payload.contacts
+    data.pop("contacts", None)
+    before = {field: getattr(client, field) for field in data}
     for field, value in data.items():
         setattr(client, field, value)
+    if contacts_payload is not None:
+        apply_client_contacts(client, normalize_contact_inputs(contacts_payload, None, None))
+    elif {"contact_person", "phone"} & data.keys():
+        existing = normalize_contact_inputs(None, client.contact_person, client.phone)
+        apply_client_contacts(client, existing)
     db.commit()
     db.refresh(client)
     changes = diff_fields(before, data)
+    if contacts_payload is not None:
+        changes["contacts"] = ("updated", "updated")
     if changes:
         record_audit(
             db,
@@ -289,7 +313,7 @@ def update_client(
             changes=changes,
             summary=f"Mijoz tahrirlandi: {client.company_name}",
         )
-    return client
+    return build_client_read(client)
 
 
 @router.delete(
@@ -338,7 +362,7 @@ async def upload_client_logo(
         action=AuditAction.UPDATE,
         summary=f"Mijoz logotipi yangilandi: {client.company_name}",
     )
-    return client
+    return build_client_read(client)
 
 
 @router.delete("/{client_id}/logo", response_model=ClientRead)
@@ -361,7 +385,7 @@ def remove_client_logo(
         action=AuditAction.UPDATE,
         summary=f"Mijoz logotipi olib tashlandi: {client.company_name}",
     )
-    return client
+    return build_client_read(client)
 
 
 @router.delete(
@@ -419,7 +443,7 @@ def restore_client(
         action=AuditAction.RESTORE,
         summary=f"Mijoz arxivdan tiklandi: {client.company_name}",
     )
-    return client
+    return build_client_read(client)
 
 
 @router.delete(

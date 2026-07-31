@@ -6,7 +6,7 @@ from openpyxl.styles import Font, PatternFill
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Client, ClientStatus
+from app.models import Client, ClientContact, ClientStatus
 from app.schemas.client_import import ClientImportDuplicate, ClientImportError, ClientImportResult
 
 TEMPLATE_HEADERS = [
@@ -117,18 +117,22 @@ def import_clients_from_xlsx(db: Session, content: bytes) -> ClientImportResult:
             continue
 
         seen_in_file.add(key)
-        new_clients.append(
-            Client(
-                company_name=company_name,
-                contact_person=_clean(contact_person),
-                phone=_clean(phone),
-                website=_clean(website),
-                country=_clean(country),
-                city=_clean(city),
-                activity_type=_clean(activity_type),
-                status=status,
-            )
+        client = Client(
+            company_name=company_name,
+            contact_person=_clean(contact_person),
+            phone=_clean(phone),
+            website=_clean(website),
+            country=_clean(country),
+            city=_clean(city),
+            activity_type=_clean(activity_type),
+            status=status,
         )
+        contact_name = _clean(contact_person)
+        if contact_name:
+            client.contacts.append(
+                ClientContact(name=contact_name, phone=_clean(phone), sort_order=0)
+            )
+        new_clients.append(client)
 
     if new_clients:
         db.add_all(new_clients)

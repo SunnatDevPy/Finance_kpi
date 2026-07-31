@@ -107,12 +107,32 @@ class Client(Base):
     contracts: Mapped[list["Contract"]] = relationship(
         back_populates="client", cascade="all, delete-orphan"
     )
+    contacts: Mapped[list["ClientContact"]] = relationship(
+        back_populates="client",
+        cascade="all, delete-orphan",
+        order_by="ClientContact.sort_order",
+    )
 
     @property
     def logo_url(self) -> str | None:
         if not self.logo_path:
             return None
         return f"/api/v1/uploads/client_logos/{self.logo_path}"
+
+
+class ClientContact(Base):
+    __tablename__ = "client_contacts"
+    __table_args__ = (Index("ix_client_contacts_client_id", "client_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    client_id: Mapped[int] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    phone: Mapped[str | None] = mapped_column(String(50))
+    sort_order: Mapped[int] = mapped_column(nullable=False, default=0, server_default="0")
+
+    client: Mapped["Client"] = relationship(back_populates="contacts")
 
 
 class ServiceType(Base):
