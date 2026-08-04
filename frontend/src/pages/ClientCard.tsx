@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeftIcon,
@@ -28,6 +28,7 @@ import {
   type ContractFormState,
 } from "../components/ContractFormFields";
 import { Modal } from "../components/Modal";
+import { Pagination } from "../components/Pagination";
 import { PageError } from "../components/PageError";
 import { PageHeader, PageShell } from "../components/PageHeader";
 import { ContractStatusBadge } from "../components/ContractStatusBadge";
@@ -175,6 +176,10 @@ export function ClientCardPage() {
   const { submitting: contractSubmitting, guard: guardContract } = useSubmitGuard();
   const { submitting: editPriceSubmitting, guard: guardEditPrice } = useSubmitGuard();
   const { submitting: editClientSubmitting, guard: guardEditClient } = useSubmitGuard();
+  const [paymentsPage, setPaymentsPage] = useState(1);
+  const [paymentsPageSize, setPaymentsPageSize] = useState(10);
+  const [contractsPage, setContractsPage] = useState(1);
+  const [contractsPageSize, setContractsPageSize] = useState(5);
 
   /** Bitta shartnoma bo'yicha barcha to'lovlarni sahifalab yuklaydi
    * — backend sahifa hajmi 200 bilan cheklangani uchun, uzoq mijozlarning
@@ -210,6 +215,11 @@ export function ClientCardPage() {
   };
 
   useEffect(load, [id]);
+
+  useEffect(() => {
+    setPaymentsPage(1);
+    setContractsPage(1);
+  }, [id]);
 
   const loadServiceTypes = useCallback(() => {
     api.serviceTypes
@@ -524,8 +534,22 @@ export function ClientCardPage() {
     );
   }
 
-  const contractById = new Map(card.contracts.map((contract) => [contract.id, contract]));
-  const sortedPayments = [...payments].sort((a, b) => b.paid_at.localeCompare(a.paid_at));
+  const contractById = useMemo(
+    () => new Map(card.contracts.map((contract) => [contract.id, contract])),
+    [card.contracts],
+  );
+  const sortedPayments = useMemo(
+    () => [...payments].sort((a, b) => b.paid_at.localeCompare(a.paid_at)),
+    [payments],
+  );
+  const paginatedPayments = useMemo(() => {
+    const start = (paymentsPage - 1) * paymentsPageSize;
+    return sortedPayments.slice(start, start + paymentsPageSize);
+  }, [sortedPayments, paymentsPage, paymentsPageSize]);
+  const paginatedContracts = useMemo(() => {
+    const start = (contractsPage - 1) * contractsPageSize;
+    return card.contracts.slice(start, start + contractsPageSize);
+  }, [card.contracts, contractsPage, contractsPageSize]);
 
   return (
     <PageShell>
@@ -587,6 +611,20 @@ export function ClientCardPage() {
             empty={sortedPayments.length === 0}
             emptyMessage={t("clients.noPayments")}
             skeletonCols={4}
+            footer={
+              <Pagination
+                embedded
+                page={paymentsPage}
+                pageSize={paymentsPageSize}
+                total={sortedPayments.length}
+                pageSizeOptions={[10, 20, 50]}
+                onPageChange={setPaymentsPage}
+                onPageSizeChange={(size) => {
+                  setPaymentsPageSize(size);
+                  setPaymentsPage(1);
+                }}
+              />
+            }
           >
             <TableHeader>
               <TableRow>
@@ -597,7 +635,7 @@ export function ClientCardPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedPayments.map((p, index) => {
+              {paginatedPayments.map((p, index) => {
                 const linkedContract = contractById.get(p.contract_id);
                 return (
                   <MotionTableRow key={p.id} {...rowEnter(index)}>
@@ -641,7 +679,7 @@ export function ClientCardPage() {
             </div>
           ) : (
             <div className="flex flex-col gap-2">
-              {card.contracts.map((contract) => {
+              {paginatedContracts.map((contract) => {
                 const activeItems = activeLineItemCount(contract);
                 const canRemoveService = activeItems > 1;
                 const debt = toNumber(contract.debt_amount);
@@ -870,6 +908,18 @@ export function ClientCardPage() {
                 </div>
               );
               })}
+              <Pagination
+                embedded
+                page={contractsPage}
+                pageSize={contractsPageSize}
+                total={card.contracts.length}
+                pageSizeOptions={[5, 10, 20]}
+                onPageChange={setContractsPage}
+                onPageSizeChange={(size) => {
+                  setContractsPageSize(size);
+                  setContractsPage(1);
+                }}
+              />
             </div>
           )}
         </CardContent>
