@@ -76,7 +76,6 @@ def get_service_type_stats(db: Session, service_type_id: int) -> ServiceTypeStat
                 0,
             ).desc()
         )
-        .limit(10)
     ).all()
 
     top_clients = [
