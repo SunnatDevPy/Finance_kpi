@@ -33,6 +33,7 @@ import { api } from "../api/client";
 import { ExportButtons } from "../components/ExportButtons";
 import { CardPdfButton } from "../components/CardPdfButton";
 import { DateRangePicker } from "../components/DateRangePicker";
+import { SortableTableHead } from "@/components/SortableTableHead";
 import { StatCard } from "../components/StatCard";
 import { TableViewLink } from "../components/TableViewLink";
 import { StaggerContainer, StaggerItem } from "../components/Stagger";
@@ -73,6 +74,7 @@ import {
 } from "@/components/ui/chart";
 import type { ClientRegionStatsItem, DashboardStats, TopClientItem, TopClientLtvItem } from "../types";
 import { useI18n } from "../context/I18nContext";
+import { useTableSort } from "@/hooks/useTableSort";
 import {
   chartMonthsYearLabel,
   formatAmount,
@@ -105,6 +107,7 @@ const TABLE_LIMIT_OPTIONS = [10, 20, 30] as const;
 const TREND_MONTH_OPTIONS = [6, 12] as const;
 type TableLimit = (typeof TABLE_LIMIT_OPTIONS)[number];
 type SortOrder = "asc" | "desc";
+type RegionSortKey = "city" | "clients_count" | "total_amount" | "total_paid" | "total_debt";
 
 const CONTRACT_STATUS_COLORS: Record<(typeof CONTRACT_WORKFLOW_STATUSES)[number], string> = {
   yangi: "hsl(220 70% 50%)",
@@ -300,93 +303,6 @@ function CategoryBarListCard({
   );
 }
 
-function PaidVsDebtCard({
-  paidPercent,
-  cancelledPercent,
-  debtPercent,
-  totalPaid,
-  totalDebt,
-  cancelledAmount,
-}: {
-  paidPercent: number;
-  cancelledPercent: number;
-  debtPercent: number;
-  totalPaid: number;
-  totalDebt: number;
-  cancelledAmount: number;
-}) {
-  const { t } = useI18n();
-
-  return (
-    <RevealCard className="h-full">
-      <Card className="content-card h-full">
-        <CardHeader className="border-b">
-          <CardTitle className="text-base">{t("dashboard.charts.balance")}</CardTitle>
-          <CardDescription className="text-xs">{t("dashboard.charts.balanceDesc")}</CardDescription>
-        </CardHeader>
-        <CardContent className="flex h-full flex-col justify-center gap-5 pt-6">
-          <div className="flex h-3.5 w-full overflow-hidden rounded-full bg-muted">
-            <motion.div
-              className="h-full bg-emerald-500"
-              initial={{ width: 0 }}
-              animate={{ width: `${paidPercent}%` }}
-              transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-            />
-            {cancelledPercent > 0 && (
-              <motion.div
-                className="h-full bg-amber-400"
-                initial={{ width: 0 }}
-                animate={{ width: `${cancelledPercent}%` }}
-                transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-              />
-            )}
-            <motion.div
-              className="h-full bg-red-400"
-              initial={{ width: 0 }}
-              animate={{ width: `${debtPercent}%` }}
-              transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-            <div className="flex flex-col gap-1">
-              <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                <span className="size-2 rounded-full bg-emerald-500" />
-                {t("common.paid")}
-              </span>
-              <span className="text-lg font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
-                {formatCompactMoney(totalPaid)}
-              </span>
-            </div>
-            {cancelledAmount > 0 && (
-              <div className="flex flex-col gap-1">
-                <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                  <span className="size-2 rounded-full bg-amber-400" />
-                  {t("clients.cancelledAmount")}
-                </span>
-                <span className="text-lg font-bold tabular-nums text-amber-600 dark:text-amber-400">
-                  {formatCompactMoney(cancelledAmount)}
-                </span>
-              </div>
-            )}
-            <div className="flex flex-col gap-1 sm:text-right">
-              <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:justify-end">
-                {t("common.debt")}
-                <span className="size-2 rounded-full bg-red-400" />
-              </span>
-              <span className="text-lg font-bold tabular-nums text-red-600 dark:text-red-400">
-                {formatCompactMoney(totalDebt)}
-              </span>
-            </div>
-          </div>
-          <p className="text-center text-xs text-muted-foreground">
-            {t("dashboard.collectionRate")}: <strong className="text-foreground">{paidPercent}%</strong>
-          </p>
-        </CardContent>
-      </Card>
-    </RevealCard>
-  );
-}
-
 export function DashboardPage() {
   const { t } = useI18n();
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -409,6 +325,8 @@ export function DashboardPage() {
   const [ltvLoading, setLtvLoading] = useState(true);
   const [ltvError, setLtvError] = useState("");
   const [trendMonths, setTrendMonths] = useState<(typeof TREND_MONTH_OPTIONS)[number]>(12);
+  const { sortBy: regionSortBy, sortOrder: regionSortOrder, handleSort: handleRegionSort } =
+    useTableSort<RegionSortKey>("wtma.dashboard.regions.sort", "clients_count", "desc", ["city"]);
 
   const revenueConfig = useMemo(
     () =>
@@ -483,6 +401,26 @@ export function DashboardPage() {
     [regionStats, regionCountryFilter, regionCityFilter],
   );
 
+  const sortedRegionStats = useMemo(() => {
+    const next = [...filteredRegionStats];
+    next.sort((a, b) => {
+      let cmp = 0;
+      if (regionSortBy === "city") {
+        cmp = a.city.localeCompare(b.city, "uz") || a.country.localeCompare(b.country, "uz");
+      } else if (regionSortBy === "clients_count") {
+        cmp = a.clients_count - b.clients_count;
+      } else if (regionSortBy === "total_amount") {
+        cmp = toNumber(a.total_amount) - toNumber(b.total_amount);
+      } else if (regionSortBy === "total_paid") {
+        cmp = toNumber(a.total_paid) - toNumber(b.total_paid);
+      } else {
+        cmp = toNumber(a.total_debt) - toNumber(b.total_debt);
+      }
+      return regionSortOrder === "asc" ? cmp : -cmp;
+    });
+    return next;
+  }, [filteredRegionStats, regionSortBy, regionSortOrder]);
+
   useEffect(() => {
     setRankedLoading(true);
     setRankedError("");
@@ -550,14 +488,6 @@ export function DashboardPage() {
     }));
     const contractStatus = contractStatusAll.filter((item) => item.value > 0);
 
-    const totalPaid = toNumber(stats.total_paid);
-    const totalDebt = toNumber(stats.total_debt);
-    const cancelledAmount = toNumber(stats.cancelled_amount);
-    const balanceTotal = Math.max(1, totalPaid + totalDebt + cancelledAmount);
-    const paidPercent = Math.round((totalPaid / balanceTotal) * 100);
-    const cancelledPercent = Math.round((cancelledAmount / balanceTotal) * 100);
-    const debtPercent = Math.max(0, 100 - paidPercent - cancelledPercent);
-
     const byExpenseSorted = [...stats.charts.expenses_by_category]
       .map((item) => ({ name: item.name, amount: toNumber(item.amount) }))
       .sort((a, b) => b.amount - a.amount);
@@ -606,12 +536,6 @@ export function DashboardPage() {
       clientStatus,
       contractStatus,
       contractStatusAll,
-      totalPaid,
-      totalDebt,
-      cancelledAmount,
-      paidPercent,
-      cancelledPercent,
-      debtPercent,
       expensesByCategory,
       expensesByCategoryMax,
       profitTrend,
@@ -898,8 +822,7 @@ export function DashboardPage() {
         </div>
       </section>
 
-      {/* ── Region + balance ── */}
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+      {/* ── Region stats ── */}
       <Card className="content-card">
         <CardHeader className="border-b">
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -978,15 +901,49 @@ export function DashboardPage() {
             >
               <TableHeader>
                 <TableRow>
-                  <TableHead>{t("dashboard.regionColumn")}</TableHead>
-                  <TableHead className="w-[5.5rem] text-right">{t("dashboard.regionClients")}</TableHead>
-                  <TableHead className="text-right">{t("dashboard.regionAmount")}</TableHead>
-                  <TableHead className="text-right">{t("dashboard.regionReceived")}</TableHead>
-                  <TableHead className="text-right">{t("dashboard.regionDebt")}</TableHead>
+                  <SortableTableHead
+                    label={t("dashboard.regionColumn")}
+                    column="city"
+                    activeColumn={regionSortBy}
+                    order={regionSortOrder}
+                    onSort={handleRegionSort}
+                  />
+                  <SortableTableHead
+                    label={t("dashboard.regionClients")}
+                    column="clients_count"
+                    activeColumn={regionSortBy}
+                    order={regionSortOrder}
+                    onSort={handleRegionSort}
+                    className="w-[5.5rem] text-right"
+                  />
+                  <SortableTableHead
+                    label={t("dashboard.regionAmount")}
+                    column="total_amount"
+                    activeColumn={regionSortBy}
+                    order={regionSortOrder}
+                    onSort={handleRegionSort}
+                    className="text-right"
+                  />
+                  <SortableTableHead
+                    label={t("dashboard.regionReceived")}
+                    column="total_paid"
+                    activeColumn={regionSortBy}
+                    order={regionSortOrder}
+                    onSort={handleRegionSort}
+                    className="text-right"
+                  />
+                  <SortableTableHead
+                    label={t("dashboard.regionDebt")}
+                    column="total_debt"
+                    activeColumn={regionSortBy}
+                    order={regionSortOrder}
+                    onSort={handleRegionSort}
+                    className="text-right"
+                  />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredRegionStats.map((item, index) => (
+                {sortedRegionStats.map((item, index) => (
                   <MotionTableRow key={`${item.country}-${item.city}`} {...rowEnter(index)}>
                     <TableCell>
                       <div className="min-w-0">
@@ -1011,16 +968,6 @@ export function DashboardPage() {
           )}
         </CardContent>
       </Card>
-
-      <PaidVsDebtCard
-        paidPercent={chartData.paidPercent}
-        cancelledPercent={chartData.cancelledPercent}
-        debtPercent={chartData.debtPercent}
-        totalPaid={chartData.totalPaid}
-        totalDebt={chartData.totalDebt}
-        cancelledAmount={chartData.cancelledAmount}
-      />
-      </div>
 
       {/* ── Charts ── */}
       <div className="grid grid-cols-1 gap-8 xl:grid-cols-2">
