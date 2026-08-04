@@ -80,6 +80,7 @@ import {
   formatAmount,
   formatChartMonthTick,
   formatCompactMoney,
+  formatDate,
   formatMoney,
   formatPercent,
   sortByMonthKey,
@@ -565,6 +566,7 @@ export function DashboardPage() {
 
   const hasDateRange = Boolean(dateFrom || dateTo);
   const financeRevenue = hasDateRange ? stats.monthly_revenue : stats.total_revenue;
+  const periodRangeLabel = `${formatDate(stats.period_start)} – ${formatDate(stats.period_end)}`;
 
   return (
     <PageShell className={cn(loading && "pointer-events-none opacity-60")}>
@@ -602,100 +604,108 @@ export function DashboardPage() {
       </div>
 
       {/* ── Stat cards ── */}
-      <StaggerContainer className="grid grid-cols-1 gap-5 md:grid-cols-3">
-        <StaggerItem>
-          <StatCard
-            title={t("dashboard.totalDebt")}
-            value={formatMoney(stats.total_debt)}
-            numericValue={toNumber(stats.total_debt)}
-            formatValue={formatMoney}
-            accent="red"
-            icon={AlertTriangleIcon}
-            to="/clients?debtors=1"
-          />
-        </StaggerItem>
-        <StaggerItem>
-          <StatCard
-            title={t("dashboard.monthlyRevenue")}
-            value={formatMoney(stats.monthly_revenue)}
-            numericValue={toNumber(stats.monthly_revenue)}
-            formatValue={formatMoney}
-            change={stats.revenue_growth_pct}
-            changeLabel={t("dashboard.vsPrev")}
-            accent="green"
-            icon={TrendingUpIcon}
-          />
-        </StaggerItem>
-        <StaggerItem>
-          <StatCard
-            title={t("dashboard.monthlyPlan")}
-            value={formatMoney(stats.monthly_plan)}
-            numericValue={toNumber(stats.monthly_plan)}
-            formatValue={formatMoney}
-            subtitle={`${t("dashboard.planDone")}: ${planPercent}%`}
-            accent="amber"
-            icon={WalletIcon}
-          />
-        </StaggerItem>
-      </StaggerContainer>
+      <div className="space-y-4">
+        <StaggerContainer className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <StaggerItem>
+            <StatCard
+              size="large"
+              title={t("dashboard.totalRevenue")}
+              value={formatMoney(financeRevenue)}
+              numericValue={toNumber(financeRevenue)}
+              formatValue={formatMoney}
+              accent="green"
+              icon={TrendingUpIcon}
+              to="/finance"
+            />
+          </StaggerItem>
+          <StaggerItem>
+            <StatCard
+              size="large"
+              title={t("dashboard.totalExpenses")}
+              value={formatMoney(stats.period_expenses)}
+              numericValue={toNumber(stats.period_expenses)}
+              formatValue={formatMoney}
+              accent="red"
+              icon={WalletIcon}
+            />
+          </StaggerItem>
+        </StaggerContainer>
 
-      <StaggerContainer className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-        <StaggerItem>
-          <StatCard
-            title={t("dashboard.cancelledAmount")}
-            value={formatMoney(stats.cancelled_amount)}
-            numericValue={toNumber(stats.cancelled_amount)}
-            formatValue={formatMoney}
-            subtitle={`${t("dashboard.cancelledContractsCount")}: ${stats.cancelled_contracts_count}`}
-            accent="amber"
-            icon={XCircleIcon}
-          />
-        </StaggerItem>
-      </StaggerContainer>
-
-      <StaggerContainer className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
-        <StaggerItem>
-          <StatCard
-            title={t("dashboard.totalRevenue")}
-            value={formatMoney(financeRevenue)}
-            numericValue={toNumber(financeRevenue)}
-            formatValue={formatMoney}
-            accent="green"
-            icon={TrendingUpIcon}
-            to="/finance"
-          />
-        </StaggerItem>
-        <StaggerItem>
-          <StatCard
-            title={t("dashboard.totalExpenses")}
-            value={formatMoney(stats.period_expenses)}
-            numericValue={toNumber(stats.period_expenses)}
-            formatValue={formatMoney}
-            accent="red"
-            icon={WalletIcon}
-          />
-        </StaggerItem>
-        <StaggerItem>
-          <StatCard
-            title={t("dashboard.netProfit")}
-            value={formatMoney(stats.net_profit)}
-            numericValue={toNumber(stats.net_profit)}
-            formatValue={formatMoney}
-            accent={toNumber(stats.net_profit) >= 0 ? "green" : "red"}
-            icon={BanknoteIcon}
-          />
-        </StaggerItem>
-        <StaggerItem>
-          <StatCard
-            title={t("dashboard.profitMargin")}
-            value={formatPercent(stats.profit_margin_pct)}
-            numericValue={stats.profit_margin_pct ?? 0}
-            formatValue={(n) => formatPercent(n)}
-            accent="violet"
-            icon={ScaleIcon}
-          />
-        </StaggerItem>
-      </StaggerContainer>
+        <StaggerContainer className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-6">
+          <StaggerItem>
+            <StatCard
+              size="compact"
+              title={t("dashboard.totalDebt")}
+              value={formatMoney(stats.total_debt)}
+              numericValue={toNumber(stats.total_debt)}
+              formatValue={formatMoney}
+              accent="red"
+              icon={AlertTriangleIcon}
+              to="/clients?debtors=1"
+            />
+          </StaggerItem>
+          <StaggerItem>
+            <StatCard
+              size="compact"
+              title={t("dashboard.monthlyRevenue")}
+              value={formatMoney(stats.monthly_revenue)}
+              numericValue={toNumber(stats.monthly_revenue)}
+              formatValue={formatMoney}
+              subtitle={periodRangeLabel}
+              change={stats.revenue_growth_pct}
+              changeLabel={t("dashboard.vsPrev")}
+              accent="green"
+              icon={TrendingUpIcon}
+            />
+          </StaggerItem>
+          <StaggerItem>
+            <StatCard
+              size="compact"
+              title={t("dashboard.monthlyPlan")}
+              value={formatMoney(stats.monthly_plan)}
+              numericValue={toNumber(stats.monthly_plan)}
+              formatValue={formatMoney}
+              subtitle={`${t("dashboard.planDone")}: ${planPercent}%`}
+              accent="amber"
+              icon={WalletIcon}
+            />
+          </StaggerItem>
+          <StaggerItem>
+            <StatCard
+              size="compact"
+              title={t("dashboard.cancelledAmount")}
+              value={formatMoney(stats.cancelled_amount)}
+              numericValue={toNumber(stats.cancelled_amount)}
+              formatValue={formatMoney}
+              subtitle={`${t("dashboard.cancelledContractsCount")}: ${stats.cancelled_contracts_count}`}
+              accent="amber"
+              icon={XCircleIcon}
+            />
+          </StaggerItem>
+          <StaggerItem>
+            <StatCard
+              size="compact"
+              title={t("dashboard.netProfit")}
+              value={formatMoney(stats.net_profit)}
+              numericValue={toNumber(stats.net_profit)}
+              formatValue={formatMoney}
+              accent={toNumber(stats.net_profit) >= 0 ? "green" : "red"}
+              icon={BanknoteIcon}
+            />
+          </StaggerItem>
+          <StaggerItem>
+            <StatCard
+              size="compact"
+              title={t("dashboard.profitMargin")}
+              value={formatPercent(stats.profit_margin_pct)}
+              numericValue={stats.profit_margin_pct ?? 0}
+              formatValue={(n) => formatPercent(n)}
+              accent="violet"
+              icon={ScaleIcon}
+            />
+          </StaggerItem>
+        </StaggerContainer>
+      </div>
 
       {/* ── Insights: services + expenses ── */}
       <section className="page-section">

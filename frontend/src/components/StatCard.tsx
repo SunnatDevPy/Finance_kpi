@@ -4,6 +4,8 @@ import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { AnimatedNumber } from "./AnimatedNumber";
 
+type StatCardSize = "compact" | "default" | "large";
+
 interface StatCardProps {
   title: string;
   value: string;
@@ -14,9 +16,41 @@ interface StatCardProps {
   change?: number | null;
   changeLabel?: string;
   icon?: LucideIcon;
+  size?: StatCardSize;
   /** Berilsa, karta bosiladigan qilinadi va shu yo'lga o'tkazadi. */
   to?: string;
 }
+
+const sizeStyles: Record<
+  StatCardSize,
+  { card: string; title: string; value: string; iconWrap: string; icon: string; meta: string }
+> = {
+  compact: {
+    card: "rounded-xl p-4",
+    title: "text-xs",
+    value: "mt-3 text-xl font-bold leading-none tracking-tight sm:text-[1.35rem]",
+    iconWrap: "size-8 rounded-lg",
+    icon: "size-4",
+    meta: "mt-2.5 gap-2",
+  },
+  default: {
+    card: "rounded-2xl p-6",
+    title: "text-sm",
+    value: "mt-5 text-[1.85rem] font-bold leading-none tracking-tight sm:text-[2rem]",
+    iconWrap: "size-10 rounded-xl",
+    icon: "size-5",
+    meta: "mt-4 gap-2.5",
+  },
+  large: {
+    card: "rounded-2xl p-6 sm:p-7",
+    title: "text-sm sm:text-[0.95rem]",
+    value:
+      "mt-4 text-[1.65rem] font-bold leading-none tracking-tight tabular-nums sm:text-[2.15rem] lg:text-[2.35rem]",
+    iconWrap: "size-11 rounded-xl",
+    icon: "size-5",
+    meta: "mt-4 gap-2.5",
+  },
+};
 
 const themes = {
   green: {
@@ -79,9 +113,11 @@ export function StatCard({
   change,
   changeLabel,
   icon: Icon,
+  size = "default",
   to,
 }: StatCardProps) {
   const th = themes[accent];
+  const sz = sizeStyles[size];
   const isUp = change != null && change >= 0;
   const chipClass = change == null ? "" : isUp ? th.chipUp : th.chipDown;
 
@@ -89,7 +125,8 @@ export function StatCard({
     <motion.div
       whileHover={{ y: -4, transition: { duration: 0.2, ease: [0.16, 1, 0.3, 1] } }}
       className={cn(
-        "group relative flex h-full flex-col overflow-hidden rounded-2xl border bg-gradient-to-br p-6 backdrop-blur-sm transition-shadow duration-300 hover:shadow-xl",
+        "group relative flex h-full flex-col overflow-hidden border bg-gradient-to-br backdrop-blur-sm transition-shadow duration-300 hover:shadow-xl",
+        sz.card,
         to && "cursor-pointer",
         th.card,
         th.glow,
@@ -101,24 +138,30 @@ export function StatCard({
         </Link>
       )}
       {/* Yuqori qator: sarlavha chapda, ikonka o'ng burchakda */}
-      <div className="flex items-start justify-between gap-4">
-        <p className="min-w-0 flex-1 text-sm font-medium leading-relaxed tracking-tight text-muted-foreground">
+      <div className="flex items-start justify-between gap-3">
+        <p
+          className={cn(
+            "min-w-0 flex-1 font-medium leading-relaxed tracking-tight text-muted-foreground",
+            sz.title,
+          )}
+        >
           {title}
         </p>
         {Icon && (
           <div
             className={cn(
-              "flex size-10 shrink-0 items-center justify-center rounded-xl border transition-transform duration-300 group-hover:scale-105",
+              "flex shrink-0 items-center justify-center border transition-transform duration-300 group-hover:scale-105",
+              sz.iconWrap,
               th.iconWrap,
             )}
           >
-            <Icon className="size-5" />
+            <Icon className={sz.icon} />
           </div>
         )}
       </div>
 
       {/* Asosiy qiymat — katta, ikonka ostidagi joyda */}
-      <p className="mt-5 text-[1.85rem] font-bold leading-none tracking-tight text-foreground sm:text-[2rem]">
+      <p className={cn("text-foreground", sz.value)}>
         {numericValue != null && formatValue ? (
           <AnimatedNumber value={numericValue} format={formatValue} />
         ) : (
@@ -128,7 +171,7 @@ export function StatCard({
 
       {/* Qo'shimcha matn / o'sish foizi */}
       {(change != null || subtitle) && (
-        <div className="mt-4 flex flex-wrap items-center gap-2.5">
+        <div className={cn("flex flex-wrap items-center", sz.meta)}>
           {change != null && (
             <span
               className={cn(
