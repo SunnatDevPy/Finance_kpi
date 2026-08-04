@@ -1,8 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ArrowDownIcon,
+  ArrowUpIcon,
   Building2Icon,
   CalendarIcon,
   CheckIcon,
+  ChevronsUpDownIcon,
   FileTextIcon,
   PencilIcon,
   RepeatIcon,
@@ -16,6 +19,7 @@ import { api } from "../api/client";
 import { DeleteIconBtn } from "../components/ButtonIcons";
 import { CompanyAvatar } from "../components/CompanyAvatar";
 import { Modal } from "../components/Modal";
+import { Pagination } from "../components/Pagination";
 import { ActiveStatusToggle } from "../components/ActiveStatusToggle";
 import { Input } from "@/components/ui/input";
 import {
@@ -29,7 +33,7 @@ import {
 } from "../components/PremiumDataTable";
 import { useI18n } from "../context/I18nContext";
 import type { ServiceType, ServiceTypeStats } from "../types";
-import { formatDateWithWeekday, formatMoney } from "../utils/format";
+import { formatDateWithWeekday, formatMoney, toNumber } from "../utils/format";
 import { Button, MotionButton, motionTap } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -41,6 +45,52 @@ interface ServiceTypeDetailModalProps {
   onSetActive: (item: ServiceType, active: boolean) => void;
   onRename: (item: ServiceType, name: string) => Promise<void>;
   onDelete: (id: number) => void;
+}
+
+type TopClientSortKey = "company_name" | "usage_count" | "total_amount";
+type SortOrder = "asc" | "desc";
+
+function SortableTableHead({
+  label,
+  column,
+  activeColumn,
+  order,
+  onSort,
+  className,
+}: {
+  label: string;
+  column: TopClientSortKey;
+  activeColumn: TopClientSortKey;
+  order: SortOrder;
+  onSort: (column: TopClientSortKey) => void;
+  className?: string;
+}) {
+  const active = column === activeColumn;
+
+  return (
+    <TableHead className={className}>
+      <button
+        type="button"
+        className={cn(
+          "inline-flex items-center gap-1 font-medium text-muted-foreground transition-colors hover:text-foreground",
+          className?.includes("text-right") && "ml-auto",
+        )}
+        onClick={() => onSort(column)}
+        aria-sort={active ? (order === "asc" ? "ascending" : "descending") : "none"}
+      >
+        <span>{label}</span>
+        {active ? (
+          order === "asc" ? (
+            <ArrowUpIcon className="size-3.5 shrink-0" aria-hidden />
+          ) : (
+            <ArrowDownIcon className="size-3.5 shrink-0" aria-hidden />
+          )
+        ) : (
+          <ChevronsUpDownIcon className="size-3.5 shrink-0 opacity-40" aria-hidden />
+        )}
+      </button>
+    </TableHead>
+  );
 }
 
 function StatTile({
@@ -90,6 +140,10 @@ export function ServiceTypeDetailModal({
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [savingName, setSavingName] = useState(false);
+  const [topClientsPage, setTopClientsPage] = useState(1);
+  const [topClientsPageSize, setTopClientsPageSize] = useState(10);
+  const [topClientsSortKey, setTopClientsSortKey] = useState<TopClientSortKey>("total_amount");
+  const [topClientsSortOrder, setTopClientsSortOrder] = useState<SortOrder>("desc");
   const statsCacheRef = useRef<Map<number, ServiceTypeStats>>(new Map());
   const activeItemIdRef = useRef<number | null>(null);
 
@@ -130,6 +184,49 @@ export function ServiceTypeDetailModal({
       cancelled = true;
     };
   }, [open, item?.id]);
+
+  useEffect(() => {
+    if (!open) return;
+    setTopClientsPage(1);
+    setTopClientsSortKey("total_amount");
+    setTopClientsSortOrder("desc");
+  }, [open, item?.id]);
+
+  const topClients = useMemo(() => {
+    if (!item || !stats || stats.service_type_id !== item.id) return [];
+    return stats.top_clients;
+  }, [item, stats]);
+
+  const sortedTopClients = useMemo(() => {
+    const next = [...topClients];
+    next.sort((a, b) => {
+      let cmp = 0;
+      if (topClientsSortKey === "company_name") {
+        cmp = a.company_name.localeCompare(b.company_name, "uz");
+      } else if (topClientsSortKey === "usage_count") {
+        cmp = a.usage_count - b.usage_count;
+      } else {
+        cmp = toNumber(a.total_amount) - toNumber(b.total_amount);
+      }
+      return topClientsSortOrder === "asc" ? cmp : -cmp;
+    });
+    return next;
+  }, [topClients, topClientsSortKey, topClientsSortOrder]);
+
+  const paginatedTopClients = useMemo(() => {
+    const start = (topClientsPage - 1) * topClientsPageSize;
+    return sortedTopClients.slice(start, start + topClientsPageSize);
+  }, [sortedTopClients, topClientsPage, topClientsPageSize]);
+
+  const handleTopClientsSort = (column: TopClientSortKey) => {
+    if (topClientsSortKey === column) {
+      setTopClientsSortOrder((order) => (order === "asc" ? "desc" : "asc"));
+    } else {
+      setTopClientsSortKey(column);
+      setTopClientsSortOrder(column === "company_name" ? "asc" : "desc");
+    }
+    setTopClientsPage(1);
+  };
 
   if (!item) return null;
 
@@ -292,19 +389,52 @@ export function ServiceTypeDetailModal({
                   <p className="text-xs text-muted-foreground">{t("services.topClientsDesc")}</p>
                 </div>
                 <PremiumDataTable
-                  empty={displayStats.top_clients.length === 0}
+                  empty={sortedTopClients.length === 0}
                   emptyMessage={t("services.noUsage")}
                   skeletonCols={3}
+                  footer={
+                    <Pagination
+                      embedded
+                      page={topClientsPage}
+                      pageSize={topClientsPageSize}
+                      total={sortedTopClients.length}
+                      pageSizeOptions={[10, 20, 50]}
+                      onPageChange={setTopClientsPage}
+                      onPageSizeChange={(size) => {
+                        setTopClientsPageSize(size);
+                        setTopClientsPage(1);
+                      }}
+                    />
+                  }
                 >
                   <TableHeader>
                     <TableRow>
-                      <TableHead>{t("contracts.client")}</TableHead>
-                      <TableHead>{t("services.usageCount")}</TableHead>
-                      <TableHead className="text-right">{t("services.revenueShort")}</TableHead>
+                      <SortableTableHead
+                        label={t("contracts.client")}
+                        column="company_name"
+                        activeColumn={topClientsSortKey}
+                        order={topClientsSortOrder}
+                        onSort={handleTopClientsSort}
+                      />
+                      <SortableTableHead
+                        label={t("services.usageCount")}
+                        column="usage_count"
+                        activeColumn={topClientsSortKey}
+                        order={topClientsSortOrder}
+                        onSort={handleTopClientsSort}
+                      />
+                      <SortableTableHead
+                        label={t("services.revenueShort")}
+                        column="total_amount"
+                        activeColumn={topClientsSortKey}
+                        order={topClientsSortOrder}
+                        onSort={handleTopClientsSort}
+                        className="text-right"
+                      />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {displayStats.top_clients.map((client) => (
+                    {paginatedTopClients.map((client) => (
                       <TableRow key={client.client_id}>
                         <TableCellPrimary>
                           <span className="flex items-center gap-2">
