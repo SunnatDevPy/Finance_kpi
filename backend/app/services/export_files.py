@@ -37,14 +37,19 @@ def build_xlsx(title: str, headers: list[str], rows: list[list[str]]) -> BytesIO
     return buffer
 
 
-def build_client_card_xlsx(
-    company_name: str,
-    sheets: list[tuple[str, list[str], list[list[str]]]],
-) -> BytesIO:
+def build_multi_sheet_xlsx(sheets: list[tuple[str, list[str], list[list[str]]]]) -> BytesIO:
     wb = Workbook()
     wb.remove(wb.active)
+    used_titles: set[str] = set()
     for index, (title, headers, rows) in enumerate(sheets):
-        ws = wb.create_sheet(title=title[:31], index=index)
+        sheet_title = title[:31]
+        suffix = 2
+        while sheet_title in used_titles:
+            sheet_title = f"{title[: 31 - len(str(suffix)) - 1]}_{suffix}"
+            suffix += 1
+        used_titles.add(sheet_title)
+
+        ws = wb.create_sheet(title=sheet_title, index=index)
         ws.append(headers)
         for cell in ws[1]:
             cell.font = Font(bold=True)
@@ -62,6 +67,17 @@ def build_client_card_xlsx(
     wb.save(buffer)
     buffer.seek(0)
     return buffer
+
+
+def build_client_card_xlsx(
+    company_name: str,
+    sheets: list[tuple[str, list[str], list[list[str]]]],
+) -> BytesIO:
+    return build_multi_sheet_xlsx(sheets)
+
+
+def build_full_export_xlsx(sheets: list[tuple[str, list[str], list[list[str]]]]) -> BytesIO:
+    return build_multi_sheet_xlsx(sheets)
 
 
 def build_pdf(title: str, headers: list[str], rows: list[list[str]]) -> BytesIO:
