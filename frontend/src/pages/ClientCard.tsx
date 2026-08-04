@@ -522,21 +522,9 @@ export function ClientCardPage() {
     }
   });
 
-  if (error && !card) {
-    return <PageError message={error} />;
-  }
-
-  if (!card) {
-    return (
-      <div className="flex h-48 items-center justify-center">
-        <div className="size-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
-  }
-
   const contractById = useMemo(
-    () => new Map(card.contracts.map((contract) => [contract.id, contract])),
-    [card.contracts],
+    () => new Map((card?.contracts ?? []).map((contract) => [contract.id, contract])),
+    [card?.contracts],
   );
   const sortedPayments = useMemo(
     () => [...payments].sort((a, b) => b.paid_at.localeCompare(a.paid_at)),
@@ -548,8 +536,20 @@ export function ClientCardPage() {
   }, [sortedPayments, paymentsPage, paymentsPageSize]);
   const paginatedContracts = useMemo(() => {
     const start = (contractsPage - 1) * contractsPageSize;
-    return card.contracts.slice(start, start + contractsPageSize);
-  }, [card.contracts, contractsPage, contractsPageSize]);
+    return (card?.contracts ?? []).slice(start, start + contractsPageSize);
+  }, [card?.contracts, contractsPage, contractsPageSize]);
+
+  if (error && !card) {
+    return <PageError message={error} />;
+  }
+
+  if (!card) {
+    return (
+      <div className="flex h-48 items-center justify-center">
+        <div className="size-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <PageShell>
