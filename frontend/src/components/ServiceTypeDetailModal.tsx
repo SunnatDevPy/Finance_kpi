@@ -1,11 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowDownIcon,
-  ArrowUpIcon,
   Building2Icon,
   CalendarIcon,
   CheckIcon,
-  ChevronsUpDownIcon,
   FileTextIcon,
   PencilIcon,
   RepeatIcon,
@@ -20,6 +17,8 @@ import { DeleteIconBtn } from "../components/ButtonIcons";
 import { CompanyAvatar } from "../components/CompanyAvatar";
 import { Modal } from "../components/Modal";
 import { Pagination } from "../components/Pagination";
+import { SortableTableHead } from "@/components/SortableTableHead";
+import type { TableSortOrder } from "@/components/SortableTableHead";
 import { ActiveStatusToggle } from "../components/ActiveStatusToggle";
 import { Input } from "@/components/ui/input";
 import {
@@ -27,7 +26,6 @@ import {
   TableBody,
   TableCellMuted,
   TableCellPrimary,
-  TableHead,
   TableHeader,
   TableRow,
 } from "../components/PremiumDataTable";
@@ -48,50 +46,6 @@ interface ServiceTypeDetailModalProps {
 }
 
 type TopClientSortKey = "company_name" | "usage_count" | "total_amount";
-type SortOrder = "asc" | "desc";
-
-function SortableTableHead({
-  label,
-  column,
-  activeColumn,
-  order,
-  onSort,
-  className,
-}: {
-  label: string;
-  column: TopClientSortKey;
-  activeColumn: TopClientSortKey;
-  order: SortOrder;
-  onSort: (column: TopClientSortKey) => void;
-  className?: string;
-}) {
-  const active = column === activeColumn;
-
-  return (
-    <TableHead className={className}>
-      <button
-        type="button"
-        className={cn(
-          "inline-flex items-center gap-1 font-medium text-muted-foreground transition-colors hover:text-foreground",
-          className?.includes("text-right") && "ml-auto",
-        )}
-        onClick={() => onSort(column)}
-        aria-sort={active ? (order === "asc" ? "ascending" : "descending") : "none"}
-      >
-        <span>{label}</span>
-        {active ? (
-          order === "asc" ? (
-            <ArrowUpIcon className="size-3.5 shrink-0" aria-hidden />
-          ) : (
-            <ArrowDownIcon className="size-3.5 shrink-0" aria-hidden />
-          )
-        ) : (
-          <ChevronsUpDownIcon className="size-3.5 shrink-0 opacity-40" aria-hidden />
-        )}
-      </button>
-    </TableHead>
-  );
-}
 
 function StatTile({
   title,
@@ -143,7 +97,7 @@ export function ServiceTypeDetailModal({
   const [topClientsPage, setTopClientsPage] = useState(1);
   const [topClientsPageSize, setTopClientsPageSize] = useState(10);
   const [topClientsSortKey, setTopClientsSortKey] = useState<TopClientSortKey>("total_amount");
-  const [topClientsSortOrder, setTopClientsSortOrder] = useState<SortOrder>("desc");
+  const [topClientsSortOrder, setTopClientsSortOrder] = useState<TableSortOrder>("desc");
   const statsCacheRef = useRef<Map<number, ServiceTypeStats>>(new Map());
   const activeItemIdRef = useRef<number | null>(null);
 

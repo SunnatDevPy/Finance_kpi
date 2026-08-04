@@ -47,6 +47,44 @@ def test_finance_ledger_manual_income_expense_before_2027(
     assert Decimal(data["net_balance"]) == Decimal("500000.00")
 
 
+def test_finance_ledger_sort_by_amount(client, auth_headers, sample_contract):
+    client.post(
+        "/api/v1/incomes",
+        headers=auth_headers,
+        json={
+            "category": "sale",
+            "title": "Small sale",
+            "amount": "100000.00",
+            "income_date": "2026-05-01",
+        },
+    )
+    client.post(
+        "/api/v1/incomes",
+        headers=auth_headers,
+        json={
+            "category": "sale",
+            "title": "Large sale",
+            "amount": "900000.00",
+            "income_date": "2026-05-02",
+        },
+    )
+
+    response = client.get(
+        "/api/v1/finance/ledger",
+        headers=auth_headers,
+        params={
+            "type": "income",
+            "date_from": "2026-05-01",
+            "date_to": "2026-05-31",
+            "sort_by": "amount",
+            "sort_order": "desc",
+        },
+    )
+    assert response.status_code == 200
+    amounts = [item["amount"] for item in response.json()["items"]]
+    assert amounts == ["900000.00", "100000.00"]
+
+
 def test_finance_ledger_includes_payments_from_2027(client, auth_headers, sample_contract):
     client.post(
         "/api/v1/payments",

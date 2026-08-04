@@ -25,6 +25,7 @@ from app.services.finance import (
 )
 from app.services.finance_import import build_finance_import_template, import_finance_from_xlsx
 from app.services.finance_period import FinancePeriod
+from app.services.list_sort import FinanceLedgerSortBy, SortOrder
 
 router = APIRouter(prefix="/finance", dependencies=[Depends(get_current_user)])
 
@@ -38,6 +39,8 @@ def finance_ledger(
     date_to: date | None = Query(default=None),
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=20, ge=1, le=200),
+    sort_by: FinanceLedgerSortBy | None = Query(default=None),
+    sort_order: SortOrder = Query(default="desc"),
 ) -> FinanceLedgerPage:
     return get_finance_ledger(
         db,
@@ -47,6 +50,8 @@ def finance_ledger(
         search=search,
         skip=skip,
         limit=limit,
+        sort_by=sort_by,
+        sort_order=sort_order,
     )
 
 

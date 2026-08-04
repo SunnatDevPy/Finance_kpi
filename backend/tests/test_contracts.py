@@ -30,6 +30,16 @@ def test_list_contracts(client, auth_headers, sample_contract):
     assert data["items"][0]["id"] == sample_contract.id
 
 
+def test_list_contracts_sort_by_client(client, auth_headers, sample_contract):
+    response = client.get(
+        "/api/v1/contracts",
+        headers=auth_headers,
+        params={"sort_by": "client", "sort_order": "asc"},
+    )
+    assert response.status_code == 200
+    assert response.json()["total"] == 1
+
+
 def test_list_contracts_service_type_filter(
     client, auth_headers, sample_client, sample_service_type, db_session
 ):

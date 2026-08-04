@@ -27,6 +27,7 @@ import { PageHeader, PageShell } from "../components/PageHeader";
 import { TableColumnPicker } from "../components/TableColumnPicker";
 import { usePickerColumns } from "../hooks/usePickerColumns";
 import { Pagination } from "../components/Pagination";
+import { SortableTableHead } from "@/components/SortableTableHead";
 import { StaggerContainer, StaggerItem } from "../components/Stagger";
 import { StatCard } from "../components/StatCard";
 import {
@@ -96,6 +97,7 @@ import type {
   Payment,
 } from "../types";
 import { usePersistedState } from "../hooks/usePersistedState";
+import { useTableSort } from "@/hooks/useTableSort";
 import { EXPENSE_CATEGORIES, expenseCategoryLabel } from "../utils/expenseCategory";
 import { INCOME_CATEGORIES, incomeCategoryLabel } from "../utils/incomeCategory";
 import {
@@ -134,6 +136,7 @@ const FINANCE_OPTIONAL_COLUMNS = [
 ] as const;
 
 type FinanceOptionalColumn = (typeof FINANCE_OPTIONAL_COLUMNS)[number]["id"];
+type FinanceSortKey = "date" | "type" | "category" | "amount" | "note";
 
 type EntryKind = "income" | "expense";
 
@@ -197,6 +200,12 @@ export function FinancePage() {
   const [error, setError] = useState("");
   const { loading, start, finish } = useListLoading();
   const { submitting, guard } = useSubmitGuard();
+  const { sortBy, sortOrder, handleSort } = useTableSort<FinanceSortKey>(
+    "wtma.finance.sort",
+    "date",
+    "desc",
+    ["type", "category", "note"],
+  );
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<FinanceLedgerItem | null>(null);
@@ -327,6 +336,8 @@ export function FinancePage() {
         date_to: dateTo || undefined,
         skip: (page - 1) * pageSize,
         limit: pageSize,
+        sort_by: sortBy,
+        sort_order: sortOrder,
       })
       .then((data) => {
         setItems(data.items);
@@ -352,13 +363,13 @@ export function FinancePage() {
 
   useEffect(() => {
     setPage(1);
-  }, [entryType, dateFrom, dateTo, search]);
+  }, [entryType, dateFrom, dateTo, search, sortBy, sortOrder]);
 
   useEffect(() => {
     const timer = window.setTimeout(load, 300);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entryType, dateFrom, dateTo, search, page, pageSize]);
+  }, [entryType, dateFrom, dateTo, search, page, pageSize, sortBy, sortOrder]);
 
   const openCreate = (kind: EntryKind) => {
     setEditing(null);
@@ -755,11 +766,49 @@ export function FinancePage() {
           >
             <TableHeader>
               <TableRow>
-                <TableHead>{t("common.date")}</TableHead>
-                {isVisible("type") && <TableHead>{t("finance.typeIncome")}</TableHead>}
-                {isVisible("category") && <TableHead>{t("finance.category")}</TableHead>}
-                {isVisible("amount") && <TableHead>{t("common.amount")}</TableHead>}
-                {isVisible("note") && <TableHead>{t("common.note")}</TableHead>}
+                <SortableTableHead
+                  label={t("common.date")}
+                  column="date"
+                  activeColumn={sortBy}
+                  order={sortOrder}
+                  onSort={handleSort}
+                />
+                {isVisible("type") && (
+                  <SortableTableHead
+                    label={t("finance.typeIncome")}
+                    column="type"
+                    activeColumn={sortBy}
+                    order={sortOrder}
+                    onSort={handleSort}
+                  />
+                )}
+                {isVisible("category") && (
+                  <SortableTableHead
+                    label={t("finance.category")}
+                    column="category"
+                    activeColumn={sortBy}
+                    order={sortOrder}
+                    onSort={handleSort}
+                  />
+                )}
+                {isVisible("amount") && (
+                  <SortableTableHead
+                    label={t("common.amount")}
+                    column="amount"
+                    activeColumn={sortBy}
+                    order={sortOrder}
+                    onSort={handleSort}
+                  />
+                )}
+                {isVisible("note") && (
+                  <SortableTableHead
+                    label={t("common.note")}
+                    column="note"
+                    activeColumn={sortBy}
+                    order={sortOrder}
+                    onSort={handleSort}
+                  />
+                )}
                 <TableHead className="text-right">{t("common.actions")}</TableHead>
               </TableRow>
             </TableHeader>

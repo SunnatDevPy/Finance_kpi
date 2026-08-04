@@ -27,6 +27,7 @@ from app.services.finance_period import (
     resolve_all_years_span,
     resolve_finance_period,
 )
+from app.services.list_sort import FinanceLedgerSortBy, SortOrder, sort_finance_ledger_items
 
 
 def _compute_turnover_for_dates(
@@ -74,6 +75,8 @@ def get_finance_ledger(
     search: str | None = None,
     skip: int = 0,
     limit: int = 20,
+    sort_by: FinanceLedgerSortBy | None = None,
+    sort_order: SortOrder = "desc",
 ) -> FinanceLedgerPage:
     """Income (kirim) + Expense (chiqim) birlashgan ko'rinish.
     Shartnoma to'lovlari faqat sozlamadagi yildan boshlab qo'shiladi."""
@@ -168,7 +171,7 @@ def get_finance_ledger(
                 )
             )
 
-    items.sort(key=lambda item: (item.date, item.id), reverse=True)
+    sort_finance_ledger_items(items, sort_by=sort_by, sort_order=sort_order)
 
     total_income = sum((item.amount for item in items if item.amount > 0), Decimal("0"))
     total_expense = sum((-item.amount for item in items if item.amount < 0), Decimal("0"))

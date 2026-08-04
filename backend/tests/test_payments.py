@@ -53,6 +53,27 @@ def test_list_payments(client, auth_headers, sample_contract):
     assert data["items"][0]["company_name"] == "Acme LLC"
 
 
+def test_list_payments_sort_by_amount(client, auth_headers, sample_contract):
+    create = client.post(
+        "/api/v1/payments",
+        headers=auth_headers,
+        json={
+            "contract_id": sample_contract.id,
+            "amount": "100000.00",
+            "paid_at": "2026-02-01",
+        },
+    )
+    assert create.status_code == 201
+
+    response = client.get(
+        "/api/v1/payments",
+        headers=auth_headers,
+        params={"sort_by": "amount", "sort_order": "desc"},
+    )
+    assert response.status_code == 200
+    assert response.json()["total"] == 1
+
+
 def test_update_payment(client, auth_headers, sample_contract):
     create = client.post(
         "/api/v1/payments",

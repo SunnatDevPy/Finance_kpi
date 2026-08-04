@@ -476,6 +476,8 @@ export const api = {
       hasDebt?: boolean;
       skip?: number;
       limit?: number;
+      sort_by?: "client" | "period" | "total" | "paid" | "debt" | "invoice" | "state";
+      sort_order?: "asc" | "desc";
     }) => {
       const q = new URLSearchParams();
       if (params?.clientId) q.set("client_id", String(params.clientId));
@@ -488,6 +490,8 @@ export const api = {
       if (params?.hasDebt !== undefined) q.set("has_debt", params.hasDebt ? "true" : "false");
       if (params?.skip !== undefined) q.set("skip", String(params.skip));
       if (params?.limit !== undefined) q.set("limit", String(params.limit));
+      if (params?.sort_by) q.set("sort_by", params.sort_by);
+      if (params?.sort_order) q.set("sort_order", params.sort_order);
       const qs = q.toString();
       return request<Paginated<Contract>>(`/contracts${qs ? `?${qs}` : ""}`);
     },
@@ -585,6 +589,8 @@ export const api = {
       search?: string;
       skip?: number;
       limit?: number;
+      sort_by?: "date" | "client" | "contract" | "amount" | "note";
+      sort_order?: "asc" | "desc";
     }) => {
       const q = new URLSearchParams();
       if (params?.contractId) q.set("contract_id", String(params.contractId));
@@ -593,6 +599,8 @@ export const api = {
       if (params?.search) q.set("search", params.search);
       if (params?.skip !== undefined) q.set("skip", String(params.skip));
       if (params?.limit !== undefined) q.set("limit", String(params.limit));
+      if (params?.sort_by) q.set("sort_by", params.sort_by);
+      if (params?.sort_order) q.set("sort_order", params.sort_order);
       const qs = q.toString();
       return request<PaymentsPaginated>(`/payments${qs ? `?${qs}` : ""}`);
     },
@@ -747,6 +755,8 @@ export const api = {
       date_to?: string;
       skip?: number;
       limit?: number;
+      sort_by?: "date" | "type" | "category" | "amount" | "note";
+      sort_order?: "asc" | "desc";
     }) => {
       const q = new URLSearchParams();
       if (params?.type) q.set("type", params.type);
@@ -755,6 +765,8 @@ export const api = {
       if (params?.date_to) q.set("date_to", params.date_to);
       if (params?.skip !== undefined) q.set("skip", String(params.skip));
       if (params?.limit !== undefined) q.set("limit", String(params.limit));
+      if (params?.sort_by) q.set("sort_by", params.sort_by);
+      if (params?.sort_order) q.set("sort_order", params.sort_order);
       const qs = q.toString();
       return request<FinanceLedgerPage>(`/finance/ledger${qs ? `?${qs}` : ""}`);
     },

@@ -80,8 +80,10 @@ import { useSubmitGuard } from "../hooks/useSubmitGuard";
 import { formatDate, formatMoney, formatWeekday, toNumber, toWholeAmountDigits } from "../utils/format";
 import { PageHeader, PageShell } from "../components/PageHeader";
 import { TableColumnPicker } from "../components/TableColumnPicker";
+import { SortableTableHead } from "@/components/SortableTableHead";
 import { usePickerColumns } from "../hooks/usePickerColumns";
 import { usePersistedState } from "../hooks/usePersistedState";
+import { useTableSort } from "@/hooks/useTableSort";
 
 const CONTRACT_OPTIONAL_COLUMNS = [
   { id: "period", labelKey: "contracts.period", defaultVisible: true },
@@ -94,6 +96,7 @@ const CONTRACT_OPTIONAL_COLUMNS = [
 ] as const;
 
 type ContractOptionalColumn = (typeof CONTRACT_OPTIONAL_COLUMNS)[number]["id"];
+type ContractSortKey = "client" | "period" | "total" | "paid" | "debt" | "invoice" | "state";
 
 const formReveal = {
   hidden: { opacity: 0 },
@@ -156,6 +159,12 @@ export function ContractsPage() {
     next: string;
   } | null>(null);
   const [paymentTarget, setPaymentTarget] = useState<QuickPaymentTarget | null>(null);
+  const { sortBy, sortOrder, handleSort } = useTableSort<ContractSortKey>(
+    "wtma.contracts.sort",
+    "period",
+    "desc",
+    ["client", "invoice"],
+  );
 
   const [form, setForm] = useState({
     client_id: "",
@@ -181,6 +190,8 @@ export function ContractsPage() {
         serviceTypeId:
           serviceTypeFilter === "all" ? undefined : parseInt(serviceTypeFilter, 10),
         debtFilter: debtFilter === "all" ? undefined : debtFilter,
+        sort_by: sortBy,
+        sort_order: sortOrder,
       }),
       api.clients.list({ limit: 1000 }),
       api.serviceTypes.list(true),
@@ -205,7 +216,7 @@ export function ContractsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, exportDateFrom, exportDateTo, statusFilter, serviceTypeFilter, debtFilter]);
+  }, [search, exportDateFrom, exportDateTo, statusFilter, serviceTypeFilter, debtFilter, sortBy, sortOrder]);
 
   useEffect(() => {
     if (searchParams.get("has_debt") === "1") {
@@ -216,7 +227,7 @@ export function ContractsPage() {
   useEffect(() => {
     const timer = window.setTimeout(load, 300);
     return () => window.clearTimeout(timer);
-  }, [page, pageSize, search, exportDateFrom, exportDateTo, statusFilter, serviceTypeFilter, debtFilter]);
+  }, [page, pageSize, search, exportDateFrom, exportDateTo, statusFilter, serviceTypeFilter, debtFilter, sortBy, sortOrder]);
 
   const clientName = (id: number) =>
     clients.find((c) => c.id === id)?.company_name || `#${id}`;
@@ -611,14 +622,89 @@ export function ContractsPage() {
                     aria-label={t("common.selectAll")}
                   />
                 </TableHead>
-                <TableHead>{t("contracts.client")}</TableHead>
-                {isVisible("period") && <TableHead>{t("contracts.period")}</TableHead>}
-                {isVisible("total") && <TableHead>{t("common.total")}</TableHead>}
-                {isVisible("paid") && <TableHead>{t("common.paid")}</TableHead>}
-                {isVisible("debt") && <TableHead>{t("common.debt")}</TableHead>}
+                <SortableTableHead
+                  label={t("contracts.client")}
+                  column="client"
+                  activeColumn={sortBy}
+                  order={sortOrder}
+                  onSort={(column) => {
+                    handleSort(column);
+                    setPage(1);
+                  }}
+                />
+                {isVisible("period") && (
+                  <SortableTableHead
+                    label={t("contracts.period")}
+                    column="period"
+                    activeColumn={sortBy}
+                    order={sortOrder}
+                    onSort={(column) => {
+                      handleSort(column);
+                      setPage(1);
+                    }}
+                  />
+                )}
+                {isVisible("total") && (
+                  <SortableTableHead
+                    label={t("common.total")}
+                    column="total"
+                    activeColumn={sortBy}
+                    order={sortOrder}
+                    onSort={(column) => {
+                      handleSort(column);
+                      setPage(1);
+                    }}
+                  />
+                )}
+                {isVisible("paid") && (
+                  <SortableTableHead
+                    label={t("common.paid")}
+                    column="paid"
+                    activeColumn={sortBy}
+                    order={sortOrder}
+                    onSort={(column) => {
+                      handleSort(column);
+                      setPage(1);
+                    }}
+                  />
+                )}
+                {isVisible("debt") && (
+                  <SortableTableHead
+                    label={t("common.debt")}
+                    column="debt"
+                    activeColumn={sortBy}
+                    order={sortOrder}
+                    onSort={(column) => {
+                      handleSort(column);
+                      setPage(1);
+                    }}
+                  />
+                )}
                 {isVisible("services") && <TableHead>{t("contracts.services")}</TableHead>}
-                {isVisible("invoice") && <TableHead>{t("contracts.invoiceNumber")}</TableHead>}
-                {isVisible("state") && <TableHead>{t("contracts.state")}</TableHead>}
+                {isVisible("invoice") && (
+                  <SortableTableHead
+                    label={t("contracts.invoiceNumber")}
+                    column="invoice"
+                    activeColumn={sortBy}
+                    order={sortOrder}
+                    onSort={(column) => {
+                      handleSort(column);
+                      setPage(1);
+                    }}
+                  />
+                )}
+                {isVisible("state") && (
+                  <SortableTableHead
+                    label={t("contracts.state")}
+                    column="state"
+                    activeColumn={sortBy}
+                    order={sortOrder}
+                    onSort={(column) => {
+                      handleSort(column);
+                      setPage(1);
+                    }}
+                  />
+                )}
                 <TableHead className="text-right">{t("common.actions")}</TableHead>
               </TableRow>
             </TableHeader>

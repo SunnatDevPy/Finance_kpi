@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import get_current_user, require_admin
 from app.database import get_db
-from app.models import AuditAction, Client, Contract, ContractLineItem, ContractWorkflowStatus, User
+from app.models import AuditAction, Client, Contract, ContractLineItem, ContractWorkflowStatus, Payment, User
 from app.schemas.audit import AuditLogPage, AuditLogRead
 from app.schemas.contract import (
     ContractCreate,
@@ -45,6 +45,7 @@ from app.services.helpers import (
     get_service_type_or_404,
     validate_line_items,
 )
+from app.services.list_sort import ContractSortBy, SortOrder, contract_list_order_by
 from app.services.purge import purge_contract
 
 router = APIRouter(prefix="/contracts", dependencies=[Depends(get_current_user)])
@@ -70,9 +71,11 @@ def list_contracts(
     has_debt: bool | None = Query(default=None),
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=20, ge=1, le=200),
+    sort_by: ContractSortBy | None = Query(default=None),
+    sort_order: SortOrder = Query(default="desc"),
 ) -> Page[ContractRead]:
     filters = [Contract.deleted_at.is_(None)]
-    join_client = False
+    join_client = sort_by == "client"
     if client_id is not None:
         filters.append(Contract.client_id == client_id)
     if status is not None:
@@ -112,9 +115,10 @@ def list_contracts(
         count_stmt = count_stmt.join(Contract.client)
     total = db.scalar(count_stmt) or 0
 
-    stmt = _contracts_query().where(*filters).order_by(Contract.start_date.desc())
+    stmt = _contracts_query().where(*filters)
     if join_client:
         stmt = stmt.join(Contract.client)
+    stmt = stmt.order_by(*contract_list_order_by(sort_by, sort_order))
     contracts = list(db.scalars(stmt.offset(skip).limit(limit)).all())
 
     return Page(

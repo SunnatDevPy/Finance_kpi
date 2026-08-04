@@ -11,9 +11,11 @@ import { Modal } from "../components/Modal";
 import { PageError } from "../components/PageError";
 import { Pagination } from "../components/Pagination";
 import { TableColumnPicker } from "../components/TableColumnPicker";
+import { SortableTableHead } from "@/components/SortableTableHead";
 import { useListLoading } from "../hooks/useListLoading";
 import { usePickerColumns } from "../hooks/usePickerColumns";
 import { usePersistedState } from "../hooks/usePersistedState";
+import { useTableSort } from "@/hooks/useTableSort";
 import { useRowSelection } from "../hooks/useRowSelection";
 import { useSubmitGuard } from "../hooks/useSubmitGuard";
 import {
@@ -60,6 +62,7 @@ const PAYMENT_OPTIONAL_COLUMNS = [
 ] as const;
 
 type PaymentOptionalColumn = (typeof PAYMENT_OPTIONAL_COLUMNS)[number]["id"];
+type PaymentSortKey = "date" | "client" | "contract" | "amount" | "note";
 
 export function PaymentsPage() {
   const { t } = useI18n();
@@ -95,6 +98,12 @@ export function PaymentsPage() {
     note: "",
   });
   const { submitting: paySubmitting, guard: guardPay } = useSubmitGuard();
+  const { sortBy, sortOrder, handleSort } = useTableSort<PaymentSortKey>(
+    "wtma.payments.sort",
+    "date",
+    "desc",
+    ["client", "contract", "note"],
+  );
 
   const clientOptions = useMemo(
     () =>
@@ -122,6 +131,8 @@ export function PaymentsPage() {
         search: search || undefined,
         skip: (page - 1) * pageSize,
         limit: pageSize,
+        sort_by: sortBy,
+        sort_order: sortOrder,
       })
       .then((data) => {
         setPayments(data.items);
@@ -134,12 +145,12 @@ export function PaymentsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [dateFrom, dateTo, search]);
+  }, [dateFrom, dateTo, search, sortBy, sortOrder]);
 
   useEffect(() => {
     const timer = window.setTimeout(load, 300);
     return () => window.clearTimeout(timer);
-  }, [dateFrom, dateTo, search, page, pageSize]);
+  }, [dateFrom, dateTo, search, page, pageSize, sortBy, sortOrder]);
 
   const handleDelete = guardDelete(async () => {
     if (!deleteId) return;
@@ -325,11 +336,47 @@ export function PaymentsPage() {
                     aria-label={t("common.selectAll")}
                   />
                 </TableHead>
-                <TableHead>{t("common.date")}</TableHead>
-                <TableHead>{t("payments.client")}</TableHead>
-                {isVisible("contract") && <TableHead>{t("common.contract")}</TableHead>}
-                {isVisible("amount") && <TableHead>{t("common.amount")}</TableHead>}
-                {isVisible("note") && <TableHead>{t("common.note")}</TableHead>}
+                <SortableTableHead
+                  label={t("common.date")}
+                  column="date"
+                  activeColumn={sortBy}
+                  order={sortOrder}
+                  onSort={handleSort}
+                />
+                <SortableTableHead
+                  label={t("payments.client")}
+                  column="client"
+                  activeColumn={sortBy}
+                  order={sortOrder}
+                  onSort={handleSort}
+                />
+                {isVisible("contract") && (
+                  <SortableTableHead
+                    label={t("common.contract")}
+                    column="contract"
+                    activeColumn={sortBy}
+                    order={sortOrder}
+                    onSort={handleSort}
+                  />
+                )}
+                {isVisible("amount") && (
+                  <SortableTableHead
+                    label={t("common.amount")}
+                    column="amount"
+                    activeColumn={sortBy}
+                    order={sortOrder}
+                    onSort={handleSort}
+                  />
+                )}
+                {isVisible("note") && (
+                  <SortableTableHead
+                    label={t("common.note")}
+                    column="note"
+                    activeColumn={sortBy}
+                    order={sortOrder}
+                    onSort={handleSort}
+                  />
+                )}
                 <TableHead className="text-right">{t("common.actions")}</TableHead>
               </TableRow>
             </TableHeader>

@@ -12,6 +12,7 @@ from app.schemas.payment import PaymentCreate, PaymentListRead, PaymentRead, Pay
 from app.services.audit import diff_fields, record_audit
 from app.services.contract_status import sync_status_after_payment
 from app.services.purge import purge_payment
+from app.services.list_sort import PaymentSortBy, SortOrder, payment_list_order_by
 from app.services.helpers import get_contract_or_404, get_payment_or_404
 
 router = APIRouter(prefix="/payments", dependencies=[Depends(get_current_user)])
@@ -40,6 +41,8 @@ def list_payments(
     search: str | None = Query(default=None, min_length=1),
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=20, ge=1, le=200),
+    sort_by: PaymentSortBy | None = Query(default=None),
+    sort_order: SortOrder = Query(default="desc"),
 ) -> PaymentsPage:
     filters = [Payment.deleted_at.is_(None), Contract.deleted_at.is_(None)]
     if contract_id is not None:
@@ -72,7 +75,7 @@ def list_payments(
         .join(Payment.contract)
         .join(Contract.client)
         .where(*filters)
-        .order_by(Payment.paid_at.desc(), Payment.id.desc())
+        .order_by(*payment_list_order_by(sort_by, sort_order))
     )
 
     payments = list(db.scalars(stmt.offset(skip).limit(limit)).all())
