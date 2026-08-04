@@ -3,6 +3,7 @@ import { Building2Icon, HistoryIcon, ShieldIcon, UserIcon } from "lucide-react";
 import { api } from "../api/client";
 import { KeyIconBtn, LoadingIconBtn, SaveIconBtn } from "../components/ButtonIcons";
 import { PageError } from "../components/PageError";
+import { Pagination } from "../components/Pagination";
 import { PageHeader, PageShell } from "../components/PageHeader";
 import { RoleBadge } from "../components/UserBadges";
 import {
@@ -73,6 +74,9 @@ export function ProfilePage() {
   const [loginHistory, setLoginHistory] = useState<LoginHistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyLoadError, setHistoryLoadError] = useState("");
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageSize, setHistoryPageSize] = useState(10);
+  const [historyTotal, setHistoryTotal] = useState(0);
   const [settingsLoadError, setSettingsLoadError] = useState("");
 
   useEffect(() => {
@@ -91,17 +95,28 @@ export function ProfilePage() {
       .catch((err) => {
         setSettingsLoadError(err instanceof Error ? err.message : t("common.error"));
       });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
     setHistoryLoading(true);
     setHistoryLoadError("");
     api.audit
-      .loginHistory(50)
-      .then(setLoginHistory)
+      .loginHistory({
+        skip: (historyPage - 1) * historyPageSize,
+        limit: historyPageSize,
+      })
+      .then((data) => {
+        setLoginHistory(data.items);
+        setHistoryTotal(data.total);
+      })
       .catch((err) => {
         setHistoryLoadError(err instanceof Error ? err.message : t("common.error"));
       })
       .finally(() => setHistoryLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin]);
+  }, [isAdmin, historyPage, historyPageSize]);
 
   const [form, setForm] = useState({
     current_password: "",
@@ -467,6 +482,19 @@ export function ProfilePage() {
               empty={!historyLoading && !historyLoadError && loginHistory.length === 0}
               emptyMessage={t("profile.loginHistoryEmpty")}
               skeletonCols={4}
+              footer={
+                <Pagination
+                  embedded
+                  page={historyPage}
+                  pageSize={historyPageSize}
+                  total={historyTotal}
+                  onPageChange={setHistoryPage}
+                  onPageSizeChange={(size) => {
+                    setHistoryPageSize(size);
+                    setHistoryPage(1);
+                  }}
+                />
+              }
             >
               <TableHeader>
                 <TableRow>
