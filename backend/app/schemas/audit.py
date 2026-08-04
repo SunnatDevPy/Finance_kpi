@@ -17,6 +17,13 @@ class LoginHistoryRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class LoginHistoryPage(BaseModel):
+    items: list[LoginHistoryRead]
+    total: int
+    skip: int
+    limit: int
+
+
 class AuditLogRead(BaseModel):
     id: int
     entity_type: str

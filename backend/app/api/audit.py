@@ -5,19 +5,21 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import require_admin
 from app.database import get_db
-from app.schemas.audit import AuditLogClearResult, AuditLogPage, LoginHistoryRead
+from app.schemas.audit import AuditLogClearResult, AuditLogPage, LoginHistoryPage
 from app.services.audit import clear_audit_logs, list_audit_logs
 from app.services.login_history import list_login_history
 
 router = APIRouter(prefix="/audit", dependencies=[Depends(require_admin)])
 
 
-@router.get("/login-history", response_model=list[LoginHistoryRead])
+@router.get("/login-history", response_model=LoginHistoryPage)
 def get_login_history(
     db: Session = Depends(get_db),
-    limit: int = Query(100, ge=1, le=500),
-) -> list[LoginHistoryRead]:
-    return list_login_history(db, limit=limit)
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=10, ge=1, le=200),
+) -> LoginHistoryPage:
+    items, total = list_login_history(db, skip=skip, limit=limit)
+    return LoginHistoryPage(items=items, total=total, skip=skip, limit=limit)
 
 
 @router.get("/log", response_model=AuditLogPage)

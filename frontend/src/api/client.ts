@@ -348,8 +348,13 @@ export const api = {
   },
 
   audit: {
-    loginHistory: (limit = 100) =>
-      request<LoginHistoryEntry[]>(`/audit/login-history?limit=${limit}`),
+    loginHistory: (params?: { skip?: number; limit?: number }) => {
+      const q = new URLSearchParams();
+      if (params?.skip !== undefined) q.set("skip", String(params.skip));
+      if (params?.limit !== undefined) q.set("limit", String(params.limit));
+      const qs = q.toString();
+      return request<Paginated<LoginHistoryEntry>>(`/audit/login-history${qs ? `?${qs}` : ""}`);
+    },
     log: (params?: {
       entityType?: AuditEntityType;
       entityId?: number;
