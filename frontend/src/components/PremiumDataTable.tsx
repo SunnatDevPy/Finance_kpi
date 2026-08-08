@@ -22,6 +22,7 @@ interface PremiumDataTableProps {
   footer?: ReactNode
   children: ReactNode
   className?: string
+  tableClassName?: string
 }
 
 function SkeletonBar({ className, delay = 0 }: { className?: string; delay?: number }) {
@@ -102,6 +103,7 @@ export function PremiumDataTable({
   footer,
   children,
   className,
+  tableClassName,
 }: PremiumDataTableProps) {
   if (loading) {
     return (
@@ -122,7 +124,7 @@ export function PremiumDataTable({
   return (
     <div className={cn("flex flex-col", tableInset, className)}>
       <div className="glass-panel shine-border overflow-hidden rounded-xl">
-        <Table variant="default">{children}</Table>
+        <Table variant="default" className={tableClassName}>{children}</Table>
       </div>
       {footer ? (
         <div className="-mt-px rounded-b-xl border border-t-0 border-border/50 bg-muted/15 px-4 py-2 sm:px-5">
@@ -221,17 +223,23 @@ interface TableCellCompanyProps {
   subtitle?: string
   className?: string
   logoUrl?: string | null
+  multiline?: boolean
 }
 
-export function TableCellCompany({ to, name, subtitle, className, logoUrl }: TableCellCompanyProps) {
+export function TableCellCompany({ to, name, subtitle, className, logoUrl, multiline = false }: TableCellCompanyProps) {
   return (
     <TableCell className={className}>
-      <div className="flex items-center gap-2.5">
-        <CompanyAvatar name={name} size="sm" logoUrl={logoUrl} />
+      <div className="flex items-start gap-2">
+        <CompanyAvatar name={name} size="sm" logoUrl={logoUrl} className="mt-0.5 shrink-0" />
         <div className="flex min-w-0 flex-col gap-0.5">
           <Link
             to={to}
-            className="link-surface truncate font-semibold text-primary"
+            className={cn(
+              "link-surface font-semibold text-primary",
+              multiline
+                ? "line-clamp-2 break-words text-[13px] leading-tight"
+                : "truncate",
+            )}
           >
             {name}
           </Link>

@@ -109,6 +109,7 @@ const RANK_STYLES = [
 
 const TABLE_LIMIT_OPTIONS = [10, 20, 30] as const;
 const TREND_MONTH_OPTIONS = [6, 12] as const;
+const CONTRACTS_BY_CLIENT_PAGE_SIZE = 20;
 type TableLimit = (typeof TABLE_LIMIT_OPTIONS)[number];
 type SortOrder = "asc" | "desc";
 type RegionSortKey = "city" | "clients_count" | "total_amount" | "total_paid" | "total_debt";
@@ -255,9 +256,11 @@ function CategoryBarListCard({
           ) : (
             visibleItems.map((item, index) => (
               <div key={`${item.name}-${safePage}-${index}`} className="flex flex-col gap-1">
-                <div className="flex items-center justify-between gap-2 text-sm">
-                  <span className="truncate font-medium text-foreground">{item.name}</span>
-                  <span className="shrink-0 font-semibold tabular-nums text-foreground/90">
+                <div className="flex items-start justify-between gap-2 text-sm leading-tight">
+                  <span className="line-clamp-2 min-w-0 flex-1 break-words font-medium text-foreground">
+                    {item.name}
+                  </span>
+                  <span className="shrink-0 self-start font-semibold tabular-nums text-foreground/90">
                     {formatCompactMoney(item.amount)}
                   </span>
                 </div>
@@ -340,6 +343,7 @@ export function DashboardPage() {
   const [contractsSortKey, setContractsSortKey] = useState<ContractClientSortKey>("amount");
   const [contractsSortDir, setContractsSortDir] = useState<SortDir>("desc");
   const [contractsExportLoading, setContractsExportLoading] = useState<"xlsx" | "pdf" | null>(null);
+  const [contractsPage, setContractsPage] = useState(0);
 
   const revenueConfig = useMemo(
     () =>
@@ -496,6 +500,20 @@ export function DashboardPage() {
     });
     return items;
   }, [contractsByClient, contractsSortKey, contractsSortDir]);
+
+  const contractsTotalPages = Math.max(
+    1,
+    Math.ceil(sortedContractsByClient.length / CONTRACTS_BY_CLIENT_PAGE_SIZE),
+  );
+  const contractsSafePage = Math.min(contractsPage, contractsTotalPages - 1);
+  const visibleContractsByClient = sortedContractsByClient.slice(
+    contractsSafePage * CONTRACTS_BY_CLIENT_PAGE_SIZE,
+    contractsSafePage * CONTRACTS_BY_CLIENT_PAGE_SIZE + CONTRACTS_BY_CLIENT_PAGE_SIZE,
+  );
+
+  useEffect(() => {
+    setContractsPage(0);
+  }, [sortedContractsByClient.length, contractsSortKey, contractsSortDir]);
 
   const handleContractsExport = async (format: "xlsx" | "pdf") => {
     setContractsExportLoading(format);
@@ -819,7 +837,7 @@ export function DashboardPage() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className={cn("flex-1 p-0", contractsByClientLoading && "pointer-events-none opacity-60")}>
+            <CardContent className={cn("flex min-w-0 flex-1 flex-col p-0", contractsByClientLoading && "pointer-events-none opacity-60")}>
               {contractsByClientError && (
                 <p className="px-6 py-4 text-sm text-red-600 dark:text-red-400">
                   {t("common.error")}: {contractsByClientError}
@@ -827,9 +845,44 @@ export function DashboardPage() {
               )}
               {!contractsByClientError && (
                 <PremiumDataTable
+                  className="min-w-0"
+                  tableClassName="table-fixed"
                   empty={sortedContractsByClient.length === 0}
                   emptyMessage={t("common.noData")}
-                  skeletonCols={4}
+                  skeletonCols={3}
+                  footer={
+                    sortedContractsByClient.length > CONTRACTS_BY_CLIENT_PAGE_SIZE ? (
+                      <div className="flex items-center justify-between gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-8 gap-1 px-2.5"
+                          disabled={contractsSafePage === 0}
+                          onClick={() => setContractsPage((value) => Math.max(0, value - 1))}
+                        >
+                          <ChevronLeftIcon className="size-4" />
+                          {t("pagination.prev")}
+                        </Button>
+                        <span className="text-xs tabular-nums text-muted-foreground">
+                          {contractsSafePage + 1} / {contractsTotalPages}
+                        </span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-8 gap-1 px-2.5"
+                          disabled={contractsSafePage >= contractsTotalPages - 1}
+                          onClick={() =>
+                            setContractsPage((value) => Math.min(contractsTotalPages - 1, value + 1))
+                          }
+                        >
+                          {t("pagination.next")}
+                          <ChevronRightIcon className="size-4" />
+                        </Button>
+                      </div>
+                    ) : undefined
+                  }
                 >
                   <TableHeader>
                     <TableRow>
@@ -839,6 +892,7 @@ export function DashboardPage() {
                         activeColumn={contractsSortKey}
                         order={contractsSortDir}
                         onSort={(column) => toggleContractsSort(column as ContractClientSortKey)}
+                        className="w-[48%] whitespace-normal px-3 normal-case tracking-normal"
                       />
                       <SortableTableHead
                         label={t("dashboard.ltvContractsCount")}
@@ -846,7 +900,7 @@ export function DashboardPage() {
                         activeColumn={contractsSortKey}
                         order={contractsSortDir}
                         onSort={(column) => toggleContractsSort(column as ContractClientSortKey)}
-                        className="text-right"
+                        className="w-[22%] px-2 text-right whitespace-normal normal-case tracking-normal"
                       />
                       <SortableTableHead
                         label={t("common.total")}
@@ -854,22 +908,25 @@ export function DashboardPage() {
                         activeColumn={contractsSortKey}
                         order={contractsSortDir}
                         onSort={(column) => toggleContractsSort(column as ContractClientSortKey)}
-                        className="text-right"
+                        className="w-[30%] px-2 text-right whitespace-normal normal-case tracking-normal"
                       />
-                      <TableHead className="text-right">{t("common.actions")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sortedContractsByClient.map((item, index) => (
+                    {visibleContractsByClient.map((item, index) => (
                       <MotionTableRow key={item.client_id} {...rowEnter(index)}>
-                        <TableCellCompany to={`/clients/${item.client_id}`} name={item.company_name} />
-                        <TableCell className="text-right tabular-nums font-medium">
+                        <TableCellCompany
+                          to={`/clients/${item.client_id}`}
+                          name={item.company_name}
+                          multiline
+                          className="px-3 py-2"
+                        />
+                        <TableCell className="px-2 py-2 text-right text-sm tabular-nums font-medium">
                           {item.contracts_count}
                         </TableCell>
-                        <TableCellMoney tone="neutral">{formatMoney(item.total_amount)}</TableCellMoney>
-                        <TableCell className="text-right">
-                          <TableViewLink to={`/clients/${item.client_id}`} />
-                        </TableCell>
+                        <TableCellMoney tone="neutral" className="px-2 py-2 text-right text-sm whitespace-nowrap">
+                          {formatMoney(item.total_amount)}
+                        </TableCellMoney>
                       </MotionTableRow>
                     ))}
                   </TableBody>
