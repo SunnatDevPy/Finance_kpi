@@ -7,9 +7,17 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.database import get_db
-from app.schemas.dashboard import ChartPoint, ClientRegionStatsItem, DashboardStats, TopClientItem, TopClientLtvItem
+from app.schemas.dashboard import (
+    ChartPoint,
+    ClientRegionStatsItem,
+    ContractClientStatsItem,
+    DashboardStats,
+    TopClientItem,
+    TopClientLtvItem,
+)
 from app.services.dashboard import (
     get_clients_by_region,
+    get_contracts_by_client,
     get_dashboard_stats,
     get_revenue_trend,
     get_top_clients_by_ltv,
@@ -21,8 +29,15 @@ from app.services.dashboard_export import (
     export_top_clients_ltv_pdf,
     export_top_clients_ranked_pdf,
 )
+from app.services.export_data import _money
+from app.services.export_files import build_pdf, build_xlsx
 
 router = APIRouter(prefix="/dashboard", dependencies=[Depends(get_current_user)])
+
+CONTRACTS_BY_CLIENT_HEADERS = ["Korxona", "Shartnomalar soni", "Summa"]
+CONTRACTS_BY_CLIENT_TITLE = "Mijozlar bo'yicha kontraktlar"
+
+SortOrder = Literal["asc", "desc"]
 
 
 @router.get("", response_model=DashboardStats)
@@ -32,9 +47,6 @@ def dashboard(
     date_to: date | None = Query(default=None),
 ) -> DashboardStats:
     return get_dashboard_stats(db, date_from=date_from, date_to=date_to)
-
-
-SortOrder = Literal["asc", "desc"]
 
 
 @router.get("/top-clients", response_model=list[TopClientLtvItem])
@@ -77,6 +89,44 @@ def revenue_trend(
 @router.get("/clients-by-region", response_model=list[ClientRegionStatsItem])
 def clients_by_region(db: Session = Depends(get_db)) -> list[ClientRegionStatsItem]:
     return get_clients_by_region(db)
+
+
+@router.get("/contracts-by-client", response_model=list[ContractClientStatsItem])
+def contracts_by_client(
+    db: Session = Depends(get_db),
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+) -> list[ContractClientStatsItem]:
+    return get_contracts_by_client(db, date_from=date_from, date_to=date_to)
+
+
+@router.get("/contracts-by-client/export")
+def export_contracts_by_client(
+    db: Session = Depends(get_db),
+    file_format: str = Query(alias="format", pattern="^(xlsx|pdf)$"),
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+) -> StreamingResponse:
+    items = get_contracts_by_client(db, date_from=date_from, date_to=date_to)
+    rows = [
+        [item.company_name, str(item.contracts_count), _money(item.total_amount)]
+        for item in items
+    ]
+
+    if file_format == "xlsx":
+        buffer = build_xlsx(CONTRACTS_BY_CLIENT_TITLE, CONTRACTS_BY_CLIENT_HEADERS, rows)
+        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        filename = "kontraktlar_mijozlar.xlsx"
+    else:
+        buffer = build_pdf(CONTRACTS_BY_CLIENT_TITLE, CONTRACTS_BY_CLIENT_HEADERS, rows)
+        media_type = "application/pdf"
+        filename = "kontraktlar_mijozlar.pdf"
+
+    return StreamingResponse(
+        buffer,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/export/services")

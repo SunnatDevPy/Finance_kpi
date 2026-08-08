@@ -22,6 +22,7 @@ from app.schemas.dashboard import (
     ChartPoint,
     ClientCountStats,
     ClientRegionStatsItem,
+    ContractClientStatsItem,
     ContractWorkflowStats,
     DashboardCharts,
     DashboardStats,
@@ -789,3 +790,53 @@ def get_clients_by_region(db: Session) -> list[ClientRegionStatsItem]:
     ]
     items.sort(key=lambda item: (-item.clients_count, item.city))
     return items
+
+
+def get_contracts_by_client(
+    db: Session,
+    date_from: date | None = None,
+    date_to: date | None = None,
+) -> list[ContractClientStatsItem]:
+    contract_filters = [Contract.deleted_at.is_(None)]
+    if date_from is not None:
+        contract_filters.append(Contract.start_date >= date_from)
+    if date_to is not None:
+        contract_filters.append(Contract.start_date <= date_to)
+
+    contract_totals = (
+        select(
+            Contract.id.label("contract_id"),
+            Contract.client_id.label("client_id"),
+            func.coalesce(func.sum(ContractLineItem.price), 0).label("contract_amount"),
+        )
+        .join(ContractLineItem, ContractLineItem.contract_id == Contract.id)
+        .where(
+            ContractLineItem.is_cancelled.is_(False),
+            *contract_filters,
+        )
+        .group_by(Contract.id, Contract.client_id)
+        .subquery()
+    )
+
+    rows = db.execute(
+        select(
+            Client.id,
+            Client.company_name,
+            func.count(contract_totals.c.contract_id),
+            func.coalesce(func.sum(contract_totals.c.contract_amount), 0),
+        )
+        .join(contract_totals, contract_totals.c.client_id == Client.id)
+        .where(Client.deleted_at.is_(None))
+        .group_by(Client.id, Client.company_name)
+        .order_by(func.coalesce(func.sum(contract_totals.c.contract_amount), 0).desc())
+    ).all()
+
+    return [
+        ContractClientStatsItem(
+            client_id=row[0],
+            company_name=row[1],
+            contracts_count=int(row[2]),
+            total_amount=row[3],
+        )
+        for row in rows
+    ]

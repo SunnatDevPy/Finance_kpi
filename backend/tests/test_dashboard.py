@@ -272,3 +272,30 @@ def test_dashboard_export_top_clients_ltv_pdf(client, auth_headers, sample_contr
     )
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/pdf"
+
+
+def test_contracts_by_client(client, auth_headers, sample_contract):
+    response = client.get("/api/v1/dashboard/contracts-by-client", headers=auth_headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["contracts_count"] == 1
+    assert float(data[0]["total_amount"]) == 1_000_000.0
+
+    filtered = client.get(
+        "/api/v1/dashboard/contracts-by-client",
+        headers=auth_headers,
+        params={"date_from": "2020-01-01", "date_to": "2020-12-31"},
+    )
+    assert filtered.status_code == 200
+    assert filtered.json() == []
+
+
+def test_contracts_by_client_export_pdf(client, auth_headers, sample_contract):
+    response = client.get(
+        "/api/v1/dashboard/contracts-by-client/export",
+        headers=auth_headers,
+        params={"format": "pdf"},
+    )
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/pdf"

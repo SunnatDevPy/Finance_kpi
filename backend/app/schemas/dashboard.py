@@ -4,6 +4,13 @@ from decimal import Decimal
 from pydantic import BaseModel
 
 
+class ContractClientStatsItem(BaseModel):
+    client_id: int
+    company_name: str
+    contracts_count: int
+    total_amount: Decimal
+
+
 class ClientRegionStatsItem(BaseModel):
     country: str
     city: str

@@ -10,6 +10,7 @@ import type {
   ClientImportResult,
   CompanyProfile,
   Contract,
+  ContractClientStatsItem,
   ContractImportResult,
   ContractWorkflowStatus,
   DashboardStats,
@@ -316,6 +317,29 @@ export const api = {
     },
   },
 
+  dashboardContractsByClient: (params?: { date_from?: string; date_to?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.date_from) q.set("date_from", params.date_from);
+    if (params?.date_to) q.set("date_to", params.date_to);
+    const qs = q.toString();
+    return request<ContractClientStatsItem[]>(
+      `/dashboard/contracts-by-client${qs ? `?${qs}` : ""}`,
+    );
+  },
+
+  dashboardExportContractsByClient: (
+    format: "xlsx" | "pdf",
+    params?: { date_from?: string; date_to?: string },
+  ) => {
+    const q = new URLSearchParams({ format });
+    if (params?.date_from) q.set("date_from", params.date_from);
+    if (params?.date_to) q.set("date_to", params.date_to);
+    return download(
+      `/dashboard/contracts-by-client/export?${q}`,
+      `kontraktlar_mijozlar.${format}`,
+    );
+  },
+
   debts: {
     list: (search?: string) =>
       request<DebtsSummary>(`/debts${search ? `?search=${encodeURIComponent(search)}` : ""}`),
@@ -475,6 +499,7 @@ export const api = {
       search?: string;
       dateFrom?: string;
       dateTo?: string;
+      year?: number;
       status?: ContractWorkflowStatus;
       serviceTypeId?: number;
       debtFilter?: DebtFilter;
@@ -489,6 +514,7 @@ export const api = {
       if (params?.search) q.set("search", params.search);
       if (params?.dateFrom) q.set("date_from", params.dateFrom);
       if (params?.dateTo) q.set("date_to", params.dateTo);
+      if (params?.year) q.set("year", String(params.year));
       if (params?.status) q.set("status", params.status);
       if (params?.serviceTypeId) q.set("service_type_id", String(params.serviceTypeId));
       if (params?.debtFilter) q.set("debt_filter", params.debtFilter);

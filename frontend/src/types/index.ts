@@ -262,6 +262,13 @@ export interface ClientRegionStatsItem {
   total_debt: string;
 }
 
+export interface ContractClientStatsItem {
+  client_id: number;
+  company_name: string;
+  contracts_count: number;
+  total_amount: string;
+}
+
 export interface TopClientLtvItem {
   client_id: number;
   company_name: string;

@@ -115,6 +115,11 @@ const formSectionReveal = {
   },
 };
 
+const CONTRACT_YEAR_OPTIONS = Array.from(
+  { length: 10 },
+  (_, index) => new Date().getFullYear() - index,
+);
+
 export function ContractsPage() {
   const { t } = useI18n();
   const [searchParams] = useSearchParams();
@@ -147,6 +152,15 @@ export function ContractsPage() {
     "wtma.contracts.serviceTypeFilter",
     "all",
   );
+  const [yearFilter, setYearFilter] = usePersistedState(
+    "wtma.contracts.yearFilter",
+    String(new Date().getFullYear()),
+  );
+  const selectedYear = yearFilter !== "all" ? parseInt(yearFilter, 10) : undefined;
+  const exportDateFromEffective =
+    selectedYear !== undefined ? `${selectedYear}-01-01` : exportDateFrom;
+  const exportDateToEffective =
+    selectedYear !== undefined ? `${selectedYear}-12-31` : exportDateTo;
   const selection = useRowSelection(contracts.map((c) => c.id));
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -184,8 +198,9 @@ export function ContractsPage() {
         skip: (page - 1) * pageSize,
         limit: pageSize,
         search: search || undefined,
-        dateFrom: exportDateFrom || undefined,
-        dateTo: exportDateTo || undefined,
+        year: selectedYear,
+        dateFrom: selectedYear === undefined ? exportDateFrom || undefined : undefined,
+        dateTo: selectedYear === undefined ? exportDateTo || undefined : undefined,
         status: statusFilter === "all" ? undefined : (statusFilter as ContractWorkflowStatus),
         serviceTypeId:
           serviceTypeFilter === "all" ? undefined : parseInt(serviceTypeFilter, 10),
@@ -216,7 +231,7 @@ export function ContractsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, exportDateFrom, exportDateTo, statusFilter, serviceTypeFilter, debtFilter, sortBy, sortOrder]);
+  }, [search, exportDateFrom, exportDateTo, statusFilter, serviceTypeFilter, debtFilter, yearFilter, sortBy, sortOrder]);
 
   useEffect(() => {
     if (searchParams.get("has_debt") === "1") {
@@ -227,7 +242,7 @@ export function ContractsPage() {
   useEffect(() => {
     const timer = window.setTimeout(load, 300);
     return () => window.clearTimeout(timer);
-  }, [page, pageSize, search, exportDateFrom, exportDateTo, statusFilter, serviceTypeFilter, debtFilter, sortBy, sortOrder]);
+  }, [page, pageSize, search, exportDateFrom, exportDateTo, statusFilter, serviceTypeFilter, debtFilter, yearFilter, sortBy, sortOrder]);
 
   const clientName = (id: number) =>
     clients.find((c) => c.id === id)?.company_name || `#${id}`;
@@ -478,8 +493,8 @@ export function ContractsPage() {
       <PageHeader title={t("contracts.title")} subtitle={t("contracts.subtitle")}>
         <ExportButtons
           resource="contracts"
-          dateFrom={exportDateFrom}
-          dateTo={exportDateTo}
+          dateFrom={exportDateFromEffective}
+          dateTo={exportDateToEffective}
           ids={selection.count > 0 ? selection.selectedIds : undefined}
         />
         <MotionButton variant="outline" onClick={openImportModal} {...motionTap}>
@@ -563,12 +578,39 @@ export function ContractsPage() {
               </SelectGroup>
             </SelectContent>
           </Select>
+          <Select
+            value={yearFilter}
+            onValueChange={(v) => {
+              if (!v) return;
+              setYearFilter(v);
+              if (v !== "all") {
+                setExportDateFrom("");
+                setExportDateTo("");
+              }
+            }}
+            className="w-full sm:w-32"
+          >
+            <SelectTrigger>
+              <SelectValue placeholder={t("contracts.yearFilter")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="all">{t("contracts.allYears")}</SelectItem>
+                {CONTRACT_YEAR_OPTIONS.map((year) => (
+                  <SelectItem key={year} value={String(year)}>
+                    {year}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
           <DateRangePicker
             from={exportDateFrom}
             to={exportDateTo}
             onChange={(from, to) => {
               setExportDateFrom(from);
               setExportDateTo(to);
+              if (from || to) setYearFilter("all");
             }}
           />
           <TableColumnPicker

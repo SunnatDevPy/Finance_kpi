@@ -23,6 +23,9 @@ import {
   ChevronRightIcon,
   MapPinIcon,
   CrownIcon,
+  FileSpreadsheetIcon,
+  FileTextIcon,
+  Loader2Icon,
   ScaleIcon,
   TrendingUpIcon,
   UsersIcon,
@@ -72,7 +75,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-import type { ClientRegionStatsItem, DashboardStats, TopClientItem, TopClientLtvItem } from "../types";
+import type { ClientRegionStatsItem, ContractClientStatsItem, DashboardStats, TopClientItem, TopClientLtvItem } from "../types";
 import { useI18n } from "../context/I18nContext";
 import { useTableSort } from "@/hooks/useTableSort";
 import {
@@ -109,6 +112,9 @@ const TREND_MONTH_OPTIONS = [6, 12] as const;
 type TableLimit = (typeof TABLE_LIMIT_OPTIONS)[number];
 type SortOrder = "asc" | "desc";
 type RegionSortKey = "city" | "clients_count" | "total_amount" | "total_paid" | "total_debt";
+
+type ContractClientSortKey = "company" | "count" | "amount";
+type SortDir = "asc" | "desc";
 
 const CONTRACT_STATUS_COLORS: Record<(typeof CONTRACT_WORKFLOW_STATUSES)[number], string> = {
   yangi: "hsl(220 70% 50%)",
@@ -328,6 +334,12 @@ export function DashboardPage() {
   const [trendMonths, setTrendMonths] = useState<(typeof TREND_MONTH_OPTIONS)[number]>(12);
   const { sortBy: regionSortBy, sortOrder: regionSortOrder, handleSort: handleRegionSort } =
     useTableSort<RegionSortKey>("wtma.dashboard.regions.sort", "clients_count", "desc", ["city"]);
+  const [contractsByClient, setContractsByClient] = useState<ContractClientStatsItem[]>([]);
+  const [contractsByClientLoading, setContractsByClientLoading] = useState(true);
+  const [contractsByClientError, setContractsByClientError] = useState("");
+  const [contractsSortKey, setContractsSortKey] = useState<ContractClientSortKey>("amount");
+  const [contractsSortDir, setContractsSortDir] = useState<SortDir>("desc");
+  const [contractsExportLoading, setContractsExportLoading] = useState<"xlsx" | "pdf" | null>(null);
 
   const revenueConfig = useMemo(
     () =>
@@ -447,6 +459,58 @@ export function DashboardPage() {
       .finally(() => setLtvLoading(false));
   }, [ltvLimit, ltvOrder]);
 
+  useEffect(() => {
+    setContractsByClientLoading(true);
+    setContractsByClientError("");
+    api
+      .dashboardContractsByClient({
+        date_from: dateFrom || undefined,
+        date_to: dateTo || undefined,
+      })
+      .then(setContractsByClient)
+      .catch((e) => setContractsByClientError(e.message))
+      .finally(() => setContractsByClientLoading(false));
+  }, [dateFrom, dateTo]);
+
+  const toggleContractsSort = (key: ContractClientSortKey) => {
+    if (contractsSortKey === key) {
+      setContractsSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setContractsSortKey(key);
+    setContractsSortDir(key === "company" ? "asc" : "desc");
+  };
+
+  const sortedContractsByClient = useMemo(() => {
+    const items = [...contractsByClient];
+    items.sort((a, b) => {
+      let cmp = 0;
+      if (contractsSortKey === "company") {
+        cmp = a.company_name.localeCompare(b.company_name, "uz");
+      } else if (contractsSortKey === "count") {
+        cmp = a.contracts_count - b.contracts_count;
+      } else {
+        cmp = toNumber(a.total_amount) - toNumber(b.total_amount);
+      }
+      return contractsSortDir === "asc" ? cmp : -cmp;
+    });
+    return items;
+  }, [contractsByClient, contractsSortKey, contractsSortDir]);
+
+  const handleContractsExport = async (format: "xlsx" | "pdf") => {
+    setContractsExportLoading(format);
+    try {
+      await api.dashboardExportContractsByClient(format, {
+        date_from: dateFrom || undefined,
+        date_to: dateTo || undefined,
+      });
+    } catch (err) {
+      setContractsByClientError(err instanceof Error ? err.message : t("export.failed"));
+    } finally {
+      setContractsExportLoading(null);
+    }
+  };
+
   const chartData = useMemo(() => {
     if (!stats) return null;
 
@@ -489,19 +553,6 @@ export function DashboardPage() {
     }));
     const contractStatus = contractStatusAll.filter((item) => item.value > 0);
 
-    const byExpenseSorted = [...stats.charts.expenses_by_category]
-      .map((item) => ({ name: item.name, amount: toNumber(item.amount) }))
-      .sort((a, b) => b.amount - a.amount);
-    const topExpenseCategories = byExpenseSorted.slice(0, 5);
-    const othersExpenseAmount = byExpenseSorted
-      .slice(5)
-      .reduce((sum, item) => sum + item.amount, 0);
-    const expensesByCategory =
-      othersExpenseAmount > 0
-        ? [...topExpenseCategories, { name: t("dashboard.charts.others"), amount: othersExpenseAmount }]
-        : topExpenseCategories;
-    const expensesByCategoryMax = Math.max(1, ...expensesByCategory.map((item) => item.amount));
-
     const profitTrend = sortByMonthKey(
       stats.charts.profit_by_month.map((point) => ({
         month: point.month,
@@ -537,8 +588,6 @@ export function DashboardPage() {
       clientStatus,
       contractStatus,
       contractStatusAll,
-      expensesByCategory,
-      expensesByCategoryMax,
       profitTrend,
       yearlyGrowth,
     };
@@ -720,12 +769,115 @@ export function DashboardPage() {
             pageSize={10}
             onExportPdf={() => api.dashboardExportPdf.services()}
           />
-          <CategoryBarListCard
-            title={t("dashboard.charts.expensesByCategory")}
-            description={t("dashboard.charts.expensesByCategoryDesc")}
-            items={chartData.expensesByCategory}
-            maxAmount={chartData.expensesByCategoryMax}
-          />
+          <RevealCard>
+          <Card className="content-card flex h-full flex-col">
+            <CardHeader className="border-b">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <CardTitle className="text-base">{t("dashboard.charts.contractsByClient")}</CardTitle>
+                  <CardDescription className="text-xs">
+                    {t("dashboard.charts.contractsByClientDesc")}
+                  </CardDescription>
+                </div>
+                <div className="inline-flex overflow-hidden rounded-lg border border-border/70 shadow-sm">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="relative min-w-[5.25rem] rounded-none border-0 border-r border-border/70 shadow-none"
+                    disabled={contractsExportLoading !== null}
+                    onClick={() => handleContractsExport("xlsx")}
+                  >
+                    <span className={cn("inline-flex items-center gap-1", contractsExportLoading === "xlsx" && "invisible")}>
+                      <FileSpreadsheetIcon data-icon="inline-start" />
+                      {t("export.excel")}
+                    </span>
+                    {contractsExportLoading === "xlsx" && (
+                      <span className="absolute inset-0 flex items-center justify-center">
+                        <Loader2Icon className="size-3.5 animate-spin" />
+                      </span>
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="relative min-w-[5.25rem] rounded-none border-0 shadow-none"
+                    disabled={contractsExportLoading !== null}
+                    onClick={() => handleContractsExport("pdf")}
+                  >
+                    <span className={cn("inline-flex items-center gap-1", contractsExportLoading === "pdf" && "invisible")}>
+                      <FileTextIcon data-icon="inline-start" />
+                      {t("export.pdf")}
+                    </span>
+                    {contractsExportLoading === "pdf" && (
+                      <span className="absolute inset-0 flex items-center justify-center">
+                        <Loader2Icon className="size-3.5 animate-spin" />
+                      </span>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className={cn("flex-1 p-0", contractsByClientLoading && "pointer-events-none opacity-60")}>
+              {contractsByClientError && (
+                <p className="px-6 py-4 text-sm text-red-600 dark:text-red-400">
+                  {t("common.error")}: {contractsByClientError}
+                </p>
+              )}
+              {!contractsByClientError && (
+                <PremiumDataTable
+                  empty={sortedContractsByClient.length === 0}
+                  emptyMessage={t("common.noData")}
+                  skeletonCols={4}
+                >
+                  <TableHeader>
+                    <TableRow>
+                      <SortableTableHead
+                        label={t("dashboard.company")}
+                        column="company"
+                        activeColumn={contractsSortKey}
+                        order={contractsSortDir}
+                        onSort={(column) => toggleContractsSort(column as ContractClientSortKey)}
+                      />
+                      <SortableTableHead
+                        label={t("dashboard.ltvContractsCount")}
+                        column="count"
+                        activeColumn={contractsSortKey}
+                        order={contractsSortDir}
+                        onSort={(column) => toggleContractsSort(column as ContractClientSortKey)}
+                        className="text-right"
+                      />
+                      <SortableTableHead
+                        label={t("common.total")}
+                        column="amount"
+                        activeColumn={contractsSortKey}
+                        order={contractsSortDir}
+                        onSort={(column) => toggleContractsSort(column as ContractClientSortKey)}
+                        className="text-right"
+                      />
+                      <TableHead className="text-right">{t("common.actions")}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sortedContractsByClient.map((item, index) => (
+                      <MotionTableRow key={item.client_id} {...rowEnter(index)}>
+                        <TableCellCompany to={`/clients/${item.client_id}`} name={item.company_name} />
+                        <TableCell className="text-right tabular-nums font-medium">
+                          {item.contracts_count}
+                        </TableCell>
+                        <TableCellMoney tone="neutral">{formatMoney(item.total_amount)}</TableCellMoney>
+                        <TableCell className="text-right">
+                          <TableViewLink to={`/clients/${item.client_id}`} />
+                        </TableCell>
+                      </MotionTableRow>
+                    ))}
+                  </TableBody>
+                </PremiumDataTable>
+              )}
+            </CardContent>
+          </Card>
+          </RevealCard>
         </div>
       </section>
 

@@ -40,6 +40,24 @@ def test_list_contracts_sort_by_client(client, auth_headers, sample_contract):
     assert response.json()["total"] == 1
 
 
+def test_list_contracts_filters_by_year(client, auth_headers, sample_contract):
+    response = client.get(
+        "/api/v1/contracts",
+        headers=auth_headers,
+        params={"year": 2026},
+    )
+    assert response.status_code == 200
+    assert response.json()["total"] == 1
+
+    empty = client.get(
+        "/api/v1/contracts",
+        headers=auth_headers,
+        params={"year": 2020},
+    )
+    assert empty.status_code == 200
+    assert empty.json()["total"] == 0
+
+
 def test_list_contracts_service_type_filter(
     client, auth_headers, sample_client, sample_service_type, db_session
 ):

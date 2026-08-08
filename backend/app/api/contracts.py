@@ -65,6 +65,7 @@ def list_contracts(
     search: str | None = Query(default=None, min_length=1),
     date_from: date | None = Query(default=None),
     date_to: date | None = Query(default=None),
+    year: int | None = Query(default=None, ge=2000, le=2100),
     status: ContractWorkflowStatus | None = Query(default=None),
     service_type_id: int | None = Query(default=None),
     debt_filter: DebtFilter | None = Query(default=None),
@@ -105,10 +106,14 @@ def list_contracts(
                 Contract.invoice_number.ilike(pattern),
             )
         )
-    if date_from is not None:
-        filters.append(Contract.end_date >= date_from)
-    if date_to is not None:
-        filters.append(Contract.end_date <= date_to)
+    if year is not None:
+        filters.append(Contract.start_date >= date(year, 1, 1))
+        filters.append(Contract.start_date <= date(year, 12, 31))
+    else:
+        if date_from is not None:
+            filters.append(Contract.end_date >= date_from)
+        if date_to is not None:
+            filters.append(Contract.end_date <= date_to)
 
     count_stmt = select(func.count(Contract.id)).where(*filters)
     if join_client:
