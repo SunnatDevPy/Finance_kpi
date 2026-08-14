@@ -83,7 +83,7 @@ import {
   formatAmount,
   formatChartMonthTick,
   formatCompactMoney,
-  formatDate,
+  formatDateShort,
   formatMoney,
   formatPercent,
   sortByMonthKey,
@@ -633,7 +633,7 @@ export function DashboardPage() {
 
   const hasDateRange = Boolean(dateFrom || dateTo);
   const financeRevenue = hasDateRange ? stats.monthly_revenue : stats.total_revenue;
-  const periodRangeLabel = `${formatDate(stats.period_start)} – ${formatDate(stats.period_end)}`;
+  const periodRangeLabel = `${formatDateShort(stats.period_start)} – ${formatDateShort(stats.period_end)}`;
 
   return (
     <PageShell className={cn(loading && "pointer-events-none opacity-60")}>

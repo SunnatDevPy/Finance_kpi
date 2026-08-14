@@ -1,5 +1,5 @@
 from calendar import monthrange
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
 from typing import Literal
 
@@ -225,14 +225,14 @@ def _resolve_period(
 ) -> tuple[date, date, list[date], bool]:
     today = date.today()
     if date_from is None and date_to is None:
-        period_start = today - timedelta(days=30)
-        period_end = today
+        period_start = _month_start(today)
+        period_end = _month_end(today)
         return period_start, period_end, _chart_months(today), False
 
-    period_end = date_to or today
-    period_start = date_from or (period_end - timedelta(days=30))
+    period_end = _month_end(date_to or today)
+    period_start = _month_start(date_from or period_end)
     if period_start > period_end:
-        period_start, period_end = period_end, period_start
+        period_start, period_end = _month_start(period_end), _month_end(period_start)
     return period_start, period_end, _months_in_range(period_start, period_end), True
 
 
@@ -298,9 +298,9 @@ def get_dashboard_stats(
         auto_from=auto_from,
     )
 
-    duration_days = (period_end - period_start).days + 1
-    prev_period_end = period_start - timedelta(days=1)
-    prev_period_start = prev_period_end - timedelta(days=duration_days - 1)
+    month_count = max(len(months), 1)
+    prev_period_start = _shift_month(period_start, -month_count)
+    prev_period_end = _month_end(_shift_month(period_start, -1))
     prev_period_revenue = _total_revenue(
         db,
         date_from=prev_period_start,

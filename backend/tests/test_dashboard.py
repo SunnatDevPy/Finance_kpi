@@ -1,4 +1,20 @@
+from datetime import date
 from decimal import Decimal
+
+import pytest
+
+
+def _freeze_dashboard_today(monkeypatch, frozen: date) -> None:
+    class FakeDate(date):
+        def __new__(cls, *args, **kwargs):
+            return date.__new__(date, *args, **kwargs)
+
+        @classmethod
+        def today(cls):
+            return frozen
+
+    monkeypatch.setattr("app.services.dashboard.date", FakeDate)
+
 
 def test_dashboard_stats(client, auth_headers, app_settings, sample_contract):
     response = client.get("/api/v1/dashboard", headers=auth_headers)
@@ -14,6 +30,66 @@ def test_dashboard_stats(client, auth_headers, app_settings, sample_contract):
     assert "clients" in data
     assert data["total_contracts"] == 1
     assert "charts" in data
+
+
+@pytest.mark.parametrize(
+    ("today", "period_start", "period_end"),
+    [
+        (date(2026, 8, 14), "2026-08-01", "2026-08-31"),
+        (date(2026, 2, 10), "2026-02-01", "2026-02-28"),
+        (date(2028, 2, 10), "2028-02-01", "2028-02-29"),
+        (date(2026, 4, 10), "2026-04-01", "2026-04-30"),
+        (date(2026, 1, 5), "2026-01-01", "2026-01-31"),
+    ],
+)
+def test_dashboard_default_period_is_current_calendar_month(
+    client,
+    auth_headers,
+    app_settings,
+    sample_contract,
+    monkeypatch,
+    today,
+    period_start,
+    period_end,
+):
+    _freeze_dashboard_today(monkeypatch, today)
+
+    response = client.get("/api/v1/dashboard", headers=auth_headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["period_start"] == period_start
+    assert data["period_end"] == period_end
+
+
+@pytest.mark.parametrize(
+    ("date_from", "date_to", "period_start", "period_end"),
+    [
+        ("2026-07-15", "2026-08-14", "2026-07-01", "2026-08-31"),
+        ("2026-02-01", "2026-02-10", "2026-02-01", "2026-02-28"),
+        ("2026-04-05", "2026-04-20", "2026-04-01", "2026-04-30"),
+        ("2028-02-03", "2028-02-14", "2028-02-01", "2028-02-29"),
+        ("2026-01-01", "2026-12-31", "2026-01-01", "2026-12-31"),
+    ],
+)
+def test_dashboard_filter_period_snaps_to_calendar_month_bounds(
+    client,
+    auth_headers,
+    app_settings,
+    sample_contract,
+    date_from,
+    date_to,
+    period_start,
+    period_end,
+):
+    response = client.get(
+        "/api/v1/dashboard",
+        headers=auth_headers,
+        params={"date_from": date_from, "date_to": date_to},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["period_start"] == period_start
+    assert data["period_end"] == period_end
 
 
 def test_dashboard_stats_with_date_range(client, auth_headers, app_settings, sample_contract):

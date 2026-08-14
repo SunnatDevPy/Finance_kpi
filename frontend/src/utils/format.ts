@@ -104,6 +104,14 @@ export function formatDate(value: string): string {
   return `${day}.${month}.${year}`;
 }
 
+/** DD.MM — yilsiz qisqa sana (dashboard davr yorlig'i) */
+export function formatDateShort(value: string): string {
+  const date = parseISODate(value);
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${day}.${month}`;
+}
+
 /** Hafta kuni: i18n (Payshanba) yoki brauzer fallback */
 export function formatWeekday(value: string, _style: "long" | "short" = "long"): string {
   const date = parseISODate(value);
