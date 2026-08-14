@@ -248,3 +248,48 @@ def test_finance_auto_payments_year_setting(client, auth_headers, sample_contrac
     settings = client.get("/api/v1/settings", headers=auth_headers)
     assert settings.status_code == 200
     assert settings.json()["finance_auto_payments_from_year"] == 2025
+    assert settings.json()["finance_auto_payments_from_month"] == 1
+    assert settings.json()["finance_auto_payments_from_day"] == 1
+
+
+def test_finance_auto_payments_from_month_and_day(client, auth_headers, sample_contract):
+    patch = client.patch(
+        "/api/v1/settings/finance-auto-payments-year",
+        headers=auth_headers,
+        json={
+            "finance_auto_payments_from_year": 2026,
+            "finance_auto_payments_from_month": 8,
+            "finance_auto_payments_from_day": 14,
+        },
+    )
+    assert patch.status_code == 200
+    assert patch.json()["finance_auto_payments_from_month"] == 8
+    assert patch.json()["finance_auto_payments_from_day"] == 14
+
+    client.post(
+        "/api/v1/payments",
+        headers=auth_headers,
+        json={"contract_id": sample_contract.id, "amount": "1000000.00", "paid_at": "2026-08-13"},
+    )
+    client.post(
+        "/api/v1/payments",
+        headers=auth_headers,
+        json={"contract_id": sample_contract.id, "amount": "2500000.00", "paid_at": "2026-08-14"},
+    )
+
+    resp = client.get("/api/v1/finance/turnover", headers=auth_headers, params={"year": 2026})
+    assert resp.status_code == 200
+    assert Decimal(resp.json()["total_revenue"]) == Decimal("2500000.00")
+
+
+def test_finance_auto_payments_rejects_invalid_date(client, auth_headers):
+    resp = client.patch(
+        "/api/v1/settings/finance-auto-payments-year",
+        headers=auth_headers,
+        json={
+            "finance_auto_payments_from_year": 2026,
+            "finance_auto_payments_from_month": 2,
+            "finance_auto_payments_from_day": 31,
+        },
+    )
+    assert resp.status_code == 422

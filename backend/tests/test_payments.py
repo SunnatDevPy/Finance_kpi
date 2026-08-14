@@ -53,6 +53,30 @@ def test_list_payments(client, auth_headers, sample_contract):
     assert data["items"][0]["company_name"] == "Acme LLC"
 
 
+def test_list_payments_defaults_to_paid_at_desc(client, auth_headers, sample_contract):
+    for paid_at, amount in (
+        ("2026-02-01", "100000.00"),
+        ("2026-08-14", "200000.00"),
+        ("2026-07-28", "300000.00"),
+        ("2027-12-18", "400000.00"),
+    ):
+        created = client.post(
+            "/api/v1/payments",
+            headers=auth_headers,
+            json={
+                "contract_id": sample_contract.id,
+                "amount": amount,
+                "paid_at": paid_at,
+            },
+        )
+        assert created.status_code == 201
+
+    response = client.get("/api/v1/payments", headers=auth_headers)
+    assert response.status_code == 200
+    dates = [item["paid_at"] for item in response.json()["items"]]
+    assert dates == ["2027-12-18", "2026-08-14", "2026-07-28", "2026-02-01"]
+
+
 def test_list_payments_sort_by_amount(client, auth_headers, sample_contract):
     create = client.post(
         "/api/v1/payments",

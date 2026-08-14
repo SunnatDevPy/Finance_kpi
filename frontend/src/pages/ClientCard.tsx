@@ -189,7 +189,13 @@ export function ClientCardPage() {
     let skip = 0;
     const all: Payment[] = [];
     while (true) {
-      const page = await api.payments.list({ contractId, skip, limit });
+      const page = await api.payments.list({
+        contractId,
+        skip,
+        limit,
+        sort_by: "date",
+        sort_order: "desc",
+      });
       all.push(...page.items);
       if (page.items.length < limit || all.length >= page.total) break;
       skip += limit;

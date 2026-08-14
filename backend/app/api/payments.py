@@ -41,7 +41,7 @@ def list_payments(
     search: str | None = Query(default=None, min_length=1),
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=20, ge=1, le=200),
-    sort_by: PaymentSortBy | None = Query(default=None),
+    sort_by: PaymentSortBy | None = Query(default="date"),
     sort_order: SortOrder = Query(default="desc"),
 ) -> PaymentsPage:
     filters = [Payment.deleted_at.is_(None), Contract.deleted_at.is_(None)]

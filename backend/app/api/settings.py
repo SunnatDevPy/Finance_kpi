@@ -12,10 +12,10 @@ from app.schemas.settings import (
 )
 from app.services.app_settings import (
     get_company_profile,
-    get_finance_auto_payments_from_year,
+    get_finance_auto_payments_from,
     get_monthly_plan,
     set_company_profile,
-    set_finance_auto_payments_from_year,
+    set_finance_auto_payments_from,
     set_monthly_plan,
 )
 
@@ -23,10 +23,13 @@ router = APIRouter(prefix="/settings", dependencies=[Depends(get_current_user)])
 
 
 def _settings_read(db: Session) -> SettingsRead:
+    auto_from = get_finance_auto_payments_from(db)
     return SettingsRead(
         monthly_plan=get_monthly_plan(db),
         company=CompanyProfile(**get_company_profile(db)),
-        finance_auto_payments_from_year=get_finance_auto_payments_from_year(db),
+        finance_auto_payments_from_year=auto_from.year,
+        finance_auto_payments_from_month=auto_from.month,
+        finance_auto_payments_from_day=auto_from.day,
     )
 
 
@@ -62,5 +65,10 @@ def update_finance_auto_payments_year(
     db: Session = Depends(get_db),
     _: object = Depends(require_admin),
 ) -> SettingsRead:
-    set_finance_auto_payments_from_year(db, payload.finance_auto_payments_from_year)
+    set_finance_auto_payments_from(
+        db,
+        payload.finance_auto_payments_from_year,
+        payload.finance_auto_payments_from_month,
+        payload.finance_auto_payments_from_day,
+    )
     return _settings_read(db)

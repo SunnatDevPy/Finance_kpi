@@ -1,6 +1,7 @@
+from datetime import date
 from decimal import Decimal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class CompanyProfile(BaseModel):
@@ -18,6 +19,8 @@ class SettingsRead(BaseModel):
     monthly_plan: Decimal
     company: CompanyProfile
     finance_auto_payments_from_year: int = 2026
+    finance_auto_payments_from_month: int = 1
+    finance_auto_payments_from_day: int = 1
 
 
 class MonthlyPlanUpdate(BaseModel):
@@ -26,6 +29,20 @@ class MonthlyPlanUpdate(BaseModel):
 
 class FinanceAutoPaymentsYearUpdate(BaseModel):
     finance_auto_payments_from_year: int = Field(ge=2019, le=2035)
+    finance_auto_payments_from_month: int = Field(default=1, ge=1, le=12)
+    finance_auto_payments_from_day: int = Field(default=1, ge=1, le=31)
+
+    @model_validator(mode="after")
+    def validate_calendar_date(self) -> "FinanceAutoPaymentsYearUpdate":
+        try:
+            date(
+                self.finance_auto_payments_from_year,
+                self.finance_auto_payments_from_month,
+                self.finance_auto_payments_from_day,
+            )
+        except ValueError as exc:
+            raise ValueError("Noto'g'ri sana") from exc
+        return self
 
 
 class CompanyProfileUpdate(BaseModel):

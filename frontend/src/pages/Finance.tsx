@@ -222,9 +222,19 @@ export function FinancePage() {
   const [autoPaymentsFromYear, setAutoPaymentsFromYear] = useState(
     DEFAULT_FINANCE_AUTO_PAYMENTS_YEAR,
   );
+  const [autoPaymentsFromMonth, setAutoPaymentsFromMonth] = useState(1);
+  const [autoPaymentsFromDay, setAutoPaymentsFromDay] = useState(1);
 
-  const financeShowsContractPayments =
-    new Date().getFullYear() >= autoPaymentsFromYear;
+  const financeShowsContractPayments = (() => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const from = new Date(
+      autoPaymentsFromYear,
+      autoPaymentsFromMonth - 1,
+      autoPaymentsFromDay,
+    ).getTime();
+    return today >= from;
+  })();
 
   const yearOptions = useMemo(() => {
     const years: number[] = [];
@@ -350,9 +360,15 @@ export function FinancePage() {
   useEffect(() => {
     api.settings
       .get()
-      .then((data) => setAutoPaymentsFromYear(data.finance_auto_payments_from_year))
+      .then((data) => {
+        setAutoPaymentsFromYear(data.finance_auto_payments_from_year);
+        setAutoPaymentsFromMonth(data.finance_auto_payments_from_month ?? 1);
+        setAutoPaymentsFromDay(data.finance_auto_payments_from_day ?? 1);
+      })
       .catch(() => {
         setAutoPaymentsFromYear(DEFAULT_FINANCE_AUTO_PAYMENTS_YEAR);
+        setAutoPaymentsFromMonth(1);
+        setAutoPaymentsFromDay(1);
       });
   }, []);
 

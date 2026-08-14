@@ -99,7 +99,7 @@ export function PaymentsPage() {
   });
   const { submitting: paySubmitting, guard: guardPay } = useSubmitGuard();
   const { sortBy, sortOrder, handleSort } = useTableSort<PaymentSortKey>(
-    "wtma.payments.sort",
+    "wtma.payments.tableSort",
     "date",
     "desc",
     ["client", "contract", "note"],

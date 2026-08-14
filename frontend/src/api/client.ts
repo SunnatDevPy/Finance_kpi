@@ -364,10 +364,18 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify(data),
       }),
-    updateFinanceAutoPaymentsYear: (finance_auto_payments_from_year: number) =>
+    updateFinanceAutoPaymentsYear: (
+      finance_auto_payments_from_year: number,
+      finance_auto_payments_from_month = 1,
+      finance_auto_payments_from_day = 1,
+    ) =>
       request<AppSettings>("/settings/finance-auto-payments-year", {
         method: "PATCH",
-        body: JSON.stringify({ finance_auto_payments_from_year }),
+        body: JSON.stringify({
+          finance_auto_payments_from_year,
+          finance_auto_payments_from_month,
+          finance_auto_payments_from_day,
+        }),
       }),
   },
 

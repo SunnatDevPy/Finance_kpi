@@ -23,6 +23,7 @@ import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
 import { formatDateTimeWithWeekday, toWholeAmountDigits } from "../utils/format";
 import type { CompanyProfile, LoginHistoryEntry } from "../types";
+import { MONTH_KEYS } from "@/lib/dateRange";
 import { FloatingLabelInput, FloatingLabelPhoneInput } from "@/components/ui/floating-label-input";
 import { parsePhoneNational, toPhoneE164 } from "@/hooks/usePhoneInput";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,10 @@ const FINANCE_YEAR_OPTIONS = Array.from(
   (_, index) => FINANCE_YEAR_START + index,
 );
 
+function daysInMonth(year: number, month: number): number {
+  return new Date(year, month, 0).getDate();
+}
+
 export function ProfilePage() {
   const { user, isAdmin } = useAuth();
   const { t } = useI18n();
@@ -55,6 +60,8 @@ export function ProfilePage() {
   const [planSuccess, setPlanSuccess] = useState("");
   const [planLoading, setPlanLoading] = useState(false);
   const [financeAutoPaymentsYear, setFinanceAutoPaymentsYear] = useState("2026");
+  const [financeAutoPaymentsMonth, setFinanceAutoPaymentsMonth] = useState("1");
+  const [financeAutoPaymentsDay, setFinanceAutoPaymentsDay] = useState("1");
   const [financeYearSuccess, setFinanceYearSuccess] = useState("");
   const [financeYearError, setFinanceYearError] = useState("");
   const [financeYearLoading, setFinanceYearLoading] = useState(false);
@@ -86,7 +93,12 @@ export function ProfilePage() {
       .get()
       .then((data) => {
         setMonthlyPlanInput(toWholeAmountDigits(data.monthly_plan));
-        setFinanceAutoPaymentsYear(String(data.finance_auto_payments_from_year));
+        const year = data.finance_auto_payments_from_year;
+        const month = data.finance_auto_payments_from_month ?? 1;
+        const day = data.finance_auto_payments_from_day ?? 1;
+        setFinanceAutoPaymentsYear(String(year));
+        setFinanceAutoPaymentsMonth(String(month));
+        setFinanceAutoPaymentsDay(String(Math.min(day, daysInMonth(year, month))));
         setCompanyForm({
           ...data.company,
           company_phone: parsePhoneNational(data.company.company_phone || ""),
@@ -173,18 +185,29 @@ export function ProfilePage() {
     setFinanceYearError("");
     setFinanceYearSuccess("");
     const year = Number.parseInt(financeAutoPaymentsYear, 10);
+    const month = Number.parseInt(financeAutoPaymentsMonth, 10);
+    const day = Number.parseInt(financeAutoPaymentsDay, 10);
+    const lastDay = daysInMonth(year, month);
     if (
       Number.isNaN(year) ||
+      Number.isNaN(month) ||
+      Number.isNaN(day) ||
       year < FINANCE_YEAR_START ||
-      year > FINANCE_YEAR_END
+      year > FINANCE_YEAR_END ||
+      month < 1 ||
+      month > 12 ||
+      day < 1 ||
+      day > lastDay
     ) {
       setFinanceYearError(t("common.error"));
       return;
     }
     setFinanceYearLoading(true);
     try {
-      const data = await api.settings.updateFinanceAutoPaymentsYear(year);
+      const data = await api.settings.updateFinanceAutoPaymentsYear(year, month, day);
       setFinanceAutoPaymentsYear(String(data.finance_auto_payments_from_year));
+      setFinanceAutoPaymentsMonth(String(data.finance_auto_payments_from_month));
+      setFinanceAutoPaymentsDay(String(data.finance_auto_payments_from_day));
       setFinanceYearSuccess(t("profile.financeAutoPaymentsYearSaved"));
     } catch (err) {
       setFinanceYearError(err instanceof Error ? err.message : t("common.error"));
@@ -308,43 +331,112 @@ export function ProfilePage() {
                 {financeYearSuccess}
               </p>
             )}
-            <form onSubmit={handleFinanceYearSubmit} className="flex flex-col gap-4 sm:flex-row sm:items-end">
-              <div className="flex flex-1 flex-col gap-2">
-                <Label htmlFor="finance_auto_payments_year">
-                  {t("profile.financeAutoPaymentsYear")}
-                </Label>
-                <Select
-                  value={financeAutoPaymentsYear}
-                  onValueChange={(value) => value && setFinanceAutoPaymentsYear(value)}
-                >
-                  <SelectTrigger id="finance_auto_payments_year" className="w-full sm:max-w-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    {FINANCE_YEAR_OPTIONS.map((year) => (
-                      <SelectItem key={year} value={String(year)}>
-                        {year}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <form onSubmit={handleFinanceYearSubmit} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <p className="text-sm font-medium">{t("profile.financeAutoPaymentsFrom")}</p>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                  <div className="flex flex-col gap-2 sm:w-28">
+                    <Label htmlFor="finance_auto_payments_year">
+                      {t("profile.financeAutoPaymentsYear")}
+                    </Label>
+                    <Select
+                      value={financeAutoPaymentsYear}
+                      onValueChange={(value) => {
+                        if (!value) return;
+                        setFinanceAutoPaymentsYear(value);
+                        const nextYear = Number.parseInt(value, 10);
+                        const month = Number.parseInt(financeAutoPaymentsMonth, 10);
+                        const day = Number.parseInt(financeAutoPaymentsDay, 10);
+                        const lastDay = daysInMonth(nextYear, month);
+                        if (day > lastDay) setFinanceAutoPaymentsDay(String(lastDay));
+                      }}
+                    >
+                      <SelectTrigger id="finance_auto_payments_year">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-60">
+                        {FINANCE_YEAR_OPTIONS.map((year) => (
+                          <SelectItem key={year} value={String(year)}>
+                            {year}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex flex-1 flex-col gap-2 sm:max-w-[10rem]">
+                    <Label htmlFor="finance_auto_payments_month">
+                      {t("profile.financeAutoPaymentsMonth")}
+                    </Label>
+                    <Select
+                      value={financeAutoPaymentsMonth}
+                      onValueChange={(value) => {
+                        if (!value) return;
+                        setFinanceAutoPaymentsMonth(value);
+                        const year = Number.parseInt(financeAutoPaymentsYear, 10);
+                        const nextMonth = Number.parseInt(value, 10);
+                        const day = Number.parseInt(financeAutoPaymentsDay, 10);
+                        const lastDay = daysInMonth(year, nextMonth);
+                        if (day > lastDay) setFinanceAutoPaymentsDay(String(lastDay));
+                      }}
+                    >
+                      <SelectTrigger id="finance_auto_payments_month">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-60">
+                        {MONTH_KEYS.map((key, index) => (
+                          <SelectItem key={key} value={String(index + 1)}>
+                            {t(`dateRange.months.${key}`)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex flex-col gap-2 sm:w-24">
+                    <Label htmlFor="finance_auto_payments_day">
+                      {t("profile.financeAutoPaymentsDay")}
+                    </Label>
+                    <Select
+                      value={financeAutoPaymentsDay}
+                      onValueChange={(value) => value && setFinanceAutoPaymentsDay(value)}
+                    >
+                      <SelectTrigger id="finance_auto_payments_day">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-60">
+                        {Array.from(
+                          {
+                            length: daysInMonth(
+                              Number.parseInt(financeAutoPaymentsYear, 10),
+                              Number.parseInt(financeAutoPaymentsMonth, 10),
+                            ),
+                          },
+                          (_, index) => index + 1,
+                        ).map((day) => (
+                          <SelectItem key={day} value={String(day)}>
+                            {day}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button type="submit" disabled={financeYearLoading}>
+                    {financeYearLoading ? (
+                      <>
+                        <LoadingIconBtn />
+                        {t("common.loading")}
+                      </>
+                    ) : (
+                      <>
+                        <SaveIconBtn />
+                        {t("common.save")}
+                      </>
+                    )}
+                  </Button>
+                </div>
                 <p className="text-xs text-muted-foreground">
                   {t("profile.financeAutoPaymentsYearHint")}
                 </p>
               </div>
-              <Button type="submit" disabled={financeYearLoading}>
-                {financeYearLoading ? (
-                  <>
-                    <LoadingIconBtn />
-                    {t("common.loading")}
-                  </>
-                ) : (
-                  <>
-                    <SaveIconBtn />
-                    {t("common.save")}
-                  </>
-                )}
-              </Button>
             </form>
           </CardContent>
         </Card>

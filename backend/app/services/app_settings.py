@@ -1,3 +1,4 @@
+from calendar import monthrange
 from datetime import date
 from decimal import Decimal, InvalidOperation
 
@@ -7,6 +8,8 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models import AppSetting
 from app.services.finance_period import (
+    DEFAULT_FINANCE_AUTO_PAYMENTS_FROM_DAY,
+    DEFAULT_FINANCE_AUTO_PAYMENTS_FROM_MONTH,
     DEFAULT_FINANCE_AUTO_PAYMENTS_FROM_YEAR,
     TURNOVER_YEAR_END,
     TURNOVER_YEAR_START,
@@ -15,6 +18,8 @@ from app.services.finance_period import (
 MONTHLY_PLAN_KEY = "monthly_plan"
 YEARLY_PLAN_KEY_PREFIX = "yearly_plan_"
 FINANCE_AUTO_PAYMENTS_FROM_YEAR_KEY = "finance_auto_payments_from_year"
+FINANCE_AUTO_PAYMENTS_FROM_MONTH_KEY = "finance_auto_payments_from_month"
+FINANCE_AUTO_PAYMENTS_FROM_DAY_KEY = "finance_auto_payments_from_day"
 
 
 def yearly_plan_key(year: int) -> str:
@@ -96,33 +101,93 @@ def set_company_profile(db: Session, data: dict[str, str]) -> dict[str, str]:
     return get_company_profile(db)
 
 
-def get_finance_auto_payments_from_year(db: Session) -> int:
-    row = db.get(AppSetting, FINANCE_AUTO_PAYMENTS_FROM_YEAR_KEY)
+def _get_int_setting(
+    db: Session,
+    key: str,
+    default: int,
+    min_value: int,
+    max_value: int,
+) -> int:
+    row = db.get(AppSetting, key)
     if row is None:
-        return DEFAULT_FINANCE_AUTO_PAYMENTS_FROM_YEAR
+        return default
     try:
-        year = int(row.value)
+        value = int(row.value)
     except (TypeError, ValueError):
-        return DEFAULT_FINANCE_AUTO_PAYMENTS_FROM_YEAR
-    if year < TURNOVER_YEAR_START or year > TURNOVER_YEAR_END:
-        return DEFAULT_FINANCE_AUTO_PAYMENTS_FROM_YEAR
-    return year
+        return default
+    if value < min_value or value > max_value:
+        return default
+    return value
+
+
+def _set_setting(db: Session, key: str, value: str) -> None:
+    row = db.get(AppSetting, key)
+    if row is None:
+        db.add(AppSetting(key=key, value=value))
+    else:
+        row.value = value
+
+
+def get_finance_auto_payments_from_year(db: Session) -> int:
+    return _get_int_setting(
+        db,
+        FINANCE_AUTO_PAYMENTS_FROM_YEAR_KEY,
+        DEFAULT_FINANCE_AUTO_PAYMENTS_FROM_YEAR,
+        TURNOVER_YEAR_START,
+        TURNOVER_YEAR_END,
+    )
+
+
+def get_finance_auto_payments_from_month(db: Session) -> int:
+    return _get_int_setting(
+        db,
+        FINANCE_AUTO_PAYMENTS_FROM_MONTH_KEY,
+        DEFAULT_FINANCE_AUTO_PAYMENTS_FROM_MONTH,
+        1,
+        12,
+    )
+
+
+def get_finance_auto_payments_from_day(db: Session) -> int:
+    return _get_int_setting(
+        db,
+        FINANCE_AUTO_PAYMENTS_FROM_DAY_KEY,
+        DEFAULT_FINANCE_AUTO_PAYMENTS_FROM_DAY,
+        1,
+        31,
+    )
 
 
 def get_finance_auto_payments_from(db: Session) -> date:
-    return date(get_finance_auto_payments_from_year(db), 1, 1)
+    year = get_finance_auto_payments_from_year(db)
+    month = get_finance_auto_payments_from_month(db)
+    day = get_finance_auto_payments_from_day(db)
+    last_day = monthrange(year, month)[1]
+    return date(year, month, min(day, last_day))
 
 
-def set_finance_auto_payments_from_year(db: Session, year: int) -> int:
+def set_finance_auto_payments_from(
+    db: Session,
+    year: int,
+    month: int = DEFAULT_FINANCE_AUTO_PAYMENTS_FROM_MONTH,
+    day: int = DEFAULT_FINANCE_AUTO_PAYMENTS_FROM_DAY,
+) -> date:
     if year < TURNOVER_YEAR_START or year > TURNOVER_YEAR_END:
         raise ValueError(
             f"Year must be between {TURNOVER_YEAR_START} and {TURNOVER_YEAR_END}"
         )
-    row = db.get(AppSetting, FINANCE_AUTO_PAYMENTS_FROM_YEAR_KEY)
-    value = str(year)
-    if row is None:
-        db.add(AppSetting(key=FINANCE_AUTO_PAYMENTS_FROM_YEAR_KEY, value=value))
-    else:
-        row.value = value
+    try:
+        result = date(year, month, day)
+    except ValueError as exc:
+        raise ValueError("Noto'g'ri sana") from exc
+    _set_setting(db, FINANCE_AUTO_PAYMENTS_FROM_YEAR_KEY, str(year))
+    _set_setting(db, FINANCE_AUTO_PAYMENTS_FROM_MONTH_KEY, str(month))
+    _set_setting(db, FINANCE_AUTO_PAYMENTS_FROM_DAY_KEY, str(day))
     db.commit()
+    return result
+
+
+def set_finance_auto_payments_from_year(db: Session, year: int) -> int:
+    current = get_finance_auto_payments_from(db)
+    set_finance_auto_payments_from(db, year, current.month, current.day)
     return year
