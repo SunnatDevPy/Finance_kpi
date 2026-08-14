@@ -191,6 +191,12 @@ export interface DashboardStats {
   monthly_revenue: string;
   monthly_plan: string;
   revenue_growth_pct: number | null;
+  yearly_revenue: string;
+  yearly_plan: string;
+  yearly_growth_pct: number | null;
+  yearly_debt: string;
+  year_start: string;
+  year_end: string;
   collection_rate: number;
   total_contracts: number;
   active_contracts: number;

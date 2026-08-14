@@ -32,7 +32,7 @@ from app.schemas.dashboard import (
     TopClientLtvItem,
 )
 
-from app.services.app_settings import get_finance_auto_payments_from, get_monthly_plan
+from app.services.app_settings import get_finance_auto_payments_from, get_monthly_plan, get_yearly_plan
 from app.services.cancelled_stats import sum_cancelled_line_items
 from app.services.finance_period import payment_counting_start
 from app.services.helpers import client_total_amount, client_total_paid
@@ -99,6 +99,36 @@ def _growth_pct(current: Decimal, previous: Decimal) -> float | None:
     if previous <= 0:
         return None if current <= 0 else 100.0
     return float(((current - previous) / previous) * 100)
+
+
+def _calendar_year_bounds(anchor: date) -> tuple[date, date]:
+    return date(anchor.year, 1, 1), date(anchor.year, 12, 31)
+
+
+def _year_contract_debt(db: Session, *, year_start: date, year_end: date) -> Decimal:
+    amount = db.scalar(
+        select(func.coalesce(func.sum(ContractLineItem.price), 0))
+        .select_from(ContractLineItem)
+        .join(Contract, Contract.id == ContractLineItem.contract_id)
+        .where(
+            ContractLineItem.is_cancelled.is_(False),
+            Contract.deleted_at.is_(None),
+            Contract.start_date >= year_start,
+            Contract.start_date <= year_end,
+        )
+    ) or Decimal("0")
+    paid = db.scalar(
+        select(func.coalesce(func.sum(Payment.amount), 0))
+        .select_from(Payment)
+        .join(Contract, Contract.id == Payment.contract_id)
+        .where(
+            Payment.deleted_at.is_(None),
+            Contract.deleted_at.is_(None),
+            Contract.start_date >= year_start,
+            Contract.start_date <= year_end,
+        )
+    ) or Decimal("0")
+    return amount - paid
 
 
 def _sum_manual_income(
@@ -267,6 +297,8 @@ def get_dashboard_stats(
     today = date.today()
     auto_from = get_finance_auto_payments_from(db)
     monthly_plan = get_monthly_plan(db)
+    year_start, year_end = _calendar_year_bounds(today)
+    yearly_plan = get_yearly_plan(db, today.year)
     period_start, period_end, months, has_custom_range = _resolve_period(date_from, date_to)
     range_start = months[0]
     range_end = _month_end(months[-1])
@@ -308,6 +340,22 @@ def get_dashboard_stats(
         auto_from=auto_from,
     )
     revenue_growth_pct = _growth_pct(period_revenue, prev_period_revenue)
+
+    yearly_revenue = _total_revenue(
+        db,
+        date_from=year_start,
+        date_to=year_end,
+        auto_from=auto_from,
+    )
+    prev_year_start, prev_year_end = _calendar_year_bounds(date(today.year - 1, 1, 1))
+    prev_year_revenue = _total_revenue(
+        db,
+        date_from=prev_year_start,
+        date_to=prev_year_end,
+        auto_from=auto_from,
+    )
+    yearly_growth_pct = _growth_pct(yearly_revenue, prev_year_revenue)
+    yearly_debt = _year_contract_debt(db, year_start=year_start, year_end=year_end)
 
     total_expenses = db.scalar(
         select(func.coalesce(func.sum(Expense.amount), 0)).where(Expense.deleted_at.is_(None))
@@ -578,6 +626,12 @@ def get_dashboard_stats(
         monthly_revenue=period_revenue,
         monthly_plan=monthly_plan,
         revenue_growth_pct=revenue_growth_pct,
+        yearly_revenue=yearly_revenue,
+        yearly_plan=yearly_plan,
+        yearly_growth_pct=yearly_growth_pct,
+        yearly_debt=yearly_debt,
+        year_start=year_start,
+        year_end=year_end,
         collection_rate=collection_rate,
         total_contracts=total_contracts,
         active_contracts=active_contracts,

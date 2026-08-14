@@ -4,11 +4,13 @@ from decimal import Decimal
 from app.services.finance_period import DEFAULT_FINANCE_AUTO_PAYMENTS_FROM
 
 
-def test_finance_turnover_summary_manual_only_before_2027(client, auth_headers, sample_contract):
+def test_finance_turnover_summary_manual_only_before_auto_year(
+    client, auth_headers, sample_contract
+):
     client.post(
         "/api/v1/payments",
         headers=auth_headers,
-        json={"contract_id": sample_contract.id, "amount": "2000000.00", "paid_at": "2026-04-01"},
+        json={"contract_id": sample_contract.id, "amount": "2000000.00", "paid_at": "2025-04-01"},
     )
     client.post(
         "/api/v1/incomes",
@@ -17,7 +19,7 @@ def test_finance_turnover_summary_manual_only_before_2027(client, auth_headers, 
             "category": "investment",
             "title": "Investitsiya",
             "amount": "1000000.00",
-            "income_date": "2026-04-02",
+            "income_date": "2025-04-02",
         },
     )
     client.post(
@@ -27,14 +29,14 @@ def test_finance_turnover_summary_manual_only_before_2027(client, auth_headers, 
             "category": "rent",
             "title": "Ofis ijarasi",
             "amount": "500000.00",
-            "expense_date": "2026-04-03",
+            "expense_date": "2025-04-03",
         },
     )
 
-    resp = client.get("/api/v1/finance/turnover", headers=auth_headers, params={"year": 2026})
+    resp = client.get("/api/v1/finance/turnover", headers=auth_headers, params={"year": 2025})
     assert resp.status_code == 200
     data = resp.json()
-    assert data["year"] == 2026
+    assert data["year"] == 2025
     assert data["period"] == "full"
     assert Decimal(data["total_revenue"]) == Decimal("1000000.00")
     assert Decimal(data["total_expense"]) == Decimal("500000.00")
@@ -224,7 +226,7 @@ def test_finance_turnover_trend(client, auth_headers, sample_contract):
 
 
 def test_finance_auto_payments_cutover_default_year():
-    assert DEFAULT_FINANCE_AUTO_PAYMENTS_FROM == date(2027, 1, 1)
+    assert DEFAULT_FINANCE_AUTO_PAYMENTS_FROM == date(2026, 1, 1)
 
 
 def test_finance_auto_payments_year_setting(client, auth_headers, sample_contract):

@@ -38,7 +38,9 @@ import { CardPdfButton } from "../components/CardPdfButton";
 import { DateRangePicker } from "../components/DateRangePicker";
 import { SortableTableHead } from "@/components/SortableTableHead";
 import { StatCard } from "../components/StatCard";
+import { MonthlyRevenueModal } from "../components/MonthlyRevenueModal";
 import { TableViewLink } from "../components/TableViewLink";
+import { usePersistedState } from "../hooks/usePersistedState";
 import { StaggerContainer, StaggerItem } from "../components/Stagger";
 import { PageShell, SectionHeader } from "../components/PageHeader";
 import {
@@ -112,6 +114,7 @@ const TREND_MONTH_OPTIONS = [6, 12] as const;
 const CONTRACTS_BY_CLIENT_PAGE_SIZE = 20;
 type TableLimit = (typeof TABLE_LIMIT_OPTIONS)[number];
 type SortOrder = "asc" | "desc";
+type Horizon = "month" | "year";
 type RegionSortKey = "city" | "clients_count" | "total_amount" | "total_paid" | "total_debt";
 
 type ContractClientSortKey = "company" | "count" | "amount";
@@ -321,6 +324,8 @@ export function DashboardPage() {
   const [regionCityFilter, setRegionCityFilter] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [horizon, setHorizon] = usePersistedState<Horizon>("wtma.dashboard.horizon", "month");
+  const [revenueModalOpen, setRevenueModalOpen] = useState(false);
   const [error, setError] = useState("");
   const [regionError, setRegionError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -626,14 +631,26 @@ export function DashboardPage() {
     );
   }
 
-  const planPercent =
-    toNumber(stats.monthly_plan) > 0
-      ? Math.round((toNumber(stats.monthly_revenue) / toNumber(stats.monthly_plan)) * 100)
-      : 0;
-
   const hasDateRange = Boolean(dateFrom || dateTo);
+  const showYear = !hasDateRange && horizon === "year";
   const financeRevenue = hasDateRange ? stats.monthly_revenue : stats.total_revenue;
   const periodRangeLabel = `${formatDateShort(stats.period_start)} – ${formatDateShort(stats.period_end)}`;
+  const yearRangeLabel = `${formatDateShort(stats.year_start)} – ${formatDateShort(stats.year_end)}`;
+  const revenueValue = showYear ? stats.yearly_revenue : stats.monthly_revenue;
+  const revenueChange = showYear ? stats.yearly_growth_pct : stats.revenue_growth_pct;
+  const revenuePeriodLabel = showYear ? yearRangeLabel : periodRangeLabel;
+  const debtValue = showYear ? stats.yearly_debt : stats.total_debt;
+  const planValue = showYear ? stats.yearly_plan : stats.monthly_plan;
+  const planPercent =
+    toNumber(planValue) > 0
+      ? Math.round((toNumber(revenueValue) / toNumber(planValue)) * 100)
+      : 0;
+
+  const selectHorizon = (next: Horizon) => {
+    setDateFrom("");
+    setDateTo("");
+    setHorizon(next);
+  };
 
   return (
     <PageShell className={cn(loading && "pointer-events-none opacity-60")}>
@@ -672,6 +689,28 @@ export function DashboardPage() {
 
       {/* ── Stat cards ── */}
       <div className="space-y-4">
+        <div className="flex justify-end">
+          <div className="segmented-control" role="group" aria-label={t("dashboard.horizonAria")}>
+            <Button
+              type="button"
+              size="sm"
+              variant={!hasDateRange && horizon === "month" ? "default" : "ghost"}
+              className="h-8 px-3.5"
+              onClick={() => selectHorizon("month")}
+            >
+              {t("dashboard.horizonMonth")}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={!hasDateRange && horizon === "year" ? "default" : "ghost"}
+              className="h-8 px-3.5"
+              onClick={() => selectHorizon("year")}
+            >
+              {t("dashboard.horizonYear")}
+            </Button>
+          </div>
+        </div>
         <StaggerContainer className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <StaggerItem>
             <StatCard
@@ -702,9 +741,9 @@ export function DashboardPage() {
           <StaggerItem>
             <StatCard
               size="compact"
-              title={t("dashboard.totalDebt")}
-              value={formatMoney(stats.total_debt)}
-              numericValue={toNumber(stats.total_debt)}
+              title={showYear ? t("dashboard.yearlyDebt") : t("dashboard.totalDebt")}
+              value={formatMoney(debtValue)}
+              numericValue={toNumber(debtValue)}
               formatValue={formatMoney}
               accent="red"
               icon={AlertTriangleIcon}
@@ -714,23 +753,24 @@ export function DashboardPage() {
           <StaggerItem>
             <StatCard
               size="compact"
-              title={t("dashboard.monthlyRevenue")}
-              value={formatMoney(stats.monthly_revenue)}
-              numericValue={toNumber(stats.monthly_revenue)}
+              title={showYear ? t("dashboard.yearlyRevenue") : t("dashboard.monthlyRevenue")}
+              value={formatMoney(revenueValue)}
+              numericValue={toNumber(revenueValue)}
               formatValue={formatMoney}
-              subtitle={periodRangeLabel}
-              change={stats.revenue_growth_pct}
+              subtitle={revenuePeriodLabel}
+              change={revenueChange}
               changeLabel={t("dashboard.vsPrev")}
               accent="green"
               icon={TrendingUpIcon}
+              onClick={() => setRevenueModalOpen(true)}
             />
           </StaggerItem>
           <StaggerItem>
             <StatCard
               size="compact"
-              title={t("dashboard.monthlyPlan")}
-              value={formatMoney(stats.monthly_plan)}
-              numericValue={toNumber(stats.monthly_plan)}
+              title={showYear ? t("dashboard.yearlyPlan") : t("dashboard.monthlyPlan")}
+              value={formatMoney(planValue)}
+              numericValue={toNumber(planValue)}
               formatValue={formatMoney}
               subtitle={`${t("dashboard.planDone")}: ${planPercent}%`}
               accent="amber"
@@ -1645,6 +1685,13 @@ export function DashboardPage() {
           )}
         </CardContent>
       </Card>
+      <MonthlyRevenueModal
+        open={revenueModalOpen}
+        onClose={() => setRevenueModalOpen(false)}
+        periodStart={showYear ? stats.year_start : stats.period_start}
+        periodEnd={showYear ? stats.year_end : stats.period_end}
+        periodLabel={revenuePeriodLabel}
+      />
     </PageShell>
   );
 }

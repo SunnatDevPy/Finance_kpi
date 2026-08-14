@@ -19,6 +19,8 @@ interface StatCardProps {
   size?: StatCardSize;
   /** Berilsa, karta bosiladigan qilinadi va shu yo'lga o'tkazadi. */
   to?: string;
+  /** Berilsa, karta bosilganda chaqiriladi (masalan, modal ochish). */
+  onClick?: () => void;
 }
 
 const sizeStyles: Record<
@@ -115,11 +117,13 @@ export function StatCard({
   icon: Icon,
   size = "default",
   to,
+  onClick,
 }: StatCardProps) {
   const th = themes[accent];
   const sz = sizeStyles[size];
   const isUp = change != null && change >= 0;
   const chipClass = change == null ? "" : isUp ? th.chipUp : th.chipDown;
+  const clickable = Boolean(to || onClick);
 
   return (
     <motion.div
@@ -127,7 +131,7 @@ export function StatCard({
       className={cn(
         "group relative flex h-full flex-col overflow-hidden border bg-gradient-to-br backdrop-blur-sm transition-shadow duration-300 hover:shadow-xl",
         sz.card,
-        to && "cursor-pointer",
+        clickable && "cursor-pointer",
         th.card,
         th.glow,
       )}
@@ -136,6 +140,14 @@ export function StatCard({
         <Link to={to} className="absolute inset-0 z-10" aria-label={title}>
           <span className="sr-only">{title}</span>
         </Link>
+      )}
+      {!to && onClick && (
+        <button
+          type="button"
+          className="absolute inset-0 z-10 rounded-[inherit] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          onClick={onClick}
+          aria-label={title}
+        />
       )}
       {/* Yuqori qator: sarlavha chapda, ikonka o'ng burchakda */}
       <div className="flex items-start justify-between gap-3">

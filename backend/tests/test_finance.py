@@ -4,13 +4,13 @@ from io import BytesIO
 from openpyxl import Workbook, load_workbook
 
 
-def test_finance_ledger_manual_income_expense_before_2027(
+def test_finance_ledger_manual_income_expense_before_auto_year(
     client, auth_headers, sample_contract
 ):
     client.post(
         "/api/v1/payments",
         headers=auth_headers,
-        json={"contract_id": sample_contract.id, "amount": "2000000.00", "paid_at": "2026-04-01"},
+        json={"contract_id": sample_contract.id, "amount": "2000000.00", "paid_at": "2025-04-01"},
     )
     client.post(
         "/api/v1/incomes",
@@ -19,7 +19,7 @@ def test_finance_ledger_manual_income_expense_before_2027(
             "category": "investment",
             "title": "Investitsiya",
             "amount": "1000000.00",
-            "income_date": "2026-04-02",
+            "income_date": "2025-04-02",
         },
     )
     client.post(
@@ -29,14 +29,14 @@ def test_finance_ledger_manual_income_expense_before_2027(
             "category": "rent",
             "title": "Ofis ijarasi",
             "amount": "500000.00",
-            "expense_date": "2026-04-03",
+            "expense_date": "2025-04-03",
         },
     )
 
     resp = client.get(
         "/api/v1/finance/ledger",
         headers=auth_headers,
-        params={"date_from": "2026-04-01", "date_to": "2026-04-30"},
+        params={"date_from": "2025-04-01", "date_to": "2025-04-30"},
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -112,6 +112,31 @@ def test_finance_ledger_includes_payments_from_2027(client, auth_headers, sample
     types = {item["type"] for item in data["items"]}
     assert types == {"payment", "income"}
     assert Decimal(data["total_income"]) == Decimal("3000000.00")
+
+
+def test_finance_ledger_includes_august_2026_contract_payments(
+    client, auth_headers, sample_contract
+):
+    client.post(
+        "/api/v1/payments",
+        headers=auth_headers,
+        json={
+            "contract_id": sample_contract.id,
+            "amount": "8000000.00",
+            "paid_at": "2026-08-14",
+        },
+    )
+
+    resp = client.get(
+        "/api/v1/finance/ledger",
+        headers=auth_headers,
+        params={"date_from": "2026-08-01", "date_to": "2026-08-31"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    types = {item["type"] for item in data["items"]}
+    assert "payment" in types
+    assert Decimal(data["total_income"]) == Decimal("8000000.00")
 
 
 def test_finance_ledger_filters_by_type(client, auth_headers, sample_contract):

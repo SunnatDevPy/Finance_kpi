@@ -6,12 +6,15 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models import AppSetting
-from app.services.finance_period import TURNOVER_YEAR_END, TURNOVER_YEAR_START
+from app.services.finance_period import (
+    DEFAULT_FINANCE_AUTO_PAYMENTS_FROM_YEAR,
+    TURNOVER_YEAR_END,
+    TURNOVER_YEAR_START,
+)
 
 MONTHLY_PLAN_KEY = "monthly_plan"
 YEARLY_PLAN_KEY_PREFIX = "yearly_plan_"
 FINANCE_AUTO_PAYMENTS_FROM_YEAR_KEY = "finance_auto_payments_from_year"
-DEFAULT_FINANCE_AUTO_PAYMENTS_FROM_YEAR = 2027
 
 
 def yearly_plan_key(year: int) -> str:

@@ -54,7 +54,7 @@ export function ProfilePage() {
   const [planError, setPlanError] = useState("");
   const [planSuccess, setPlanSuccess] = useState("");
   const [planLoading, setPlanLoading] = useState(false);
-  const [financeAutoPaymentsYear, setFinanceAutoPaymentsYear] = useState("2027");
+  const [financeAutoPaymentsYear, setFinanceAutoPaymentsYear] = useState("2026");
   const [financeYearSuccess, setFinanceYearSuccess] = useState("");
   const [financeYearError, setFinanceYearError] = useState("");
   const [financeYearLoading, setFinanceYearLoading] = useState(false);

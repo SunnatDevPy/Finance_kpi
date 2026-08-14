@@ -86,6 +86,12 @@ class DashboardStats(BaseModel):
     monthly_revenue: Decimal
     monthly_plan: Decimal
     revenue_growth_pct: float | None
+    yearly_revenue: Decimal
+    yearly_plan: Decimal
+    yearly_growth_pct: float | None
+    yearly_debt: Decimal
+    year_start: date
+    year_end: date
     collection_rate: float
     total_contracts: int
     active_contracts: int

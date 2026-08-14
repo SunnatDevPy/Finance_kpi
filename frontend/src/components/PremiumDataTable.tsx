@@ -218,7 +218,7 @@ export function TableCellLink({ to, children, subtitle, className }: TableCellLi
 }
 
 interface TableCellCompanyProps {
-  to: string
+  to?: string
   name: string
   subtitle?: string
   className?: string
@@ -227,22 +227,23 @@ interface TableCellCompanyProps {
 }
 
 export function TableCellCompany({ to, name, subtitle, className, logoUrl, multiline = false }: TableCellCompanyProps) {
+  const nameClass = cn(
+    "font-semibold",
+    multiline ? "line-clamp-2 break-words text-[13px] leading-tight" : "truncate",
+  )
+
   return (
     <TableCell className={className}>
       <div className="flex items-start gap-2">
         <CompanyAvatar name={name} size="sm" logoUrl={logoUrl} className="mt-0.5 shrink-0" />
         <div className="flex min-w-0 flex-col gap-0.5">
-          <Link
-            to={to}
-            className={cn(
-              "link-surface font-semibold text-primary",
-              multiline
-                ? "line-clamp-2 break-words text-[13px] leading-tight"
-                : "truncate",
-            )}
-          >
-            {name}
-          </Link>
+          {to ? (
+            <Link to={to} className={cn("link-surface text-primary", nameClass)}>
+              {name}
+            </Link>
+          ) : (
+            <span className={cn("text-foreground", nameClass)}>{name}</span>
+          )}
           {subtitle ? (
             <span className="truncate text-xs text-muted-foreground">{subtitle}</span>
           ) : null}

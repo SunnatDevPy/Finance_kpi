@@ -30,6 +30,33 @@ def test_dashboard_stats(client, auth_headers, app_settings, sample_contract):
     assert "clients" in data
     assert data["total_contracts"] == 1
     assert "charts" in data
+    assert "yearly_revenue" in data
+    assert "yearly_debt" in data
+    assert data["year_start"] == f"{date.today().year:04d}-01-01"
+    assert data["year_end"] == f"{date.today().year:04d}-12-31"
+
+
+def test_dashboard_yearly_revenue_and_debt(
+    client, auth_headers, app_settings, sample_contract, monkeypatch
+):
+    _freeze_dashboard_today(monkeypatch, date(2026, 8, 14))
+    client.post(
+        "/api/v1/payments",
+        headers=auth_headers,
+        json={
+            "contract_id": sample_contract.id,
+            "amount": "300000.00",
+            "paid_at": "2026-08-14",
+        },
+    )
+
+    response = client.get("/api/v1/dashboard", headers=auth_headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["year_start"] == "2026-01-01"
+    assert data["year_end"] == "2026-12-31"
+    assert Decimal(data["yearly_revenue"]) == Decimal("300000.00")
+    assert Decimal(data["yearly_debt"]) == Decimal("700000.00")
 
 
 @pytest.mark.parametrize(
@@ -244,7 +271,7 @@ def test_dashboard_manual_income_before_auto_payments_year(client, auth_headers,
     client.post(
         "/api/v1/payments",
         headers=auth_headers,
-        json={"contract_id": sample_contract.id, "amount": "5000000.00", "paid_at": "2026-06-01"},
+        json={"contract_id": sample_contract.id, "amount": "5000000.00", "paid_at": "2025-06-01"},
     )
     client.post(
         "/api/v1/incomes",
@@ -253,7 +280,7 @@ def test_dashboard_manual_income_before_auto_payments_year(client, auth_headers,
             "category": "sale",
             "title": "Qo'lda kirim",
             "amount": "1200000.00",
-            "income_date": "2026-06-10",
+            "income_date": "2025-06-10",
         },
     )
     client.post(
@@ -263,14 +290,14 @@ def test_dashboard_manual_income_before_auto_payments_year(client, auth_headers,
             "category": "rent",
             "title": "Ijara",
             "amount": "200000.00",
-            "expense_date": "2026-06-15",
+            "expense_date": "2025-06-15",
         },
     )
 
     response = client.get(
         "/api/v1/dashboard",
         headers=auth_headers,
-        params={"date_from": "2026-06-01", "date_to": "2026-06-30"},
+        params={"date_from": "2025-06-01", "date_to": "2025-06-30"},
     )
     assert response.status_code == 200
     data = response.json()
@@ -306,6 +333,29 @@ def test_dashboard_includes_payments_from_auto_year(client, auth_headers, sample
     data = response.json()
     assert Decimal(data["monthly_revenue"]) == Decimal("3500000.00")
     assert Decimal(data["net_profit"]) == Decimal("3500000.00")
+
+
+def test_dashboard_includes_august_2026_contract_payments(
+    client, auth_headers, sample_contract
+):
+    client.post(
+        "/api/v1/payments",
+        headers=auth_headers,
+        json={
+            "contract_id": sample_contract.id,
+            "amount": "8000000.00",
+            "paid_at": "2026-08-14",
+        },
+    )
+
+    response = client.get(
+        "/api/v1/dashboard",
+        headers=auth_headers,
+        params={"date_from": "2026-08-01", "date_to": "2026-08-31"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert Decimal(data["monthly_revenue"]) == Decimal("8000000.00")
 
 
 def test_clients_by_region(client, auth_headers, sample_contract):

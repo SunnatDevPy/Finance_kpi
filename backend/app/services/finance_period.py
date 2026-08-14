@@ -9,7 +9,8 @@ TURNOVER_YEAR_END = 2035
 
 # Shartnoma to'lovlari moliyaga avtomatik tushadigan boshlanish sanasi (default).
 # Haqiqiy qiymat Profil → Tizim sozlamalaridan o'qiladi.
-DEFAULT_FINANCE_AUTO_PAYMENTS_FROM = date(2027, 1, 1)
+DEFAULT_FINANCE_AUTO_PAYMENTS_FROM_YEAR = 2026
+DEFAULT_FINANCE_AUTO_PAYMENTS_FROM = date(DEFAULT_FINANCE_AUTO_PAYMENTS_FROM_YEAR, 1, 1)
 
 
 def resolve_finance_period(year: int, period: FinancePeriod) -> tuple[date, date]:

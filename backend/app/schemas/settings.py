@@ -17,7 +17,7 @@ class CompanyProfile(BaseModel):
 class SettingsRead(BaseModel):
     monthly_plan: Decimal
     company: CompanyProfile
-    finance_auto_payments_from_year: int = 2027
+    finance_auto_payments_from_year: int = 2026
 
 
 class MonthlyPlanUpdate(BaseModel):

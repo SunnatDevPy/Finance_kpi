@@ -111,7 +111,7 @@ import { cn } from "@/lib/utils";
 const TURNOVER_YEAR_START = 2019;
 const TURNOVER_YEAR_END = 2035;
 const TURNOVER_TREND_END_YEAR = new Date().getFullYear();
-const DEFAULT_FINANCE_AUTO_PAYMENTS_YEAR = 2027;
+const DEFAULT_FINANCE_AUTO_PAYMENTS_YEAR = 2026;
 const TURNOVER_YEAR_ALL = "all" as const;
 const TURNOVER_PERIODS: FinancePeriod[] = ["full", "q1", "q2", "q3", "q4"];
 
