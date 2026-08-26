@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { CalendarRangeIcon, XIcon } from "lucide-react";
@@ -6,6 +6,7 @@ import { useI18n } from "../context/I18nContext";
 import { CalendarBodySwitch, CalendarMonthNav, type CalendarNavMode } from "./CalendarMonthNav";
 import { Button, MotionButton, motionTap } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useFloatingPosition } from "@/hooks/useFloatingPosition";
 import {
   formatRangeLabelWithWeekday,
   getMonthGrid,
@@ -39,7 +40,6 @@ export function DateRangePicker({ from, to, onChange, onClear, className, onDark
   const containerRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
-  const [coords, setCoords] = useState<{ top: number; left: number; width: number } | null>(null);
   const [viewMonth, setViewMonth] = useState(() => startOfMonth(new Date()));
   const [draftFrom, setDraftFrom] = useState(from);
   const [draftTo, setDraftTo] = useState(to);
@@ -47,6 +47,16 @@ export function DateRangePicker({ from, to, onChange, onClear, className, onDark
   const [navMode, setNavMode] = useState<CalendarNavMode>("days");
   /** Picker ochilganda mavjud muddat — faqat tahrirlash rejimida «eski sana» sifatida */
   const [editBaseline, setEditBaseline] = useState<{ from: string; to: string } | null>(null);
+
+  const coords = useFloatingPosition({
+    triggerRef: containerRef,
+    popoverRef,
+    isOpen: open,
+    targetWidth: () => (window.innerWidth >= 640 ? 520 : 380),
+    estimatedHeight: 460,
+    viewportPadding: 12,
+    offset: 6,
+  });
 
   const getMonthName = (key: MonthKey) => t(`dateRange.months.${key}`);
 
@@ -89,6 +99,7 @@ export function DateRangePicker({ from, to, onChange, onClear, className, onDark
   }, [open, from, to, formField]);
 
   useEffect(() => {
+    if (!open) return;
     const handleClick = (event: MouseEvent) => {
       const target = event.target as Node;
       if (
@@ -99,32 +110,16 @@ export function DateRangePicker({ from, to, onChange, onClear, className, onDark
         setOpen(false);
       }
     };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
-
-  useLayoutEffect(() => {
-    if (!open) return;
-
-    const updatePosition = () => {
-      const trigger = containerRef.current;
-      if (!trigger) return;
-      const rect = trigger.getBoundingClientRect();
-      const dropdownWidth = window.innerWidth >= 640 ? 520 : Math.min(window.innerWidth - 32, 400);
-      const left = Math.min(
-        Math.max(16, rect.left),
-        Math.max(16, window.innerWidth - dropdownWidth - 16),
-      );
-      const top = Math.min(rect.bottom + 8, window.innerHeight - 24);
-      setCoords({ top, left, width: dropdownWidth });
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
     };
-
-    updatePosition();
-    window.addEventListener("resize", updatePosition);
-    window.addEventListener("scroll", updatePosition, true);
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKeyDown);
     return () => {
-      window.removeEventListener("resize", updatePosition);
-      window.removeEventListener("scroll", updatePosition, true);
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKeyDown);
     };
   }, [open]);
 
@@ -290,12 +285,27 @@ export function DateRangePicker({ from, to, onChange, onClear, className, onDark
           {open && coords && (
             <motion.div
               ref={popoverRef}
-              initial={{ opacity: 0, y: -6, scale: 0.98 }}
+              initial={{
+                opacity: 0,
+                y: coords.placement === "top" ? 6 : -6,
+                scale: 0.98,
+              }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -6, scale: 0.98 }}
-              transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-              style={{ position: "fixed", top: coords.top, left: coords.left, width: coords.width, zIndex: 9999 }}
-              className="overflow-hidden rounded-2xl border border-border/60 bg-popover text-popover-foreground shadow-2xl backdrop-blur-xl"
+              exit={{
+                opacity: 0,
+                y: coords.placement === "top" ? 6 : -6,
+                scale: 0.98,
+              }}
+              transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+              style={{
+                position: "fixed",
+                top: coords.top,
+                left: coords.left,
+                width: coords.width,
+                maxHeight: coords.maxHeight,
+                zIndex: 9999,
+              }}
+              className="flex flex-col overflow-y-auto rounded-2xl border border-border/70 bg-popover text-popover-foreground shadow-2xl backdrop-blur-xl"
               role="dialog"
               aria-label={t("dateRange.title")}
             >

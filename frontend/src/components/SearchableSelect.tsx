@@ -1,7 +1,6 @@
 import {
   useEffect,
   useId,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -21,6 +20,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { antiAutofillAttrs } from "@/lib/autofill";
+import { useFloatingPosition } from "@/hooks/useFloatingPosition";
 import { useI18n } from "@/context/I18nContext";
 
 export interface SearchableSelectOption {
@@ -70,7 +70,16 @@ export function SearchableSelect({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [highlightIndex, setHighlightIndex] = useState(0);
-  const [coords, setCoords] = useState<{ top: number; left: number; width: number } | null>(null);
+
+  const coords = useFloatingPosition({
+    triggerRef: containerRef,
+    popoverRef: listRef,
+    isOpen: open,
+    targetWidth: "trigger",
+    estimatedHeight: 240,
+    viewportPadding: 12,
+    offset: 4,
+  });
 
   const selectedOption = useMemo(
     () => options.find((option) => option.value === value),
@@ -81,41 +90,27 @@ export function SearchableSelect({
   const filtered = useMemo(() => filterOptions(options, query), [options, query]);
   const isFloated = variant === "floating" && (Boolean(value) || open || query.length > 0);
 
-  const updateCoords = () => {
-    const el = containerRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    setCoords({
-      top: rect.bottom + 4,
-      left: rect.left,
-      width: rect.width,
-    });
-  };
-
-  useLayoutEffect(() => {
-    if (!open) return;
-    updateCoords();
-    const onScrollOrResize = () => updateCoords();
-    window.addEventListener("resize", onScrollOrResize);
-    window.addEventListener("scroll", onScrollOrResize, true);
-    return () => {
-      window.removeEventListener("resize", onScrollOrResize);
-      window.removeEventListener("scroll", onScrollOrResize, true);
-    };
-  }, [open]);
-
   useEffect(() => {
     if (!open) return;
     const handleClick = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (containerRef.current?.contains(target) || listRef.current?.contains(target)) {
+      if (containerRef.current?.contains(event.target as Node) || listRef.current?.contains(event.target as Node)) {
         return;
       }
       setOpen(false);
       setQuery("");
     };
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+        setQuery("");
+      }
+    };
     document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
   }, [open]);
 
   useEffect(() => {
@@ -126,7 +121,6 @@ export function SearchableSelect({
     if (disabled) return;
     setOpen(true);
     setQuery("");
-    updateCoords();
   };
 
   const closeList = () => {
@@ -188,18 +182,27 @@ export function SearchableSelect({
           ref={listRef}
           id={`${inputId}-listbox`}
           role="listbox"
-          initial={{ opacity: 0, y: -4, scale: 0.98 }}
+          initial={{
+            opacity: 0,
+            y: coords.placement === "top" ? 4 : -4,
+            scale: 0.98,
+          }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -4, scale: 0.98 }}
+          exit={{
+            opacity: 0,
+            y: coords.placement === "top" ? 4 : -4,
+            scale: 0.98,
+          }}
           transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
           style={{
             position: "fixed",
             top: coords.top,
             left: coords.left,
             width: coords.width,
+            maxHeight: coords.maxHeight ? Math.min(coords.maxHeight, 260) : 240,
             zIndex: 10000,
           }}
-          className="max-h-60 overflow-y-auto rounded-xl border border-border/70 bg-popover/95 p-1 text-popover-foreground shadow-xl ring-1 ring-foreground/5 backdrop-blur-xl"
+          className="overflow-y-auto rounded-xl border border-border/70 bg-popover/95 p-1 text-popover-foreground shadow-xl ring-1 ring-foreground/5 backdrop-blur-xl"
         >
           {filtered.length === 0 ? (
             <p className="px-3 py-2 text-sm text-muted-foreground">{t("common.noResults")}</p>

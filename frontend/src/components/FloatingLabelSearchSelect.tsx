@@ -1,7 +1,6 @@
 import {
   useEffect,
   useId,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -21,6 +20,7 @@ import {
 import { cn } from "@/lib/utils";
 import { antiAutofillAttrs } from "@/lib/autofill";
 import { useAutofillGuard } from "@/hooks/useAutofillGuard";
+import { useFloatingPosition } from "@/hooks/useFloatingPosition";
 import { useI18n } from "@/context/I18nContext";
 import {
   filterGeoOptions,
@@ -63,9 +63,17 @@ export function FloatingLabelSearchSelect({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [highlightIndex, setHighlightIndex] = useState(0);
-  const [coords, setCoords] = useState<{ top: number; left: number; width: number } | null>(
-    null,
-  );
+
+  const coords = useFloatingPosition({
+    triggerRef: containerRef,
+    popoverRef: listRef,
+    isOpen: open,
+    targetWidth: "trigger",
+    estimatedHeight: 220,
+    viewportPadding: 12,
+    offset: 4,
+  });
+
   const hasStoredValue = Boolean(value);
   const { guardProps, unlock } = useAutofillGuard(true, hasStoredValue);
   const guardReadOnly = "readOnly" in guardProps ? guardProps.readOnly : false;
@@ -82,29 +90,6 @@ export function FloatingLabelSearchSelect({
   const filtered = useMemo(() => filterGeoOptions(options, query), [options, query]);
 
   const isFloated = Boolean(value) || open || query.length > 0;
-
-  const updateCoords = () => {
-    const el = containerRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    setCoords({
-      top: rect.bottom + 4,
-      left: rect.left,
-      width: rect.width,
-    });
-  };
-
-  useLayoutEffect(() => {
-    if (!open) return;
-    updateCoords();
-    const onScrollOrResize = () => updateCoords();
-    window.addEventListener("resize", onScrollOrResize);
-    window.addEventListener("scroll", onScrollOrResize, true);
-    return () => {
-      window.removeEventListener("resize", onScrollOrResize);
-      window.removeEventListener("scroll", onScrollOrResize, true);
-    };
-  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -132,7 +117,6 @@ export function FloatingLabelSearchSelect({
     unlock();
     setOpen(true);
     setQuery("");
-    updateCoords();
   };
 
   const closeList = () => {
@@ -255,18 +239,27 @@ export function FloatingLabelSearchSelect({
               ref={listRef}
               id={`${inputId}-listbox`}
               role="listbox"
-              initial={{ opacity: 0, y: -4, scale: 0.98 }}
+              initial={{
+                opacity: 0,
+                y: coords.placement === "top" ? 4 : -4,
+                scale: 0.98,
+              }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -4, scale: 0.98 }}
+              exit={{
+                opacity: 0,
+                y: coords.placement === "top" ? 4 : -4,
+                scale: 0.98,
+              }}
               transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
               style={{
                 position: "fixed",
                 top: coords.top,
                 left: coords.left,
                 width: coords.width,
+                maxHeight: coords.maxHeight ? Math.min(coords.maxHeight, 240) : 224,
                 zIndex: 10000,
               }}
-              className="max-h-56 overflow-y-auto rounded-xl border border-border/70 bg-popover/95 p-1 text-popover-foreground shadow-xl ring-1 ring-foreground/5 backdrop-blur-xl"
+              className="overflow-y-auto rounded-xl border border-border/70 bg-popover/95 p-1 text-popover-foreground shadow-xl ring-1 ring-foreground/5 backdrop-blur-xl"
             >
               {filtered.length === 0 ? (
                 <p className="px-3 py-2 text-sm text-muted-foreground">{t("common.noResults")}</p>

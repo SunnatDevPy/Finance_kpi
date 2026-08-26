@@ -21,3 +21,5 @@ playwright-report/
 playwright/.cache/
 postgres_data/
 backend/uploads/
+.tmp*
+*.restored

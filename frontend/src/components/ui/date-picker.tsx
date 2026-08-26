@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { CalendarIcon } from "lucide-react";
@@ -6,6 +6,7 @@ import { useI18n } from "@/context/I18nContext";
 import { CalendarBodySwitch, CalendarMonthNav, type CalendarNavMode } from "@/components/CalendarMonthNav";
 import { cn } from "@/lib/utils";
 import { floatedLabel, labelPeer } from "@/components/ui/floating-label-input";
+import { useFloatingPosition } from "@/hooks/useFloatingPosition";
 import {
   getMonthGrid,
   isSameDay,
@@ -49,9 +50,18 @@ export function FloatingLabelDatePicker({
   const containerRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
-  const [coords, setCoords] = useState<{ top: number; left: number; width: number } | null>(null);
   const [viewMonth, setViewMonth] = useState(() => startOfMonth(value ? parseISODate(value) : new Date()));
   const [navMode, setNavMode] = useState<CalendarNavMode>("days");
+
+  const coords = useFloatingPosition({
+    triggerRef: containerRef,
+    popoverRef,
+    isOpen: open,
+    targetWidth: 296,
+    estimatedHeight: 340,
+    viewportPadding: 12,
+    offset: 6,
+  });
 
   const dateLocale = locale === "ru" ? "ru-RU" : "uz-UZ";
   const getMonthName = (key: MonthKey) => t(`dateRange.months.${key}`);
@@ -65,7 +75,6 @@ export function FloatingLabelDatePicker({
     : "";
   const displayLabel = displayDate;
 
-
   useEffect(() => {
     if (open) {
       setViewMonth(startOfMonth(value ? parseISODate(value) : new Date()));
@@ -74,6 +83,7 @@ export function FloatingLabelDatePicker({
   }, [open, value]);
 
   useEffect(() => {
+    if (!open) return;
     const handleClick = (event: MouseEvent) => {
       const target = event.target as Node;
       if (
@@ -84,27 +94,16 @@ export function FloatingLabelDatePicker({
         setOpen(false);
       }
     };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
-
-  useLayoutEffect(() => {
-    if (!open) return;
-    const updatePosition = () => {
-      const trigger = containerRef.current;
-      if (!trigger) return;
-      const rect = trigger.getBoundingClientRect();
-      const width = Math.min(288, window.innerWidth - 32);
-      const left = Math.min(Math.max(16, rect.left), Math.max(16, window.innerWidth - width - 16));
-      const top = Math.min(rect.bottom + 8, window.innerHeight - 24);
-      setCoords({ top, left, width });
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
     };
-    updatePosition();
-    window.addEventListener("resize", updatePosition);
-    window.addEventListener("scroll", updatePosition, true);
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKeyDown);
     return () => {
-      window.removeEventListener("resize", updatePosition);
-      window.removeEventListener("scroll", updatePosition, true);
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKeyDown);
     };
   }, [open]);
 
@@ -164,12 +163,27 @@ export function FloatingLabelDatePicker({
           {open && coords && (
             <motion.div
               ref={popoverRef}
-              initial={{ opacity: 0, y: -6, scale: 0.98 }}
+              initial={{
+                opacity: 0,
+                y: coords.placement === "top" ? 6 : -6,
+                scale: 0.98,
+              }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -6, scale: 0.98 }}
-              transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-              style={{ position: "fixed", top: coords.top, left: coords.left, width: coords.width, zIndex: 9999 }}
-              className="overflow-hidden rounded-2xl border border-border/60 bg-popover p-3 text-popover-foreground shadow-2xl backdrop-blur-xl"
+              exit={{
+                opacity: 0,
+                y: coords.placement === "top" ? 6 : -6,
+                scale: 0.98,
+              }}
+              transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+              style={{
+                position: "fixed",
+                top: coords.top,
+                left: coords.left,
+                width: coords.width,
+                maxHeight: coords.maxHeight,
+                zIndex: 9999,
+              }}
+              className="flex flex-col overflow-y-auto rounded-2xl border border-border/70 bg-popover p-3 text-popover-foreground shadow-2xl backdrop-blur-xl"
               role="dialog"
               aria-label={label}
             >
@@ -187,53 +201,57 @@ export function FloatingLabelDatePicker({
               />
 
               <CalendarBodySwitch mode={navMode}>
-              <div className="grid grid-cols-7 gap-0.5 text-center">
-                {WEEKDAY_KEYS.map((key) => (
-                  <div key={key} className="py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    {t(`dateRange.weekdays.${key}`)}
-                  </div>
-                ))}
-                {days.map((day) => {
-                  const inMonth = day.getMonth() === viewMonth.getMonth();
-                  const isSelected = selectedDate && isSameDay(day, selectedDate);
-                  const isToday = isSameDay(day, new Date());
-                  const disabled = (minDate && day < minDate) || (maxDate && day > maxDate);
-
-                  return (
-                    <button
-                      key={toISODate(day)}
-                      type="button"
-                      disabled={Boolean(disabled)}
-                      onClick={() => handleDayClick(day)}
-                      className={cn(
-                        "relative flex size-9 items-center justify-center rounded-lg text-sm transition-colors",
-                        !inMonth && "text-muted-foreground/30 opacity-40",
-                        inMonth && "text-foreground",
-                        isSelected && "bg-primary font-semibold text-primary-foreground opacity-100 shadow-sm",
-                        isToday && !isSelected && inMonth && "ring-1 ring-primary/40",
-                        inMonth && !isSelected && !disabled && "hover:bg-muted",
-                        disabled && "cursor-not-allowed opacity-30",
-                      )}
+                <div className="grid grid-cols-7 gap-0.5 text-center">
+                  {WEEKDAY_KEYS.map((key) => (
+                    <div
+                      key={key}
+                      className="py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
                     >
-                      {day.getDate()}
-                    </button>
-                  );
-                })}
-              </div>
+                      {t(`dateRange.weekdays.${key}`)}
+                    </div>
+                  ))}
+                  {days.map((day) => {
+                    const inMonth = day.getMonth() === viewMonth.getMonth();
+                    const isSelected = selectedDate && isSameDay(day, selectedDate);
+                    const isToday = isSameDay(day, new Date());
+                    const disabled = (minDate && day < minDate) || (maxDate && day > maxDate);
+
+                    return (
+                      <button
+                        key={toISODate(day)}
+                        type="button"
+                        disabled={Boolean(disabled)}
+                        onClick={() => handleDayClick(day)}
+                        className={cn(
+                          "relative flex size-8.5 sm:size-9 items-center justify-center rounded-lg text-sm transition-colors",
+                          !inMonth && "text-muted-foreground/30 opacity-40",
+                          inMonth && "text-foreground",
+                          isSelected &&
+                            "bg-primary font-semibold text-primary-foreground opacity-100 shadow-sm",
+                          isToday && !isSelected && inMonth && "ring-1 ring-primary/40",
+                          inMonth && !isSelected && !disabled && "hover:bg-muted",
+                          disabled && "cursor-not-allowed opacity-30",
+                        )}
+                      >
+                        {day.getDate()}
+                      </button>
+                    );
+                  })}
+                </div>
               </CalendarBodySwitch>
 
-              <div className="mt-3 flex items-center justify-between border-t border-border/50 pt-3">
+              <div className="mt-3 flex items-center justify-between border-t border-border/50 pt-2.5">
                 <button
                   type="button"
                   onClick={handleClear}
-                  className="text-btn-surface text-xs font-medium text-muted-foreground hover:text-foreground"
+                  className="rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                   {t("dateRange.clear")}
                 </button>
                 <button
                   type="button"
                   onClick={handleToday}
-                  className="text-btn-surface text-xs font-medium text-primary"
+                  className="rounded-md px-2 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary/10"
                 >
                   {t("dateRange.today")}
                 </button>
@@ -246,3 +264,4 @@ export function FloatingLabelDatePicker({
     </div>
   );
 }
+
