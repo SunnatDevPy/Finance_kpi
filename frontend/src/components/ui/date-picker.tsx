@@ -57,10 +57,10 @@ export function FloatingLabelDatePicker({
     triggerRef: containerRef,
     popoverRef,
     isOpen: open,
-    targetWidth: 296,
-    estimatedHeight: 340,
-    viewportPadding: 12,
-    offset: 6,
+    targetWidth: 272,
+    estimatedHeight: 285,
+    viewportPadding: 10,
+    offset: 5,
   });
 
   const dateLocale = locale === "ru" ? "ru-RU" : "uz-UZ";
@@ -165,25 +165,24 @@ export function FloatingLabelDatePicker({
               ref={popoverRef}
               initial={{
                 opacity: 0,
-                y: coords.placement === "top" ? 6 : -6,
+                y: coords.placement === "top" ? 4 : -4,
                 scale: 0.98,
               }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{
                 opacity: 0,
-                y: coords.placement === "top" ? 6 : -6,
+                y: coords.placement === "top" ? 4 : -4,
                 scale: 0.98,
               }}
-              transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+              transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
               style={{
                 position: "fixed",
                 top: coords.top,
                 left: coords.left,
                 width: coords.width,
-                maxHeight: coords.maxHeight,
                 zIndex: 9999,
               }}
-              className="flex flex-col overflow-y-auto rounded-2xl border border-border/70 bg-popover p-3 text-popover-foreground shadow-2xl backdrop-blur-xl"
+              className="overflow-hidden rounded-2xl border border-border/70 bg-popover p-2.5 text-popover-foreground shadow-2xl backdrop-blur-xl"
               role="dialog"
               aria-label={label}
             >
@@ -205,7 +204,7 @@ export function FloatingLabelDatePicker({
                   {WEEKDAY_KEYS.map((key) => (
                     <div
                       key={key}
-                      className="py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+                      className="py-0.5 text-[9px] font-semibold uppercase tracking-wider text-muted-foreground"
                     >
                       {t(`dateRange.weekdays.${key}`)}
                     </div>
@@ -223,7 +222,7 @@ export function FloatingLabelDatePicker({
                         disabled={Boolean(disabled)}
                         onClick={() => handleDayClick(day)}
                         className={cn(
-                          "relative flex size-8.5 sm:size-9 items-center justify-center rounded-lg text-sm transition-colors",
+                          "relative flex size-7.5 sm:size-8 items-center justify-center rounded-lg text-xs sm:text-[13px] font-medium transition-colors",
                           !inMonth && "text-muted-foreground/30 opacity-40",
                           inMonth && "text-foreground",
                           isSelected &&
@@ -240,18 +239,18 @@ export function FloatingLabelDatePicker({
                 </div>
               </CalendarBodySwitch>
 
-              <div className="mt-3 flex items-center justify-between border-t border-border/50 pt-2.5">
+              <div className="mt-2 flex items-center justify-between border-t border-border/50 pt-2">
                 <button
                   type="button"
                   onClick={handleClear}
-                  className="rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  className="rounded-md px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                   {t("dateRange.clear")}
                 </button>
                 <button
                   type="button"
                   onClick={handleToday}
-                  className="rounded-md px-2 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary/10"
+                  className="rounded-md px-1.5 py-0.5 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/10"
                 >
                   {t("dateRange.today")}
                 </button>

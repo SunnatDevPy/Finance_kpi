@@ -52,10 +52,10 @@ export function DateRangePicker({ from, to, onChange, onClear, className, onDark
     triggerRef: containerRef,
     popoverRef,
     isOpen: open,
-    targetWidth: () => (window.innerWidth >= 640 ? 520 : 380),
-    estimatedHeight: 460,
-    viewportPadding: 12,
-    offset: 6,
+    targetWidth: () => (window.innerWidth >= 640 ? 470 : 340),
+    estimatedHeight: 350,
+    viewportPadding: 10,
+    offset: 5,
   });
 
   const getMonthName = (key: MonthKey) => t(`dateRange.months.${key}`);
@@ -287,32 +287,31 @@ export function DateRangePicker({ from, to, onChange, onClear, className, onDark
               ref={popoverRef}
               initial={{
                 opacity: 0,
-                y: coords.placement === "top" ? 6 : -6,
+                y: coords.placement === "top" ? 4 : -4,
                 scale: 0.98,
               }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{
                 opacity: 0,
-                y: coords.placement === "top" ? 6 : -6,
+                y: coords.placement === "top" ? 4 : -4,
                 scale: 0.98,
               }}
-              transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+              transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
               style={{
                 position: "fixed",
                 top: coords.top,
                 left: coords.left,
                 width: coords.width,
-                maxHeight: coords.maxHeight,
                 zIndex: 9999,
               }}
-              className="flex flex-col overflow-y-auto rounded-2xl border border-border/70 bg-popover text-popover-foreground shadow-2xl backdrop-blur-xl"
+              className="overflow-hidden rounded-2xl border border-border/70 bg-popover text-popover-foreground shadow-2xl backdrop-blur-xl"
               role="dialog"
               aria-label={t("dateRange.title")}
             >
             <div className="flex flex-col sm:flex-row">
               {/* Presets */}
-              <div className="border-b border-border/50 bg-muted/30 p-2 sm:w-36 sm:border-b-0 sm:border-r">
-                <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <div className="border-b border-border/50 bg-muted/30 p-1.5 sm:w-32 sm:border-b-0 sm:border-r">
+                <p className="px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-wider text-muted-foreground">
                   {t("dateRange.presets")}
                 </p>
                 <div className="flex flex-row gap-1 overflow-x-auto sm:flex-col sm:overflow-visible">
@@ -321,7 +320,7 @@ export function DateRangePicker({ from, to, onChange, onClear, className, onDark
                       key={preset}
                       type="button"
                       onClick={() => handlePreset(preset)}
-                      className="shrink-0 rounded-lg px-3 py-2 text-left text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground sm:w-full"
+                      className="shrink-0 rounded-lg px-2 py-1 text-left text-xs font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground sm:w-full"
                     >
                       {t(`dateRange.${preset}`)}
                     </button>
@@ -330,10 +329,10 @@ export function DateRangePicker({ from, to, onChange, onClear, className, onDark
               </div>
 
               {/* Calendar */}
-              <div className="flex-1 p-3">
+              <div className="flex-1 p-2.5">
                 <div
                   className={cn(
-                    "mb-3 rounded-xl border px-3 py-2.5 text-sm transition-colors",
+                    "mb-2 rounded-lg border px-2.5 py-1.5 text-xs transition-colors",
                     selectionStep === "end"
                       ? "border-primary/30 bg-primary/5 text-foreground"
                       : selectionStep === "done"
@@ -343,24 +342,19 @@ export function DateRangePicker({ from, to, onChange, onClear, className, onDark
                   role="status"
                   aria-live="polite"
                 >
-                  <p className="font-medium">{stepMessage}</p>
+                  <p className="font-medium leading-tight">{stepMessage}</p>
                   {stepHint && (
-                    <p className="mt-0.5 text-xs text-muted-foreground">{stepHint}</p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">{stepHint}</p>
                   )}
                   {isEditingRange && previousRangeLabel && (
-                    <div className="mt-2 rounded-lg border border-border/50 bg-background/60 px-2.5 py-1.5">
-                      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <div className="mt-1.5 rounded-md border border-border/50 bg-background/60 px-2 py-1">
+                      <p className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">
                         {t("dateRange.previousRange")}
                       </p>
-                      <p className="mt-0.5 text-xs font-medium text-foreground">
+                      <p className="text-[11px] font-medium text-foreground">
                         {previousRangeLabel}
                       </p>
                     </div>
-                  )}
-                  {!isEditingRange && selectionStep === "end" && draftFrom && (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {formatRangeLabelWithWeekday(draftFrom, draftFrom, getWeekdayName, " — ")}
-                    </p>
                   )}
                 </div>
 
@@ -382,7 +376,7 @@ export function DateRangePicker({ from, to, onChange, onClear, className, onDark
                   {WEEKDAY_KEYS.map((key) => (
                     <div
                       key={key}
-                      className="py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+                      className="py-0.5 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground"
                     >
                       {t(`dateRange.weekdays.${key}`)}
                     </div>
@@ -407,7 +401,7 @@ export function DateRangePicker({ from, to, onChange, onClear, className, onDark
                         onMouseEnter={() => draftFrom && !draftTo && setHoverDate(day)}
                         onMouseLeave={() => setHoverDate(null)}
                         className={cn(
-                          "relative flex size-9 items-center justify-center rounded-lg text-sm transition-colors",
+                          "relative flex size-7.5 sm:size-8 items-center justify-center rounded-lg text-xs sm:text-[13px] font-medium transition-colors",
                           !inMonth && "text-muted-foreground/30 opacity-40",
                           inMonth && "text-foreground",
                           inRange && inMonth && "bg-primary/10 text-foreground",
@@ -425,21 +419,22 @@ export function DateRangePicker({ from, to, onChange, onClear, className, onDark
                 </div>
                 </CalendarBodySwitch>
 
-                <div className="mt-3 flex flex-col gap-2 border-t border-border/50 pt-3 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-xs leading-snug text-muted-foreground sm:min-w-0 sm:truncate">
+                <div className="mt-2 flex flex-col gap-1.5 border-t border-border/50 pt-2 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-[11px] leading-snug text-muted-foreground sm:min-w-0 sm:truncate">
                     {draftFrom && draftTo
                       ? formatRangeLabelWithWeekday(draftFrom, draftTo, getWeekdayName, " — ")
                       : draftFrom
                         ? t("dateRange.selectEnd")
                         : t("dateRange.selectStart")}
                   </p>
-                  <div className="flex shrink-0 justify-end gap-1.5">
-                    <Button type="button" variant="ghost" size="sm" onClick={handlePopoverClear}>
+                  <div className="flex shrink-0 justify-end gap-1">
+                    <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={handlePopoverClear}>
                       {t("dateRange.clear")}
                     </Button>
                     <MotionButton
                       type="button"
                       size="sm"
+                      className="h-7 px-2.5 text-xs"
                       disabled={!draftFrom || !draftTo}
                       onClick={handleApply}
                       {...motionTap}

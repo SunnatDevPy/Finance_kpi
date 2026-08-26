@@ -199,10 +199,9 @@ export function SearchableSelect({
             top: coords.top,
             left: coords.left,
             width: coords.width,
-            maxHeight: coords.maxHeight ? Math.min(coords.maxHeight, 260) : 240,
             zIndex: 10000,
           }}
-          className="overflow-y-auto rounded-xl border border-border/70 bg-popover/95 p-1 text-popover-foreground shadow-xl ring-1 ring-foreground/5 backdrop-blur-xl"
+          className="max-h-60 overflow-y-auto rounded-xl border border-border/70 bg-popover/95 p-1 text-popover-foreground shadow-xl ring-1 ring-foreground/5 backdrop-blur-xl"
         >
           {filtered.length === 0 ? (
             <p className="px-3 py-2 text-sm text-muted-foreground">{t("common.noResults")}</p>

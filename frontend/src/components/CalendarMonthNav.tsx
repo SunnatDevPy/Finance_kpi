@@ -20,7 +20,7 @@ interface CalendarMonthNavProps {
 }
 
 function navBtnClass() {
-  return "flex size-8 items-center justify-center rounded-lg border border-border/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground";
+  return "flex size-7 items-center justify-center rounded-lg border border-border/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground";
 }
 
 export function CalendarMonthNav({
@@ -62,7 +62,7 @@ export function CalendarMonthNav({
 
   if (mode === "month-year") {
     return (
-      <div className="mb-3">
+      <div className="mb-2">
         <div className="flex items-center justify-between">
           <button
             type="button"
@@ -70,20 +70,20 @@ export function CalendarMonthNav({
             className={navBtnClass()}
             aria-label={prevYearLabel}
           >
-            <ChevronLeftIcon className="size-4" />
+            <ChevronLeftIcon className="size-3.5" />
           </button>
-          <p className="text-sm font-semibold tabular-nums text-foreground">{pickerYear}</p>
+          <p className="text-xs sm:text-sm font-semibold tabular-nums text-foreground">{pickerYear}</p>
           <button
             type="button"
             onClick={() => shiftYear(1)}
             className={navBtnClass()}
             aria-label={nextYearLabel}
           >
-            <ChevronRightIcon className="size-4" />
+            <ChevronRightIcon className="size-3.5" />
           </button>
         </div>
 
-        <div className="mt-3 grid grid-cols-3 gap-1.5">
+        <div className="mt-2 grid grid-cols-3 gap-1">
           {MONTH_KEYS.map((key, monthIndex) => {
             const isActive =
               pickerYear === viewMonth.getFullYear() && monthIndex === viewMonth.getMonth();
@@ -94,7 +94,7 @@ export function CalendarMonthNav({
                 type="button"
                 onClick={() => handleSelectMonth(monthIndex)}
                 className={cn(
-                  "rounded-lg px-2 py-2.5 text-sm font-medium transition-colors",
+                  "rounded-lg px-1.5 py-2 text-xs font-medium transition-colors",
                   isActive
                     ? "bg-primary text-primary-foreground shadow-sm"
                     : "text-foreground hover:bg-muted",
@@ -110,20 +110,20 @@ export function CalendarMonthNav({
   }
 
   return (
-    <div className="mb-3 flex items-center justify-between gap-1">
+    <div className="mb-2 flex items-center justify-between gap-1">
       <button
         type="button"
         onClick={() => shiftMonth(-1)}
         className={navBtnClass()}
         aria-label={prevMonthLabel}
       >
-        <ChevronLeftIcon className="size-4" />
+        <ChevronLeftIcon className="size-3.5" />
       </button>
 
       <button
         type="button"
         onClick={() => onModeChange("month-year")}
-        className="min-w-0 flex-1 rounded-lg px-2 py-1.5 text-center text-sm font-semibold text-foreground transition-colors hover:bg-muted"
+        className="min-w-0 flex-1 rounded-lg px-1.5 py-1 text-center text-xs sm:text-sm font-semibold text-foreground transition-colors hover:bg-muted"
         aria-label={pickMonthYearLabel}
       >
         {monthYearLabel}
@@ -135,7 +135,7 @@ export function CalendarMonthNav({
         className={navBtnClass()}
         aria-label={nextMonthLabel}
       >
-        <ChevronRightIcon className="size-4" />
+        <ChevronRightIcon className="size-3.5" />
       </button>
     </div>
   );
