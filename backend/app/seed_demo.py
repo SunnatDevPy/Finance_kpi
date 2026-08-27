@@ -38,6 +38,8 @@ from app.models import (
     LoginHistory,
     Payment,
     ServiceType,
+    Trip,
+    TripFactory,
     User,
     UserRole,
 )
@@ -104,6 +106,11 @@ CLIENTS: list[dict] = [
     {"company_name": "Quva Pilla va Ipak Klasteri", "city": "Quva", "activity_type": "Pilla qayta ishlash va ipak gazlama", "website": "quva-pilla.uz", "country": "O'zbekiston"},
     {"company_name": "Shovot Oq Mato Fabrikasi", "city": "Shovot", "activity_type": "Oqlangan paxta matolari", "website": "shovot-mato.uz", "country": "O'zbekiston"},
     {"company_name": "Shumanay Qoraqalpoq Tekstil", "city": "Shumanay", "activity_type": "Tikuvchilik va trikotaj mahsulotlari", "website": "shumanay-tekstil.uz", "country": "O'zbekiston"},
+    {"company_name": "Ivanovo Krasnaya Nit", "city": "Ivanovo", "activity_type": "Ip yigirish va paxta matolari", "website": "krasnayanit.ru", "country": "Rossiya"},
+    {"company_name": "Shuyskie Sittsi Fabrikasi", "city": "Ivanovo", "activity_type": "Sits va poplin matolari", "website": "shuyatex.ru", "country": "Rossiya"},
+    {"company_name": "Moskva Tekstil Alyans", "city": "Moskva", "activity_type": "Tekstil xomashyosi importi va distribyutsiyasi", "website": "mos-tekstil.ru", "country": "Rossiya"},
+    {"company_name": "Nord-Tex MCHJ", "city": "Moskva", "activity_type": "Uy tekstili va choyshablar", "website": "nordtex.ru", "country": "Rossiya"},
+    {"company_name": "Chimkent Denim JV", "city": "Shymkent", "activity_type": "Denim matolari va jinsi shimlari", "website": "shymkent-denim.kz", "country": "Qozog'iston"},
 ]
 
 TRASH_CLIENTS: list[dict] = [
@@ -258,6 +265,8 @@ def _random_phone(city: str) -> str:
 
 
 def wipe_business_data(db: Session) -> None:
+    db.query(TripFactory).delete()
+    db.query(Trip).delete()
     db.query(Payment).delete()
     db.query(ContractLineItem).delete()
     db.query(Contract).delete()
@@ -1068,6 +1077,306 @@ def seed_settings(db: Session) -> None:
     )
 
 
+def seed_trips(db: Session, users: list[User], clients: list[Client]) -> list[Trip]:
+    client_map = {c.company_name.lower(): c for c in clients}
+    user_map = {u.full_name: u for u in users}
+
+    trips_data = [
+        {
+            "title": "Namangan viloyati to'qimachilik klasterlari va eksportyorlariga xizmat safari",
+            "region": "Namangan viloyati",
+            "country": "O'zbekiston",
+            "start_date": date(2026, 2, 12),
+            "end_date": date(2026, 2, 15),
+            "employee_name": "Dilnoza Yusupova",
+            "purpose": "2026-yilgi yangi eksport kataloglari va xalqaro marketing kampaniyasini rejalashtirish",
+            "results": "4 ta korxona bilan uchrashuv o'tkazildi, 2 ta yangi yillik marketing shartnomasi imzolandi",
+            "factories": [
+                {"factory_name": "Namangan Silk & Wool XK", "notes": "Eksport katalogi tayyorlash"},
+                {"factory_name": "Mingbuloq Baraka Trikotaj", "notes": "SMM va kontent xizmati"},
+                {"factory_name": "Pop Poplin Ishlab Chiqarish", "notes": "Foto-sessiya o'tkazildi"},
+                {"factory_name": "Chust Do'ppilari va Trikotaj", "notes": "Yangi mahsulotlar taqdimoti"},
+            ],
+        },
+        {
+            "title": "Namangan sanoat zonalari monitoring safari",
+            "region": "Namangan viloyati",
+            "country": "O'zbekiston",
+            "start_date": date(2026, 6, 8),
+            "end_date": date(2026, 6, 10),
+            "employee_name": "Sardor Ergashev",
+            "purpose": "Foto/video materiallar tayyorlash va tayyor mahsulot sifatini ko'zdan kechirish",
+            "results": "Video lavhalar suratga olindi, yangi mavsum uchun brending rejalashtirildi",
+            "factories": [
+                {"factory_name": "Namangan Silk & Wool XK", "notes": "Video rolik montaji"},
+                {"factory_name": "Mingbuloq Baraka Trikotaj", "notes": "Trikotaj matolari tahlili"},
+                {"factory_name": "Pop Poplin Ishlab Chiqarish", "notes": "Rebrending masalalari"},
+            ],
+        },
+        {
+            "title": "Farg'ona vodiysi denim va ipak ishlab chiqaruvchilariga tashrif",
+            "region": "Farg'ona viloyati",
+            "country": "O'zbekiston",
+            "start_date": date(2026, 3, 4),
+            "end_date": date(2026, 3, 7),
+            "employee_name": "Jamshid Yo'ldoshev",
+            "purpose": "Denim matolari eksport brendingi va Marg'ilon ipak mahsulotlari foto-sessiyasi",
+            "results": "4 ta korxona to'liq qamrab olindi, marketing xizmatlari shartnomasi uzaytirildi",
+            "factories": [
+                {"factory_name": "Fergana Global Denim Group", "notes": "Denim eksporti brendingi"},
+                {"factory_name": "Marg'ilon Xon Atlas Durdonasi", "notes": "Milliy matolar katalogi"},
+                {"factory_name": "Qo'qon Milliy Gazlamalari", "notes": "SMM xizmatlari"},
+                {"factory_name": "Rishton Naqsh Gazlama", "notes": "Gul bosish texnologiyasi foto-video"},
+            ],
+        },
+        {
+            "title": "Qo'qon va Marg'ilon hunarmandchilik klasterlari safari",
+            "region": "Farg'ona viloyati",
+            "country": "O'zbekiston",
+            "start_date": date(2026, 7, 20),
+            "end_date": date(2026, 7, 22),
+            "employee_name": "Dilnoza Yusupova",
+            "purpose": "Ipak gazlamalar ko'rgazmasi uchun materiallar tayyorlash",
+            "results": "Ko'rgazma stendlari dizayni tasdiqlandi",
+            "factories": [
+                {"factory_name": "Marg'ilon Xon Atlas Durdonasi", "notes": "Eksport shartnomasi"},
+                {"factory_name": "Qo'qon Milliy Gazlamalari", "notes": "Ipak va adras matolari"},
+            ],
+        },
+        {
+            "title": "Andijon viloyati tayyor kiyim-kechak fabrikalariga xizmat safari",
+            "region": "Andijon viloyati",
+            "country": "O'zbekiston",
+            "start_date": date(2026, 1, 22),
+            "end_date": date(2026, 1, 25),
+            "employee_name": "Otabek Mirzayev",
+            "purpose": "Yangi jinsi shimlari brendingi va SMM strategiyasini joriy qilish",
+            "results": "Fabrika xodimlari bilan marketing treningi o'tkazildi",
+            "factories": [
+                {"factory_name": "Andijon Premium Jeans", "notes": "Jinsi kiyimlari fotosessiyasi"},
+                {"factory_name": "Asaka Trikotaj Sanoat", "notes": "Bolalar trikotaji katalogi"},
+            ],
+        },
+        {
+            "title": "Samarqand viloyati trikotaj va paxta korxonalariga tashrif",
+            "region": "Samarqand viloyati",
+            "country": "O'zbekiston",
+            "start_date": date(2026, 4, 10),
+            "end_date": date(2026, 4, 13),
+            "employee_name": "Malika Nazarova",
+            "purpose": "Yevropa bozoriga eksport qiluvchi trikotaj korxonalari bilan hamkorlik",
+            "results": "Samarkand Eurotex bilan yillik shartnoma qiymati 20% ga oshirildi",
+            "factories": [
+                {"factory_name": "Samarkand Eurotex JV", "notes": "Eksportbop trikotaj"},
+                {"factory_name": "Kattaqo'rg'on Paxtakor MCHJ", "notes": "Ip yigirish klasteri"},
+            ],
+        },
+        {
+            "title": "Buxoro paxta klasteri va gazlama korxonalari bilan uchrashuvlar",
+            "region": "Buxoro viloyati",
+            "country": "O'zbekiston",
+            "start_date": date(2026, 5, 18),
+            "end_date": date(2026, 5, 21),
+            "employee_name": "Sardor Ergashev",
+            "purpose": "To'liq siklli paxta klasteri brendingi va yangi fabrikalar tahlili",
+            "results": "Buxoro Cotton Textile bilan yangi sayt va brending loyihasi boshlandi",
+            "factories": [
+                {"factory_name": "Buxoro Cotton Textile MCHJ", "notes": "Paxta klasteri boshqaruv kengashi"},
+                {"factory_name": "Kogon Eko-Paxta AJ", "notes": "Eko-paxta sertifikatsiyasi"},
+                {"factory_name": "G'ijduvon Shoyi Fabrikasi", "notes": "Shoyi va ipak matolari"},
+                {"factory_name": "Qorovulbozor Sanoat Gazlama", "notes": "Brezent va sanoat qoplamalari"},
+            ],
+        },
+        {
+            "title": "Toshkent viloyati yirik sanoat va mato klasterlariga xizmat safari",
+            "region": "Toshkent viloyati",
+            "country": "O'zbekiston",
+            "start_date": date(2026, 2, 25),
+            "end_date": date(2026, 2, 27),
+            "employee_name": "Jamshid Yo'ldoshev",
+            "purpose": "Kimyo-mato va maxsus kiyim ishlab chiqaruvchilarini marketing bilan ta'minlash",
+            "results": "5 ta korxona monitoring qilindi, marketing auditi topshirildi",
+            "factories": [
+                {"factory_name": "Chirchiq Kimyo-Mato Klasteri", "notes": "Sintetik matolar"},
+                {"factory_name": "Angren Maxsus Ishchi Kiyimlari", "notes": "Maxsus ish kiyimlari"},
+                {"factory_name": "Bekobod Po'lat-Tekstil Servis", "notes": "Tekstil servis"},
+                {"factory_name": "Bo'ka Denim Mills MCHJ", "notes": "Denim ishlab chiqarish"},
+                {"factory_name": "Parkent Maxsus Kiyim MCHJ", "notes": "Himoya kiyimlari"},
+            ],
+        },
+        {
+            "title": "Qashqadaryo ip-yigiruv va milliy tekstil korxonalari tashrifi",
+            "region": "Qashqadaryo viloyati",
+            "country": "O'zbekiston",
+            "start_date": date(2026, 3, 24),
+            "end_date": date(2026, 3, 26),
+            "employee_name": "Dilnoza Yusupova",
+            "purpose": "Ip-yigiruv va milliy kashtachilik mahsulotlarini eksportga tayyorlash",
+            "results": "Qarshi va Shahrisabz korxonalari bilan doimiy shartnomalar tuzildi",
+            "factories": [
+                {"factory_name": "Qarshi Nasaf Ip-Yigiruv MCHJ", "notes": "Ip yigirish sexi"},
+                {"factory_name": "Shahrisabz Kesh Suzana XK", "notes": "Milliy kashtachilik"},
+                {"factory_name": "Koson Silk Production", "notes": "Ipak to'qish"},
+            ],
+        },
+        {
+            "title": "Xorazm ipak va bo'yoqxona fabrikalariga xizmat safari",
+            "region": "Xorazm viloyati",
+            "country": "O'zbekiston",
+            "start_date": date(2026, 5, 2),
+            "end_date": date(2026, 5, 5),
+            "employee_name": "Otabek Mirzayev",
+            "purpose": "Gazlama bo'yash va ipak lentachilik mahsulotlari foto-suratlari",
+            "results": "Sifatli media kontent bazasi yaratildi",
+            "factories": [
+                {"factory_name": "Xorazm Ipak Lenta MCHJ", "notes": "Ipak lentachilik"},
+                {"factory_name": "Oltinko'l Urganch Bo'yoqxonasi", "notes": "Gazlama bo'yash"},
+                {"factory_name": "Xiva Ichan Silk MCHJ", "notes": "Milliy ipak mahsulotlari"},
+            ],
+        },
+        {
+            "title": "Sirdaryo va Jizzax sanoat matolari ishlab chiqaruvchilariga tashrif",
+            "region": "Sirdaryo viloyati",
+            "country": "O'zbekiston",
+            "start_date": date(2026, 7, 6),
+            "end_date": date(2026, 7, 9),
+            "employee_name": "Sardor Ergashev",
+            "purpose": "Tibbiy tekstil va sanoat matolari ishlab chiqaruvchilari bilan uchrashuv",
+            "results": "5 ta korxona bilan uchrashuv samarali o'tdi",
+            "factories": [
+                {"factory_name": "Sirdaryo Agromarket Tekstil", "notes": "Tekstil eksporti"},
+                {"factory_name": "Jizzax Matolari MCHJ", "notes": "Sanoat matolari"},
+                {"factory_name": "Zomin Shifo-Tekstil", "notes": "Tibbiy bint va paxta"},
+                {"factory_name": "Yangiyer Eko-Tola Klasteri", "notes": "Eko-tola qayta ishlash"},
+                {"factory_name": "Paxtakor Oq Oltin Klaster", "notes": "Agro-tekstil"},
+            ],
+        },
+        {
+            "title": "Qoraqalpog'iston paxta va trikotaj korxonalari safari",
+            "region": "Qoraqalpog'iston Respublikasi",
+            "country": "O'zbekiston",
+            "start_date": date(2026, 8, 11),
+            "end_date": date(2026, 8, 14),
+            "employee_name": "Jamshid Yo'ldoshev",
+            "purpose": "Shimoliy hudud to'qimachilik korxonalari marketing auditi",
+            "results": "4 ta fabrika bilan yangi hamkorlik kelishuvlari tuzildi",
+            "factories": [
+                {"factory_name": "Nukus Cotton Industry", "notes": "Trikotaj va gazlama"},
+                {"factory_name": "To'rtko'l Paxta Tozalash AJ", "notes": "Paxta tolasi"},
+                {"factory_name": "Beruniy Yigiruv Klaster", "notes": "Ip yigirish"},
+                {"factory_name": "Chimboy Sport Liboslari", "notes": "Sport formasi"},
+            ],
+        },
+        {
+            "title": "Qozog'iston to'qimachilik savdo uylari va distribyutorlariga xizmat safari",
+            "region": "Almaty shahri",
+            "country": "Qozog'iston",
+            "start_date": date(2026, 6, 22),
+            "end_date": date(2026, 6, 26),
+            "employee_name": "Sardor Ergashev",
+            "purpose": "O'zbekiston trikotaj va ipak mahsulotlarini Qozog'iston bozorida distribyutsiya qilish",
+            "results": "Almaty QazTextile bilan yirik distribyutsiya shartnomasi tuzildi",
+            "factories": [
+                {"factory_name": "Almaty QazTextile LLP", "notes": "Distribyutsiya kelishuvi"},
+                {"factory_name": "Chimkent Denim JV", "notes": "Denim xomashyosi yetkazish"},
+            ],
+        },
+        {
+            "title": "Chimkent to'qimachilik klasterlari va eksport bazalari",
+            "region": "Shymkent shahri",
+            "country": "Qozog'iston",
+            "start_date": date(2026, 8, 3),
+            "end_date": date(2026, 8, 6),
+            "employee_name": "Otabek Mirzayev",
+            "purpose": "Janubiy Qozog'iston to'qimachilik korxonalari bilan hamkorlik",
+            "results": "Xalqaro savdo aloqalari yo'lga qo'yildi",
+            "factories": [
+                {"factory_name": "Chimkent Denim JV", "notes": "Jinsi matolari yetkazib berish"},
+            ],
+        },
+        {
+            "title": "Ivanovo to'qimachilik ishlab chiqaruvchilari va yarmarkasi",
+            "region": "Ivanovo viloyati",
+            "country": "Rossiya",
+            "start_date": date(2026, 4, 20),
+            "end_date": date(2026, 4, 25),
+            "employee_name": "Dilnoza Yusupova",
+            "purpose": "Rossiya yirik tekstil yarmarkasida ishtirok etish va yangi buyurtmalar olish",
+            "results": "Ivanovo korxonalari bilan 3 ta yangi eksport shartnomasi imzolandi",
+            "factories": [
+                {"factory_name": "Ivanovo Krasnaya Nit", "notes": "Ip-kalava eksporti"},
+                {"factory_name": "Shuyskie Sittsi Fabrikasi", "notes": "Poplin va paxta matosi"},
+            ],
+        },
+        {
+            "title": "Moskva xalqaro tekstil ko'rgazmasi va hamkorlar uchrashuvi",
+            "region": "Moskva shahri",
+            "country": "Rossiya",
+            "start_date": date(2026, 5, 12),
+            "end_date": date(2026, 5, 16),
+            "employee_name": "Jamshid Yo'ldoshev",
+            "purpose": "Moskva Tekstil Ko'rgazmasida milliy stend taqdimoti",
+            "results": "Rossiya bozoriga O'zbekiston matolari eksportini oshirish bo'yicha kelishildi",
+            "factories": [
+                {"factory_name": "Moskva Tekstil Alyans", "notes": "Savdo vakilligi"},
+                {"factory_name": "Nord-Tex MCHJ", "notes": "Uy tekstili hamkorligi"},
+            ],
+        },
+        {
+            "title": "Farg'ona va Namangan 2025-yil yakuniy xizmat safari",
+            "region": "Farg'ona viloyati",
+            "country": "O'zbekiston",
+            "start_date": date(2025, 11, 10),
+            "end_date": date(2025, 11, 14),
+            "employee_name": "Malika Nazarova",
+            "purpose": "2025-yilgi yillik shartnomalarni sarhisob qilish",
+            "results": "Yillik hisobotlar tasdiqlandi",
+            "factories": [
+                {"factory_name": "Fergana Global Denim Group", "notes": "Yillik hisobot"},
+                {"factory_name": "Marg'ilon Xon Atlas Durdonasi", "notes": "Shartnoma uzaytirildi"},
+            ],
+        },
+        {
+            "title": "Moskva 2025 Kuzgi Tekstil Forumi",
+            "region": "Moskva shahri",
+            "country": "Rossiya",
+            "start_date": date(2025, 9, 15),
+            "end_date": date(2025, 9, 19),
+            "employee_name": "Sardor Ergashev",
+            "purpose": "Xalqaro forumda yangi marketing xizmatlari taqdimoti",
+            "results": "Yangi xorijiy mijozlar jalb qilindi",
+            "factories": [
+                {"factory_name": "Moskva Tekstil Alyans", "notes": "Forum ishtirokchisi"},
+            ],
+        },
+    ]
+
+    created_trips: list[Trip] = []
+    for td in trips_data:
+        factories_list = td.pop("factories")
+        u = user_map.get(td["employee_name"])
+        trip = Trip(
+            user_id=u.id if u else None,
+            created_at=_as_datetime(td["start_date"], 9),
+            updated_at=_as_datetime(td["end_date"], 18),
+            **td,
+        )
+        for f in factories_list:
+            c = client_map.get(f["factory_name"].lower())
+            trip.factories.append(
+                TripFactory(
+                    factory_name=f["factory_name"],
+                    client_id=c.id if c else None,
+                    notes=f.get("notes"),
+                )
+            )
+        db.add(trip)
+        created_trips.append(trip)
+
+    db.flush()
+    return created_trips
+
+
 def run_seed_demo() -> None:
     db = SessionLocal()
     try:
@@ -1075,34 +1384,37 @@ def run_seed_demo() -> None:
         if not service_types:
             raise RuntimeError("Avval `python -m app.seed` ishga tushiring (xizmat turlari topilmadi)")
 
-        print("1/9. Eski biznes ma'lumotlari tozalanmoqda...")
+        print("1/10. Eski biznes ma'lumotlari tozalanmoqda...")
         wipe_business_data(db)
 
-        print("2/9. Foydalanuvchilar va menejerlar tekshirilmoqda...")
+        print("2/10. Foydalanuvchilar va menejerlar tekshirilmoqda...")
         users = seed_extra_users(db)
 
-        print("3/9. 50 ta haqiqiy mijoz korxonalari yaratilmoqda...")
+        print("3/10. 50 ta haqiqiy mijoz korxonalari yaratilmoqda...")
         clients = seed_clients(db)
 
-        print("4/9. 2020-2026 yillar bo'yicha shartnomalar va to'lovlar yaratilmoqda...")
+        print("4/10. 2020-2026 yillar bo'yicha shartnomalar va to'lovlar yaratilmoqda...")
         seed_contracts(db, clients, service_types)
 
-        print("5/9. 2020-2026 yillar bo'yicha operatsion xarajatlar yaratilmoqda...")
+        print("5/10. 2020-2026 yillar bo'yicha operatsion xarajatlar yaratilmoqda...")
         seed_expenses(db)
 
-        print("6/9. 2020-2026 yillar bo'yicha boshqa daromadlar (incomes) yaratilmoqda...")
+        print("6/10. 2020-2026 yillar bo'yicha boshqa daromadlar (incomes) yaratilmoqda...")
         seed_incomes(db)
 
-        print("7/9. Arxiv (Trash) uchun ma'lumotlar yaratilmoqda...")
+        print("7/10. 2026-yil xizmat safarlari va viloyat fabrikalari yaratilmoqda...")
+        seed_trips(db, users, clients)
+
+        print("8/10. Arxiv (Trash) uchun ma'lumotlar yaratilmoqda...")
         seed_trash_data(db, clients, service_types, users)
 
-        print("8/9. O'zgarishlar tarixi (Audit log) va Kirish tarixi yaratilmoqda...")
+        print("9/10. O'zgarishlar tarixi (Audit log) va Kirish tarixi yaratilmoqda...")
         seed_audit_logs(db, users)
         seed_login_history(db, users)
 
         db.commit()
 
-        print("9/9. Oylik reja, yillik rejalar va kompaniya profili sozlanmoqda...")
+        print("10/10. Oylik reja, yillik rejalar va kompaniya profili sozlanmoqda...")
         seed_settings(db)
 
         active_clients = db.query(Client).filter(Client.deleted_at.is_(None)).count()
@@ -1115,6 +1427,7 @@ def run_seed_demo() -> None:
         trashed_expenses = db.query(Expense).filter(Expense.deleted_at.is_not(None)).count()
         active_incomes = db.query(Income).filter(Income.deleted_at.is_(None)).count()
         trashed_incomes = db.query(Income).filter(Income.deleted_at.is_not(None)).count()
+        active_trips = db.query(Trip).filter(Trip.deleted_at.is_(None)).count()
 
         audit_count = db.query(AuditLog).count()
         login_count = db.query(LoginHistory).count()
@@ -1127,6 +1440,7 @@ def run_seed_demo() -> None:
         print(f" • Faol to'lovlar:             {active_payments} ta | Arxivda: {trashed_payments} ta")
         print(f" • Faol xarajatlar:            {active_expenses} ta | Arxivda: {trashed_expenses} ta")
         print(f" • Faol boshqa kirimlar:       {active_incomes} ta | Arxivda: {trashed_incomes} ta")
+        print(f" • Xizmat safarlari:           {active_trips} ta")
         print(f" • Audit qaydlari (Tarix):     {audit_count} ta")
         print(f" • Kirish tarixi (Logins):     {login_count} ta")
         print("=======================================================\n")

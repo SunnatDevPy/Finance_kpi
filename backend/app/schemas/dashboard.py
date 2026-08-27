@@ -11,6 +11,22 @@ class ContractClientStatsItem(BaseModel):
     total_amount: Decimal
 
 
+class RegionFactoryItem(BaseModel):
+    id: int
+    company_name: str
+    activity_type: str | None = None
+    contact_person: str | None = None
+    phone: str | None = None
+    contracts_count: int = 0
+    total_amount: Decimal = Decimal("0")
+    total_paid: Decimal = Decimal("0")
+    total_debt: Decimal = Decimal("0")
+    trips_count: int = 0
+    trips_count_2026: int = 0
+    visited_by: list[str] = []
+    last_trip_date: date | None = None
+
+
 class ClientRegionStatsItem(BaseModel):
     country: str
     city: str
@@ -18,6 +34,9 @@ class ClientRegionStatsItem(BaseModel):
     total_amount: Decimal
     total_paid: Decimal
     total_debt: Decimal
+    trips_count: int = 0
+    trips_count_2026: int = 0
+    factories: list[RegionFactoryItem] = []
 
 
 class ClientCountStats(BaseModel):

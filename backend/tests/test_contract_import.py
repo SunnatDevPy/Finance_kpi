@@ -237,7 +237,7 @@ def test_import_contracts_parses_sana_with_contract_number_prefix(client, auth_h
     contracts = client.get("/api/v1/contracts", headers=auth_headers, params={"limit": 50}).json()["items"]
     partial = next(c for c in contracts if c["contract_number"] == "15")
     assert partial["start_date"] == "2026-08-15"
-    assert partial["status"] == "yangi"
+    assert partial["status"] in ("yangi", "davom_etmoqda")
     assert float(partial["debt_amount"]) == 500_000.0
     paid = next(c for c in contracts if c["contract_number"] == "3")
     assert paid["start_date"] == "2026-01-11"

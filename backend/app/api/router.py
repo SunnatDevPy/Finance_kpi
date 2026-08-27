@@ -15,6 +15,7 @@ from app.api.notifications import router as notifications_router
 from app.api.payments import router as payments_router
 from app.api.settings import router as settings_router
 from app.api.service_types import router as service_types_router
+from app.api.trips import router as trips_router
 from app.api.users import router as users_router
 
 api_router = APIRouter()
@@ -33,4 +34,5 @@ api_router.include_router(payments_router, tags=["payments"])
 api_router.include_router(expenses_router, tags=["expenses"])
 api_router.include_router(incomes_router, tags=["incomes"])
 api_router.include_router(finance_router, tags=["finance"])
+api_router.include_router(trips_router, tags=["trips"])
 api_router.include_router(users_router, tags=["users"])

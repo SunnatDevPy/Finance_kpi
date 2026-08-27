@@ -26,6 +26,7 @@ import {
   FileSpreadsheetIcon,
   FileTextIcon,
   Loader2Icon,
+  PlaneIcon,
   ScaleIcon,
   TrendingUpIcon,
   UsersIcon,
@@ -39,6 +40,7 @@ import { DateRangePicker } from "../components/DateRangePicker";
 import { SortableTableHead } from "@/components/SortableTableHead";
 import { StatCard } from "../components/StatCard";
 import { MonthlyRevenueModal } from "../components/MonthlyRevenueModal";
+import { RegionFactoriesModal } from "../components/RegionFactoriesModal";
 import { TableViewLink } from "../components/TableViewLink";
 import { usePersistedState } from "../hooks/usePersistedState";
 import { StaggerContainer, StaggerItem } from "../components/Stagger";
@@ -322,6 +324,7 @@ export function DashboardPage() {
   const [regionStats, setRegionStats] = useState<ClientRegionStatsItem[]>([]);
   const [regionCountryFilter, setRegionCountryFilter] = useState("all");
   const [regionCityFilter, setRegionCityFilter] = useState("all");
+  const [selectedRegionModal, setSelectedRegionModal] = useState<ClientRegionStatsItem | null>(null);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [horizon, setHorizon] = usePersistedState<Horizon>("wtma.dashboard.horizon", "month");
@@ -1156,7 +1159,7 @@ export function DashboardPage() {
             <PremiumDataTable
               empty={filteredRegionStats.length === 0}
               emptyMessage={t("dashboard.noRegionData")}
-              skeletonCols={5}
+              skeletonCols={6}
             >
               <TableHeader>
                 <TableRow>
@@ -1175,6 +1178,9 @@ export function DashboardPage() {
                     onSort={handleRegionSort}
                     className="w-[5.5rem] text-right"
                   />
+                  <TableHead className="text-right w-28">
+                    {t("trips.safarlar2026")}
+                  </TableHead>
                   <SortableTableHead
                     label={t("dashboard.regionAmount")}
                     column="total_amount"
@@ -1203,16 +1209,41 @@ export function DashboardPage() {
               </TableHeader>
               <TableBody>
                 {sortedRegionStats.map((item, index) => (
-                  <MotionTableRow key={`${item.country}-${item.city}`} {...rowEnter(index)}>
+                  <MotionTableRow
+                    key={`${item.country}-${item.city}`}
+                    {...rowEnter(index)}
+                    className="cursor-pointer hover:bg-muted/50 transition-colors group"
+                    onClick={() => setSelectedRegionModal(item)}
+                    title={t("trips.clickToViewFactories")}
+                  >
                     <TableCell>
                       <div className="min-w-0">
-                        <p className="truncate font-medium text-foreground">{item.city}</p>
+                        <p className="truncate font-semibold text-foreground group-hover:text-brand-600 dark:group-hover:text-brand-400 flex items-center gap-1.5">
+                          <span>{item.city}</span>
+                          <span className="text-[10px] opacity-0 group-hover:opacity-100 text-brand-500 font-normal transition-opacity">
+                            ({t("trips.viewFactories")})
+                          </span>
+                        </p>
                         {item.country && item.country !== "O'zbekiston" && (
                           <p className="truncate text-xs text-muted-foreground">{item.country}</p>
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="text-right tabular-nums font-medium">{item.clients_count}</TableCell>
+                    <TableCell className="text-right tabular-nums font-medium">
+                      <span className="inline-flex items-center gap-1 rounded bg-muted/60 px-1.5 py-0.5 text-xs font-semibold">
+                        {item.clients_count} ta
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {(item.trips_count_2026 ?? 0) > 0 ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                          <PlaneIcon className="size-3" />
+                          {item.trips_count_2026}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right tabular-nums">{formatAmount(item.total_amount)}</TableCell>
                     <TableCell className="text-right tabular-nums text-emerald-600 dark:text-emerald-400">
                       {formatAmount(item.total_paid)}
@@ -1692,6 +1723,16 @@ export function DashboardPage() {
         periodEnd={showYear ? stats.year_end : stats.period_end}
         periodLabel={revenuePeriodLabel}
       />
+      {selectedRegionModal && (
+        <RegionFactoriesModal
+          open={Boolean(selectedRegionModal)}
+          onClose={() => setSelectedRegionModal(null)}
+          region={selectedRegionModal.city}
+          country={selectedRegionModal.country}
+          factories={selectedRegionModal.factories || []}
+          tripsCount2026={selectedRegionModal.trips_count_2026 || 0}
+        />
+      )}
     </PageShell>
   );
 }

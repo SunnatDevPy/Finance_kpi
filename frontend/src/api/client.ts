@@ -40,6 +40,11 @@ import type {
   ServiceTypeStats,
   TopClientItem,
   TopClientLtvItem,
+  Trip,
+  TripCreatePayload,
+  TripStatsSummary,
+  TripUpdatePayload,
+  RegionTripsSummary,
   User,
   UserRole,
 } from "../types";
@@ -825,5 +830,61 @@ export const api = {
     downloadImportTemplate: () =>
       download("/finance/import-template", "moliya_tarixi_shabloni.xlsx"),
     import: (file: File) => uploadFile<FinanceImportResult>("/finance/import", file),
+  },
+
+  trips: {
+    list: (params?: {
+      year?: number;
+      region?: string;
+      user_id?: number;
+      search?: string;
+      date_from?: string;
+      date_to?: string;
+      skip?: number;
+      limit?: number;
+    }) => {
+      const q = new URLSearchParams();
+      if (params?.year) q.set("year", String(params.year));
+      if (params?.region) q.set("region", params.region);
+      if (params?.user_id) q.set("user_id", String(params.user_id));
+      if (params?.search) q.set("search", params.search);
+      if (params?.date_from) q.set("date_from", params.date_from);
+      if (params?.date_to) q.set("date_to", params.date_to);
+      if (params?.skip !== undefined) q.set("skip", String(params.skip));
+      if (params?.limit !== undefined) q.set("limit", String(params.limit));
+      const qs = q.toString();
+      return request<Paginated<Trip>>(`/trips${qs ? `?${qs}` : ""}`);
+    },
+    get: (id: number) => request<Trip>(`/trips/${id}`),
+    create: (payload: TripCreatePayload) =>
+      request<Trip>("/trips", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    update: (id: number, payload: TripUpdatePayload) =>
+      request<Trip>(`/trips/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      }),
+    delete: (id: number) =>
+      request<void>(`/trips/${id}`, {
+        method: "DELETE",
+      }),
+    summary: (year?: number | null) => {
+      const qs = year ? `?year=${year}` : "";
+      return request<TripStatsSummary>(`/trips/summary${qs}`);
+    },
+    byRegion: (year?: number | null) => {
+      const qs = year ? `?year=${year}` : "";
+      return request<RegionTripsSummary[]>(`/trips/by-region${qs}`);
+    },
+    export: (format: "xlsx" | "pdf", params?: { year?: number; region?: string }) => {
+      const q = new URLSearchParams();
+      q.set("format", format);
+      if (params?.year) q.set("year", String(params.year));
+      if (params?.region) q.set("region", params.region);
+      const filename = `safarlar_${params?.year || "barchasi"}.${format}`;
+      return download(`/trips/export?${q.toString()}`, filename);
+    },
   },
 };

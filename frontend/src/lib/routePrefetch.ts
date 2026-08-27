@@ -7,6 +7,7 @@ const routeModules: Record<string, RouteModule> = {
   "/payments": () => import("../pages/Payments"),
   "/finance": () => import("../pages/Finance"),
   "/service-types": () => import("../pages/ServiceTypes"),
+  "/trips": () => import("../pages/Trips"),
   "/profile": () => import("../pages/Profile"),
   "/employees": () => import("../pages/Employees"),
   "/audit-log": () => import("../pages/AuditLog"),

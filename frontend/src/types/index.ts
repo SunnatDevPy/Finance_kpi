@@ -261,6 +261,22 @@ export interface ContractFormLineItem {
   price: string;
 }
 
+export interface RegionFactoryItem {
+  id: number;
+  company_name: string;
+  activity_type: string | null;
+  contact_person: string | null;
+  phone: string | null;
+  contracts_count: number;
+  total_amount: string;
+  total_paid: string;
+  total_debt: string;
+  trips_count?: number;
+  trips_count_2026?: number;
+  visited_by: string[];
+  last_trip_date: string | null;
+}
+
 export interface ClientRegionStatsItem {
   country: string;
   city: string;
@@ -268,6 +284,83 @@ export interface ClientRegionStatsItem {
   total_amount: string;
   total_paid: string;
   total_debt: string;
+  trips_count?: number;
+  trips_count_2026?: number;
+  factories?: RegionFactoryItem[];
+}
+
+export interface TripFactory {
+  id: number;
+  trip_id: number;
+  factory_name: string;
+  client_id: number | null;
+  notes: string | null;
+}
+
+export interface TripFactoryFormItem {
+  factory_name: string;
+  client_id?: number | null;
+  notes?: string | null;
+}
+
+export interface Trip {
+  id: number;
+  title: string;
+  region: string;
+  country: string;
+  start_date: string;
+  end_date: string;
+  user_id: number | null;
+  employee_name: string;
+  purpose: string | null;
+  results: string | null;
+  factories: TripFactory[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TripCreatePayload {
+  title: string;
+  region: string;
+  country?: string;
+  start_date: string;
+  end_date: string;
+  user_id?: number | null;
+  employee_name: string;
+  purpose?: string | null;
+  results?: string | null;
+  factories?: TripFactoryFormItem[];
+}
+
+export interface TripUpdatePayload {
+  title?: string;
+  region?: string;
+  country?: string;
+  start_date?: string;
+  end_date?: string;
+  user_id?: number | null;
+  employee_name?: string;
+  purpose?: string | null;
+  results?: string | null;
+  factories?: TripFactoryFormItem[];
+}
+
+export interface TripStatsSummary {
+  year?: number | null;
+  total_trips: number;
+  total_regions: number;
+  total_factories: number;
+  total_employees: number;
+}
+
+export interface RegionTripsSummary {
+  region: string;
+  country: string;
+  trips_count: number;
+  factories_count: number;
+  factories: string[];
+  employees: string[];
+  last_trip_date: string | null;
 }
 
 export interface ContractClientStatsItem {

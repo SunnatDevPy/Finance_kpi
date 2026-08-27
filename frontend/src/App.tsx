@@ -34,6 +34,7 @@ const PaymentsPage = lazy(lazyWithRetry(() => import("./pages/Payments").then((m
 const ProfilePage = lazy(lazyWithRetry(() => import("./pages/Profile").then((m) => ({ default: m.ProfilePage }))));
 const ServiceTypesPage = lazy(lazyWithRetry(() => import("./pages/ServiceTypes").then((m) => ({ default: m.ServiceTypesPage }))));
 const TrashPage = lazy(lazyWithRetry(() => import("./pages/Trash").then((m) => ({ default: m.TrashPage }))));
+const TripsPage = lazy(lazyWithRetry(() => import("./pages/Trips").then((m) => ({ default: m.TripsPage }))));
 
 export default function App() {
   return (
@@ -66,6 +67,7 @@ export default function App() {
                       <Route path="finance" element={<FinancePage />} />
                       <Route path="debts" element={<Navigate to="/clients?debtors=1" replace />} />
                       <Route path="service-types" element={<ServiceTypesPage />} />
+                      <Route path="trips" element={<TripsPage />} />
                       <Route path="profile" element={<ProfilePage />} />
                       <Route element={<AdminRoute />}>
                         <Route path="employees" element={<EmployeesPage />} />

@@ -17,6 +17,8 @@ from app.models import (
     Income,
     Payment,
     ServiceType,
+    Trip,
+    TripFactory,
 )
 from app.schemas.dashboard import (
     ChartPoint,
@@ -27,6 +29,7 @@ from app.schemas.dashboard import (
     DashboardCharts,
     DashboardStats,
     NamedAmount,
+    RegionFactoryItem,
     RevenuePlanPoint,
     TopClientItem,
     TopClientLtvItem,
@@ -809,7 +812,51 @@ def get_clients_by_region(db: Session) -> list[ClientRegionStatsItem]:
         ).all()
     )
 
-    buckets: dict[tuple[str, str], dict[str, Decimal | int]] = {}
+    # All trips by region / client
+    all_trips = list(
+        db.scalars(
+            select(Trip)
+            .options(selectinload(Trip.factories))
+            .where(Trip.deleted_at.is_(None))
+        ).all()
+    )
+
+    region_trips_count: dict[tuple[str, str], int] = {}
+    region_trips_count_2026: dict[tuple[str, str], int] = {}
+    client_trip_info: dict[int, dict[str, Any]] = {}
+
+    for trip in all_trips:
+        reg = (trip.region or "").strip().lower()
+        cntry = (trip.country or "O'zbekiston").strip().lower()
+        is_2026 = trip.start_date and trip.start_date.year == 2026
+
+        if reg:
+            k = (cntry, reg)
+            region_trips_count[k] = region_trips_count.get(k, 0) + 1
+            if is_2026:
+                region_trips_count_2026[k] = region_trips_count_2026.get(k, 0) + 1
+
+        for tf in trip.factories:
+            if tf.client_id:
+                if tf.client_id not in client_trip_info:
+                    client_trip_info[tf.client_id] = {
+                        "count": 0,
+                        "count_2026": 0,
+                        "visitors": set(),
+                        "last_date": trip.start_date,
+                    }
+                client_trip_info[tf.client_id]["count"] += 1
+                if is_2026:
+                    client_trip_info[tf.client_id]["count_2026"] += 1
+                if trip.employee_name:
+                    client_trip_info[tf.client_id]["visitors"].add(trip.employee_name.strip())
+                if trip.start_date and (
+                    client_trip_info[tf.client_id]["last_date"] is None
+                    or trip.start_date > client_trip_info[tf.client_id]["last_date"]
+                ):
+                    client_trip_info[tf.client_id]["last_date"] = trip.start_date
+
+    buckets: dict[tuple[str, str], dict[str, Any]] = {}
     for client in clients:
         city = (client.city or "").strip()
         if not city:
@@ -821,27 +868,66 @@ def get_clients_by_region(db: Session) -> list[ClientRegionStatsItem]:
                 "clients_count": 0,
                 "total_amount": Decimal("0"),
                 "total_paid": Decimal("0"),
+                "factories": [],
             }
         active_contracts = [contract for contract in client.contracts if contract.deleted_at is None]
-        buckets[key]["clients_count"] = int(buckets[key]["clients_count"]) + 1
-        buckets[key]["total_amount"] = Decimal(buckets[key]["total_amount"]) + client_total_amount(
-            active_contracts
-        )
-        buckets[key]["total_paid"] = Decimal(buckets[key]["total_paid"]) + client_total_paid(
-            active_contracts
+        c_amount = client_total_amount(active_contracts)
+        c_paid = client_total_paid(active_contracts)
+        c_debt = c_amount - c_paid
+        t_info = client_trip_info.get(
+            client.id,
+            {"count": 0, "count_2026": 0, "visitors": set(), "last_date": None},
         )
 
-    items = [
-        ClientRegionStatsItem(
-            country=country,
-            city=city,
-            clients_count=int(data["clients_count"]),
-            total_amount=Decimal(data["total_amount"]),
-            total_paid=Decimal(data["total_paid"]),
-            total_debt=Decimal(data["total_amount"]) - Decimal(data["total_paid"]),
+        buckets[key]["clients_count"] += 1
+        buckets[key]["total_amount"] += c_amount
+        buckets[key]["total_paid"] += c_paid
+        buckets[key]["factories"].append(
+            RegionFactoryItem(
+                id=client.id,
+                company_name=client.company_name,
+                activity_type=client.activity_type,
+                contact_person=client.contact_person,
+                phone=client.phone,
+                contracts_count=len(active_contracts),
+                total_amount=c_amount,
+                total_paid=c_paid,
+                total_debt=c_debt,
+                trips_count=t_info["count"],
+                trips_count_2026=t_info["count_2026"],
+                visited_by=sorted(list(t_info["visitors"])),
+                last_trip_date=t_info["last_date"],
+            )
         )
-        for (country, city), data in buckets.items()
-    ]
+
+    items = []
+    for (country, city), data in buckets.items():
+        city_lower = city.lower()
+        cntry_lower = country.lower()
+        t_count = 0
+        t_count_2026 = 0
+        for (trip_cntry, reg_k), cnt in region_trips_count.items():
+            if (trip_cntry == cntry_lower or not trip_cntry) and (city_lower in reg_k or reg_k in city_lower):
+                t_count += cnt
+        for (trip_cntry, reg_k), cnt2026 in region_trips_count_2026.items():
+            if (trip_cntry == cntry_lower or not trip_cntry) and (city_lower in reg_k or reg_k in city_lower):
+                t_count_2026 += cnt2026
+
+        factories_sorted = sorted(data["factories"], key=lambda f: (-f.total_amount, f.company_name))
+        items.append(
+            ClientRegionStatsItem(
+                country=country,
+                city=city,
+                clients_count=int(data["clients_count"]),
+                total_amount=Decimal(data["total_amount"]),
+                total_paid=Decimal(data["total_paid"]),
+                total_debt=Decimal(data["total_amount"]) - Decimal(data["total_paid"]),
+                trips_count=t_count,
+                trips_count_2026=t_count_2026,
+                factories=factories_sorted,
+            )
+        )
+
     items.sort(key=lambda item: (-item.clients_count, item.city))
     return items
 
