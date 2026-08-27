@@ -422,9 +422,9 @@ export function TripsPage() {
       </div>
 
       {/* ── Dedicated Filter Bar (Boshida Qidiruv, Yillar dropdown, Mamlakat & Viloyat, Ustunlar sozlash) ── */}
-      <div className="flex flex-wrap items-center gap-2.5 rounded-2xl border border-border/80 bg-card p-3 shadow-xs">
+      <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5 rounded-2xl border border-border/80 bg-card p-3 shadow-xs">
         {/* 1. BOSHIDA: Qidiruv inputi (bir xil o'lchamda) */}
-        <div className="relative min-w-[220px] flex-1 max-w-sm">
+        <div className="relative min-w-[200px] flex-1">
           <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
@@ -433,7 +433,7 @@ export function TripsPage() {
               setPage(0);
             }}
             placeholder={t("trips.searchFactoriesPlaceholder")}
-            className="h-10 pl-9 pr-8 text-xs font-normal bg-background"
+            className="h-10 pl-9 pr-8 text-xs font-normal bg-background w-full"
           />
           {search && (
             <button
@@ -450,77 +450,83 @@ export function TripsPage() {
         </div>
 
         {/* 2. Yillar filtri Dropdown */}
-        <Select
-          value={String(selectedYear)}
-          onValueChange={(val) => {
-            setSelectedYear(val === "all" ? "all" : Number(val));
-            setPage(0);
-          }}
-        >
-          <SelectTrigger className="h-10 min-w-[130px] text-xs bg-background">
-            <SelectValue placeholder={t("trips.allYearsFilter")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectItem value="all">{t("trips.allYearsFilter")}</SelectItem>
-              {AVAILABLE_YEARS.map((yr) => (
-                <SelectItem key={yr} value={String(yr)}>
-                  {yr}-yil
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+        <div className="w-[135px] shrink-0">
+          <Select
+            value={String(selectedYear)}
+            onValueChange={(val) => {
+              setSelectedYear(val === "all" ? "all" : Number(val));
+              setPage(0);
+            }}
+          >
+            <SelectTrigger className="h-10 text-xs bg-background">
+              <SelectValue placeholder={t("trips.allYearsFilter")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="all">{t("trips.allYearsFilter")}</SelectItem>
+                {AVAILABLE_YEARS.map((yr) => (
+                  <SelectItem key={yr} value={String(yr)}>
+                    {yr}-yil
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </div>
 
         {/* 3. Mamlakat tanlash Dropdown */}
-        <Select
-          value={countryFilter}
-          onValueChange={(val) => {
-            setCountryFilter(val || "all");
-            setRegionFilter("all");
-            setPage(0);
-          }}
-        >
-          <SelectTrigger className="h-10 min-w-[150px] text-xs bg-background">
-            <SelectValue placeholder={t("trips.allCountriesFilter")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectItem value="all">{t("trips.allCountriesFilter")}</SelectItem>
-              {GEO_COUNTRIES.map((c) => (
-                <SelectItem key={c.value} value={c.value}>
-                  {locale === "ru" ? c.labelRu : c.labelUz}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+        <div className="w-[155px] shrink-0">
+          <Select
+            value={countryFilter}
+            onValueChange={(val) => {
+              setCountryFilter(val || "all");
+              setRegionFilter("all");
+              setPage(0);
+            }}
+          >
+            <SelectTrigger className="h-10 text-xs bg-background">
+              <SelectValue placeholder={t("trips.allCountriesFilter")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="all">{t("trips.allCountriesFilter")}</SelectItem>
+                {GEO_COUNTRIES.map((c) => (
+                  <SelectItem key={c.value} value={c.value}>
+                    {locale === "ru" ? c.labelRu : c.labelUz}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </div>
 
         {/* 4. Viloyat / Shahar tanlash (Mamlakat tanlanganda mos viloyatlari chiqadi) */}
-        <Select
-          value={regionFilter}
-          onValueChange={(val) => {
-            setRegionFilter(val || "all");
-            setPage(0);
-          }}
-        >
-          <SelectTrigger className="h-10 min-w-[160px] text-xs bg-background">
-            <SelectValue placeholder={t("trips.allRegionsFilter")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectItem value="all">{t("trips.allRegionsFilter")}</SelectItem>
-              {dynamicRegionsForCountry.map((reg) => (
-                <SelectItem key={reg.value} value={reg.value}>
-                  {reg.label}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+        <div className="w-[165px] shrink-0">
+          <Select
+            value={regionFilter}
+            onValueChange={(val) => {
+              setRegionFilter(val || "all");
+              setPage(0);
+            }}
+          >
+            <SelectTrigger className="h-10 text-xs bg-background">
+              <SelectValue placeholder={t("trips.allRegionsFilter")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="all">{t("trips.allRegionsFilter")}</SelectItem>
+                {dynamicRegionsForCountry.map((reg) => (
+                  <SelectItem key={reg.value} value={reg.value}>
+                    {reg.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </div>
 
         {/* 5. Ustunlar (Columns Visibility Customizer) Popover/Dropdown */}
-        <div className="relative" ref={columnsMenuRef}>
+        <div className="relative shrink-0" ref={columnsMenuRef}>
           <Button
             type="button"
             variant="outline"
@@ -571,7 +577,7 @@ export function TripsPage() {
         <Button
           type="button"
           variant="outline"
-          className="h-10 size-10 p-0 bg-background"
+          className="h-10 size-10 shrink-0 p-0 bg-background"
           onClick={() => {
             loadTrips();
             loadStats();
