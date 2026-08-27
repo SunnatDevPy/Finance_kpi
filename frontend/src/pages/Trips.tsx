@@ -14,7 +14,6 @@ import {
   MapPinIcon,
   PlaneIcon,
   PlusIcon,
-  RefreshCwIcon,
   SearchIcon,
   Trash2Icon,
   UserCheckIcon,
@@ -572,21 +571,6 @@ export function TripsPage() {
             )}
           </AnimatePresence>
         </div>
-
-        {/* 6. Qayta yuklash (Refresh) */}
-        <Button
-          type="button"
-          variant="outline"
-          className="h-10 size-10 shrink-0 p-0 bg-background"
-          onClick={() => {
-            loadTrips();
-            loadStats();
-            loadRegionData();
-          }}
-          title={t("common.reload")}
-        >
-          <RefreshCwIcon className="size-4 text-muted-foreground" />
-        </Button>
       </div>
 
       {/* ── TAB 1: ALL TRIPS TABLE (With dynamic column toggles) ── */}
