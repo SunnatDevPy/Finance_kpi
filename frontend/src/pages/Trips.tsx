@@ -421,9 +421,9 @@ export function TripsPage() {
       </div>
 
       {/* ── Dedicated Filter Bar (Boshida Qidiruv, Yillar dropdown, Mamlakat & Viloyat, Ustunlar sozlash) ── */}
-      <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5 rounded-2xl border border-border/80 bg-card p-3 shadow-xs">
-        {/* 1. BOSHIDA: Qidiruv inputi (ixchamroq) */}
-        <div className="relative min-w-[170px] max-w-[230px] flex-1">
+      <div className="flex flex-wrap lg:flex-nowrap items-center gap-3 rounded-2xl border border-border/80 bg-card p-3 shadow-xs w-full">
+        {/* 1. BOSHIDA: Qidiruv inputi (kengaytirilgan, flex-1 butun bo'sh joyni to'ldiradi) */}
+        <div className="relative min-w-[240px] flex-1">
           <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
@@ -432,7 +432,7 @@ export function TripsPage() {
               setPage(0);
             }}
             placeholder={t("trips.searchFactoriesPlaceholder")}
-            className="h-10 pl-9 pr-8 text-xs font-normal bg-background w-full truncate"
+            className="h-10 pl-9 pr-8 text-xs font-normal bg-background w-full"
           />
           {search && (
             <button
@@ -449,7 +449,7 @@ export function TripsPage() {
         </div>
 
         {/* 2. Yillar filtri Dropdown */}
-        <div className="w-[130px] shrink-0">
+        <div className="w-[145px] shrink-0">
           <Select
             value={String(selectedYear)}
             onValueChange={(val) => {
@@ -474,7 +474,7 @@ export function TripsPage() {
         </div>
 
         {/* 3. Mamlakat tanlash Dropdown */}
-        <div className="w-[155px] shrink-0">
+        <div className="w-[180px] shrink-0">
           <Select
             value={countryFilter}
             onValueChange={(val) => {
@@ -499,8 +499,8 @@ export function TripsPage() {
           </Select>
         </div>
 
-        {/* 4. Viloyat / Shahar tanlash (Kengroq va truncate bilan) */}
-        <div className="w-[225px] shrink-0 min-w-[200px]">
+        {/* 4. Viloyat / Shahar tanlash */}
+        <div className="w-[245px] shrink-0 min-w-[220px]">
           <Select
             value={regionFilter}
             onValueChange={(val) => {
@@ -509,7 +509,7 @@ export function TripsPage() {
             }}
           >
             <SelectTrigger className="h-10 text-xs bg-background" title={regionFilter}>
-              <SelectValue placeholder={t("trips.allRegionsFilter")} className="truncate max-w-[180px]" />
+              <SelectValue placeholder={t("trips.allRegionsFilter")} className="truncate max-w-[200px]" />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
@@ -524,12 +524,12 @@ export function TripsPage() {
           </Select>
         </div>
 
-        {/* 5. Ustun (Columns Visibility Customizer) Popover/Dropdown — 6/6 belgisisiz */}
+        {/* 5. Ustun (Columns Visibility Customizer) */}
         <div className="relative shrink-0" ref={columnsMenuRef}>
           <Button
             type="button"
             variant="outline"
-            className="h-10 gap-2 px-3 text-xs bg-background"
+            className="h-10 gap-2 px-3.5 text-xs bg-background shrink-0"
             onClick={() => setColumnsMenuOpen((prev) => !prev)}
             title={t("trips.columnsCustomizer")}
           >
