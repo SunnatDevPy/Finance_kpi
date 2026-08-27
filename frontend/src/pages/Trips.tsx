@@ -422,8 +422,8 @@ export function TripsPage() {
 
       {/* ── Dedicated Filter Bar (Boshida Qidiruv, Yillar dropdown, Mamlakat & Viloyat, Ustunlar sozlash) ── */}
       <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5 rounded-2xl border border-border/80 bg-card p-3 shadow-xs">
-        {/* 1. BOSHIDA: Qidiruv inputi (bir xil o'lchamda) */}
-        <div className="relative min-w-[200px] flex-1">
+        {/* 1. BOSHIDA: Qidiruv inputi (ixchamroq) */}
+        <div className="relative min-w-[170px] max-w-[230px] flex-1">
           <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
@@ -432,7 +432,7 @@ export function TripsPage() {
               setPage(0);
             }}
             placeholder={t("trips.searchFactoriesPlaceholder")}
-            className="h-10 pl-9 pr-8 text-xs font-normal bg-background w-full"
+            className="h-10 pl-9 pr-8 text-xs font-normal bg-background w-full truncate"
           />
           {search && (
             <button
@@ -449,7 +449,7 @@ export function TripsPage() {
         </div>
 
         {/* 2. Yillar filtri Dropdown */}
-        <div className="w-[135px] shrink-0">
+        <div className="w-[130px] shrink-0">
           <Select
             value={String(selectedYear)}
             onValueChange={(val) => {
@@ -458,11 +458,11 @@ export function TripsPage() {
             }}
           >
             <SelectTrigger className="h-10 text-xs bg-background">
-              <SelectValue placeholder={t("trips.allYearsFilter")} />
+              <SelectValue placeholder={t("trips.allYearsFilter")} className="truncate" />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem value="all">{t("trips.allYearsFilter")}</SelectItem>
+                <SelectItem value="all" className="truncate">{t("trips.allYearsFilter")}</SelectItem>
                 {AVAILABLE_YEARS.map((yr) => (
                   <SelectItem key={yr} value={String(yr)}>
                     {yr}-yil
@@ -484,13 +484,13 @@ export function TripsPage() {
             }}
           >
             <SelectTrigger className="h-10 text-xs bg-background">
-              <SelectValue placeholder={t("trips.allCountriesFilter")} />
+              <SelectValue placeholder={t("trips.allCountriesFilter")} className="truncate" />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem value="all">{t("trips.allCountriesFilter")}</SelectItem>
+                <SelectItem value="all" className="truncate">{t("trips.allCountriesFilter")}</SelectItem>
                 {GEO_COUNTRIES.map((c) => (
-                  <SelectItem key={c.value} value={c.value}>
+                  <SelectItem key={c.value} value={c.value} className="truncate">
                     {locale === "ru" ? c.labelRu : c.labelUz}
                   </SelectItem>
                 ))}
@@ -499,8 +499,8 @@ export function TripsPage() {
           </Select>
         </div>
 
-        {/* 4. Viloyat / Shahar tanlash (Mamlakat tanlanganda mos viloyatlari chiqadi) */}
-        <div className="w-[165px] shrink-0">
+        {/* 4. Viloyat / Shahar tanlash (Kengroq va truncate bilan) */}
+        <div className="w-[225px] shrink-0 min-w-[200px]">
           <Select
             value={regionFilter}
             onValueChange={(val) => {
@@ -508,14 +508,14 @@ export function TripsPage() {
               setPage(0);
             }}
           >
-            <SelectTrigger className="h-10 text-xs bg-background">
-              <SelectValue placeholder={t("trips.allRegionsFilter")} />
+            <SelectTrigger className="h-10 text-xs bg-background" title={regionFilter}>
+              <SelectValue placeholder={t("trips.allRegionsFilter")} className="truncate max-w-[180px]" />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem value="all">{t("trips.allRegionsFilter")}</SelectItem>
+                <SelectItem value="all" className="truncate">{t("trips.allRegionsFilter")}</SelectItem>
                 {dynamicRegionsForCountry.map((reg) => (
-                  <SelectItem key={reg.value} value={reg.value}>
+                  <SelectItem key={reg.value} value={reg.value} className="truncate" title={reg.label}>
                     {reg.label}
                   </SelectItem>
                 ))}
@@ -524,7 +524,7 @@ export function TripsPage() {
           </Select>
         </div>
 
-        {/* 5. Ustunlar (Columns Visibility Customizer) Popover/Dropdown */}
+        {/* 5. Ustun (Columns Visibility Customizer) Popover/Dropdown — 6/6 belgisisiz */}
         <div className="relative shrink-0" ref={columnsMenuRef}>
           <Button
             type="button"
@@ -535,9 +535,6 @@ export function TripsPage() {
           >
             <Columns3Icon className="size-4 text-muted-foreground" />
             <span>{t("trips.columns")}</span>
-            <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
-              {visibleColumnsCount}/{columnLabels.length}
-            </span>
             <ChevronDownIcon className="size-3 text-muted-foreground" />
           </Button>
 
