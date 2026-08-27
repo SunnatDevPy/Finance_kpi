@@ -61,7 +61,7 @@ import { useI18n } from "../context/I18nContext";
 import { useAuth } from "../context/AuthContext";
 import { formatDateShort } from "../utils/format";
 
-const AVAILABLE_YEARS = [2026, 2025, 2024, 2023, 2022, 2021, 2020] as const;
+const AVAILABLE_YEARS = [2030, 2029, 2028, 2027, 2026, 2025, 2024, 2023, 2022, 2021, 2020] as const;
 
 type ColumnKey = "date" | "region" | "factories" | "employee" | "purpose" | "actions";
 
