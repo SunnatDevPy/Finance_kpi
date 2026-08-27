@@ -360,6 +360,7 @@ export interface RegionTripsSummary {
   factories_count: number;
   factories: string[];
   employees: string[];
+  results: string[];
   last_trip_date: string | null;
 }
 

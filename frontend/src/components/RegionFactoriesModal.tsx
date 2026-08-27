@@ -30,7 +30,7 @@ interface RegionFactoriesModalProps {
   region: string;
   country?: string;
   factories: RegionFactoryItem[];
-  tripsCount2026?: number;
+  tripsCount?: number;
 }
 
 export function RegionFactoriesModal({
@@ -39,7 +39,7 @@ export function RegionFactoriesModal({
   region,
   country,
   factories,
-  tripsCount2026 = 0,
+  tripsCount = 0,
 }: RegionFactoriesModalProps) {
   const { t } = useI18n();
   const [search, setSearch] = useState("");
@@ -75,15 +75,15 @@ export function RegionFactoriesModal({
               <p className="text-[11px] text-muted-foreground">
                 {t("trips.regionFactoriesSubtitle")
                   .replace("{count}", String(factories.length))
-                  .replace("{trips}", String(tripsCount2026))}
+                  .replace("{trips}", String(tripsCount))}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-3 py-1.5 text-xs font-semibold tabular-nums text-foreground shadow-2xs">
             <PlaneIcon className="size-3.5 text-brand-500" />
-            <span>{tripsCount2026}</span>
-            <span className="text-muted-foreground font-normal">{t("trips.tripsIn2026")}</span>
+            <span>{tripsCount}</span>
+            <span className="text-muted-foreground font-normal">{t("trips.tripsCountSuffix")}</span>
           </div>
         </div>
 

@@ -8,7 +8,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDownIcon } from "lucide-react";
+import { ChevronDownIcon, PlusIcon } from "lucide-react";
 import { Input as InputPrimitive } from "@base-ui/react/input";
 
 import {
@@ -41,6 +41,10 @@ interface SearchableSelectProps {
   containerClassName?: string;
   /** default = label above; floating = form field with inner label */
   variant?: "default" | "floating";
+  /** Show a "create {query}" row when the typed name is not in the list */
+  allowCreate?: boolean;
+  onCreate?: (query: string) => void;
+  createLabel?: (query: string) => string;
 }
 
 function filterOptions(options: SearchableSelectOption[], query: string) {
@@ -61,6 +65,9 @@ export function SearchableSelect({
   className,
   containerClassName,
   variant = "default",
+  allowCreate = false,
+  onCreate,
+  createLabel,
 }: SearchableSelectProps) {
   const { t } = useI18n();
   const generatedId = useId();
@@ -88,6 +95,15 @@ export function SearchableSelect({
 
   const displayLabel = selectedOption?.label ?? "";
   const filtered = useMemo(() => filterOptions(options, query), [options, query]);
+  const trimmedQuery = query.trim();
+  const canCreate = Boolean(
+    allowCreate &&
+      onCreate &&
+      trimmedQuery &&
+      !options.some((option) => option.label.toLowerCase() === trimmedQuery.toLowerCase()),
+  );
+  const createIndex = filtered.length;
+  const itemCount = filtered.length + (canCreate ? 1 : 0);
   const isFloated = variant === "floating" && (Boolean(value) || open || query.length > 0);
 
   useEffect(() => {
@@ -133,13 +149,19 @@ export function SearchableSelect({
     closeList();
   };
 
+  const submitCreate = () => {
+    if (!canCreate || !onCreate) return;
+    onCreate(trimmedQuery);
+    closeList();
+  };
+
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (disabled) return;
 
     if (event.key === "ArrowDown") {
       event.preventDefault();
       if (!open) openList();
-      setHighlightIndex((index) => Math.min(index + 1, Math.max(filtered.length - 1, 0)));
+      setHighlightIndex((index) => Math.min(index + 1, Math.max(itemCount - 1, 0)));
       return;
     }
 
@@ -152,8 +174,15 @@ export function SearchableSelect({
 
     if (event.key === "Enter") {
       event.preventDefault();
-      if (open && filtered[highlightIndex]) {
+      if (!open) return;
+      if (canCreate && highlightIndex === createIndex) {
+        submitCreate();
+        return;
+      }
+      if (filtered[highlightIndex]) {
         selectOption(filtered[highlightIndex]);
+      } else if (canCreate) {
+        submitCreate();
       }
       return;
     }
@@ -203,10 +232,11 @@ export function SearchableSelect({
           }}
           className="max-h-60 overflow-y-auto rounded-xl border border-border/70 bg-popover/95 p-1 text-popover-foreground shadow-xl ring-1 ring-foreground/5 backdrop-blur-xl"
         >
-          {filtered.length === 0 ? (
+          {filtered.length === 0 && !canCreate ? (
             <p className="px-3 py-2 text-sm text-muted-foreground">{t("common.noResults")}</p>
           ) : (
-            filtered.map((option, index) => {
+            <>
+            {filtered.map((option, index) => {
               const active = index === highlightIndex;
               return (
                 <button
@@ -226,7 +256,29 @@ export function SearchableSelect({
                   {option.label}
                 </button>
               );
-            })
+            })}
+            {canCreate ? (
+              <button
+                type="button"
+                role="option"
+                aria-selected={highlightIndex === createIndex}
+                className={cn(
+                  "mt-0.5 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-brand-700 transition-colors dark:text-brand-300",
+                  highlightIndex === createIndex ? "bg-accent" : "hover:bg-muted/70",
+                )}
+                onMouseDown={(event) => event.preventDefault()}
+                onMouseEnter={() => setHighlightIndex(createIndex)}
+                onClick={submitCreate}
+              >
+                <PlusIcon className="size-3.5 shrink-0" />
+                <span>
+                  {createLabel
+                    ? createLabel(trimmedQuery)
+                    : t("common.createNamed").replace("{name}", trimmedQuery)}
+                </span>
+              </button>
+            ) : null}
+            </>
           )}
         </motion.div>
       )}

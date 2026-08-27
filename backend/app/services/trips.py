@@ -101,6 +101,7 @@ def get_trips_by_region_summary(
                 "trips_count": 0,
                 "factories": set(),
                 "employees": set(),
+                "results": [],
                 "last_trip_date": trip.start_date,
             }
         region_map[reg]["trips_count"] += 1
@@ -109,6 +110,9 @@ def get_trips_by_region_summary(
         for f in trip.factories:
             if f.factory_name:
                 region_map[reg]["factories"].add(f.factory_name.strip())
+        result_text = (trip.results or "").strip()
+        if result_text and result_text not in region_map[reg]["results"]:
+            region_map[reg]["results"].append(result_text)
         if trip.start_date and (
             region_map[reg]["last_trip_date"] is None
             or trip.start_date > region_map[reg]["last_trip_date"]
@@ -123,6 +127,7 @@ def get_trips_by_region_summary(
             factories_count=len(data["factories"]),
             factories=sorted(list(data["factories"])),
             employees=sorted(list(data["employees"])),
+            results=data["results"],
             last_trip_date=data["last_trip_date"],
         )
         for data in region_map.values()

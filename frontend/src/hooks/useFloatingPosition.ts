@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState, type RefObject } from "react";
+import { useLayoutEffect, useRef, useState, type RefObject } from "react";
 
 export interface FloatingPositionOptions {
   triggerRef: RefObject<HTMLElement | null>;
@@ -21,29 +21,35 @@ export interface FloatingCoords {
   placement: "top" | "bottom";
 }
 
-export function useFloatingPosition({
-  triggerRef,
-  popoverRef,
-  isOpen,
-  estimatedHeight = 290,
-  targetWidth,
-  viewportPadding = 10,
-  offset = 6,
-}: FloatingPositionOptions) {
+export function useFloatingPosition(options: FloatingPositionOptions) {
+  const { triggerRef, popoverRef, isOpen } = options;
   const [coords, setCoords] = useState<FloatingCoords | null>(null);
+
+  // Store latest options in a ref so inline functions or numbers don't trigger effect re-runs
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
 
   useLayoutEffect(() => {
     if (!isOpen) {
-      setCoords(null);
+      setCoords((prev) => (prev === null ? prev : null));
       return;
     }
 
     const calculate = () => {
-      const trigger = triggerRef.current;
+      const {
+        triggerRef: trigRef,
+        popoverRef: popRef,
+        estimatedHeight = 290,
+        targetWidth,
+        viewportPadding = 10,
+        offset = 6,
+      } = optionsRef.current;
+
+      const trigger = trigRef.current;
       if (!trigger) return;
 
       const triggerRect = trigger.getBoundingClientRect();
-      const popover = popoverRef.current;
+      const popover = popRef.current;
 
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
@@ -103,7 +109,18 @@ export function useFloatingPosition({
         left = viewportPadding;
       }
 
-      setCoords({ top, left, width, placement });
+      setCoords((prev) => {
+        if (
+          prev &&
+          prev.top === top &&
+          prev.left === left &&
+          prev.width === width &&
+          prev.placement === placement
+        ) {
+          return prev;
+        }
+        return { top, left, width, placement };
+      });
     };
 
     calculate();
@@ -129,7 +146,8 @@ export function useFloatingPosition({
       window.removeEventListener("resize", onScrollOrResize);
       window.removeEventListener("scroll", onScrollOrResize, true);
     };
-  }, [isOpen, triggerRef, popoverRef, estimatedHeight, targetWidth, viewportPadding, offset]);
+  }, [isOpen, triggerRef, popoverRef]);
 
   return coords;
 }
+

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   Area,
@@ -79,7 +80,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-import type { ClientRegionStatsItem, ContractClientStatsItem, DashboardStats, TopClientItem, TopClientLtvItem } from "../types";
+import type { ClientRegionStatsItem, ContractClientStatsItem, DashboardStats, RegionTripsSummary, TopClientItem, TopClientLtvItem, TripStatsSummary } from "../types";
 import { useI18n } from "../context/I18nContext";
 import { useTableSort } from "@/hooks/useTableSort";
 import {
@@ -113,6 +114,7 @@ const RANK_STYLES = [
 
 const TABLE_LIMIT_OPTIONS = [10, 20, 30] as const;
 const TREND_MONTH_OPTIONS = [6, 12] as const;
+const TRIP_YEARS = [2030, 2029, 2028, 2027, 2026, 2025, 2024, 2023, 2022, 2021, 2020] as const;
 const CONTRACTS_BY_CLIENT_PAGE_SIZE = 20;
 type TableLimit = (typeof TABLE_LIMIT_OPTIONS)[number];
 type SortOrder = "asc" | "desc";
@@ -352,6 +354,11 @@ export function DashboardPage() {
   const [contractsSortDir, setContractsSortDir] = useState<SortDir>("desc");
   const [contractsExportLoading, setContractsExportLoading] = useState<"xlsx" | "pdf" | null>(null);
   const [contractsPage, setContractsPage] = useState(0);
+  const [tripYear, setTripYear] = useState<number | "all">("all");
+  const [tripStats, setTripStats] = useState<TripStatsSummary | null>(null);
+  const [tripRegions, setTripRegions] = useState<RegionTripsSummary[]>([]);
+  const [tripLoading, setTripLoading] = useState(true);
+  const [tripError, setTripError] = useState("");
 
   const revenueConfig = useMemo(
     () =>
@@ -402,6 +409,19 @@ export function DashboardPage() {
       })
       .catch((e) => setRegionError(e.message));
   }, []);
+
+  useEffect(() => {
+    setTripLoading(true);
+    setTripError("");
+    const year = tripYear === "all" ? null : tripYear;
+    Promise.all([api.trips.summary(year), api.trips.byRegion(year)])
+      .then(([summary, regions]) => {
+        setTripStats(summary);
+        setTripRegions(regions);
+      })
+      .catch((e) => setTripError(e instanceof Error ? e.message : t("common.error")))
+      .finally(() => setTripLoading(false));
+  }, [tripYear, t]);
 
   const regionCountryOptions = useMemo(
     () => [...new Set(regionStats.map((item) => item.country).filter(Boolean))].sort((a, b) => a.localeCompare(b, "uz")),
@@ -1235,10 +1255,10 @@ export function DashboardPage() {
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
-                      {(item.trips_count_2026 ?? 0) > 0 ? (
+                      {(item.trips_count ?? item.trips_count_2026 ?? 0) > 0 ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
                           <PlaneIcon className="size-3" />
-                          {item.trips_count_2026}
+                          {item.trips_count ?? item.trips_count_2026}
                         </span>
                       ) : (
                         <span className="text-xs text-muted-foreground">—</span>
@@ -1255,6 +1275,153 @@ export function DashboardPage() {
                 ))}
               </TableBody>
             </PremiumDataTable>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="content-card">
+        <CardHeader className="border-b">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="flex size-8 items-center justify-center rounded-lg bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
+                <PlaneIcon className="size-4" />
+              </span>
+              <div>
+                <CardTitle className="text-base">{t("dashboard.tripsTitle")}</CardTitle>
+                <CardDescription className="text-xs">{t("dashboard.tripsDesc")}</CardDescription>
+              </div>
+            </div>
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+              <Select
+                value={String(tripYear)}
+                onValueChange={(value) => {
+                  if (!value) return;
+                  setTripYear(value === "all" ? "all" : Number(value));
+                }}
+                className="w-full sm:w-44"
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={t("trips.allYearsFilter")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="all">{t("trips.allYearsFilter")}</SelectItem>
+                    {TRIP_YEARS.map((year) => (
+                      <SelectItem key={year} value={String(year)}>
+                        {t("trips.yearLabel").replace("{year}", String(year))}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-lg shadow-sm"
+                render={<Link to="/trips" />}
+              >
+                {t("dashboard.viewAllTrips")}
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4 p-0">
+          {tripError && (
+            <p className="px-6 py-4 text-sm text-red-600 dark:text-red-400">
+              {t("common.error")}: {tripError}
+            </p>
+          )}
+          {!tripError && (
+            <>
+              <div className="grid grid-cols-2 gap-3 border-b px-6 py-4 sm:grid-cols-4">
+                <div>
+                  <p className="text-xs text-muted-foreground">{t("dashboard.tripsCount")}</p>
+                  <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">
+                    {tripLoading ? "—" : tripStats?.total_trips ?? 0}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">{t("dashboard.tripsRegions")}</p>
+                  <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">
+                    {tripLoading ? "—" : tripStats?.total_regions ?? 0}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">{t("dashboard.tripFactories")}</p>
+                  <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">
+                    {tripLoading ? "—" : tripStats?.total_factories ?? 0}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">{t("trips.colEmployee")}</p>
+                  <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">
+                    {tripLoading ? "—" : tripStats?.total_employees ?? 0}
+                  </p>
+                </div>
+              </div>
+              <PremiumDataTable
+                loading={tripLoading}
+                empty={!tripLoading && tripRegions.length === 0}
+                emptyMessage={t("dashboard.noTrips")}
+                skeletonCols={4}
+              >
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{t("dashboard.regionColumn")}</TableHead>
+                    <TableHead>{t("dashboard.tripFactories")}</TableHead>
+                    <TableHead>{t("dashboard.tripEmployee")}</TableHead>
+                    <TableHead className="min-w-[240px]">{t("dashboard.tripResult")}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {tripRegions.map((row, index) => {
+                    const shownFactories = row.factories.slice(0, 5);
+                    const extraFactories = row.factories.length - shownFactories.length;
+                    return (
+                      <MotionTableRow
+                        key={`${row.country}-${row.region}`}
+                        {...rowEnter(index)}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => {
+                          const match = regionStats.find(
+                            (item) =>
+                              item.city.toLowerCase().includes(row.region.toLowerCase()) ||
+                              row.region.toLowerCase().includes(item.city.toLowerCase()),
+                          );
+                          if (match) setSelectedRegionModal(match);
+                        }}
+                      >
+                        <TableCell>
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold text-foreground">{row.region}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {row.trips_count} {t("trips.tripsCountSuffix")}
+                              {row.country && row.country !== "O'zbekiston" ? ` · ${row.country}` : ""}
+                            </p>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <p className="text-sm leading-relaxed text-foreground">
+                            {shownFactories.join(", ") || "—"}
+                            {extraFactories > 0 ? ` +${extraFactories}` : ""}
+                          </p>
+                        </TableCell>
+                        <TableCell>
+                          <p className="text-sm leading-relaxed text-foreground">
+                            {row.employees.join(", ") || "—"}
+                          </p>
+                        </TableCell>
+                        <TableCell className="min-w-[240px] max-w-md">
+                          <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">
+                            {(row.results ?? []).length > 0 ? row.results.join(" · ") : "—"}
+                          </p>
+                        </TableCell>
+                      </MotionTableRow>
+                    );
+                  })}
+                </TableBody>
+              </PremiumDataTable>
+            </>
           )}
         </CardContent>
       </Card>
@@ -1730,7 +1897,7 @@ export function DashboardPage() {
           region={selectedRegionModal.city}
           country={selectedRegionModal.country}
           factories={selectedRegionModal.factories || []}
-          tripsCount2026={selectedRegionModal.trips_count_2026 || 0}
+          tripsCount={selectedRegionModal.trips_count ?? selectedRegionModal.trips_count_2026 ?? 0}
         />
       )}
     </PageShell>

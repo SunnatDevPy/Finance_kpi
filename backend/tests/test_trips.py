@@ -80,6 +80,7 @@ def test_trips_summary_and_region_breakdown(client, auth_headers, db_session):
             "start_date": "2026-04-15",
             "end_date": "2026-04-18",
             "employee_name": "Dilnoza Yusupova",
+            "results": "3 ta fabrika bilan muzokara o'tkazildi",
             "factories": [
                 {"factory_name": "Fergana Denim"},
                 {"factory_name": "Marg'ilon Atlas"},
@@ -109,6 +110,7 @@ def test_trips_summary_and_region_breakdown(client, auth_headers, db_session):
     assert fergana["factories_count"] == 3
     assert "Fergana Denim" in fergana["factories"]
     assert "Dilnoza Yusupova" in fergana["employees"]
+    assert "3 ta fabrika bilan muzokara o'tkazildi" in fergana["results"]
 
 
 def test_update_and_delete_trip(client, auth_headers):

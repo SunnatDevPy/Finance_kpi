@@ -74,6 +74,7 @@ class RegionTripsSummary(BaseModel):
     factories_count: int
     factories: list[str] = Field(default_factory=list)
     employees: list[str] = Field(default_factory=list)
+    results: list[str] = Field(default_factory=list)
     last_trip_date: date | None = None
 
 
