@@ -1,9 +1,11 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
-import { motion } from "framer-motion";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Building2Icon,
   CheckCircle2Icon,
+  ChevronDownIcon,
   ChevronRightIcon,
+  Columns3Icon,
   Edit2Icon,
   FileSpreadsheetIcon,
   FileTextIcon,
@@ -17,6 +19,7 @@ import {
   Trash2Icon,
   UserCheckIcon,
   UsersIcon,
+  XIcon,
 } from "lucide-react";
 import { PageHeader, PageShell } from "../components/PageHeader";
 import { StatCard } from "../components/StatCard";
@@ -41,10 +44,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
+import { Checkbox } from "../components/ui/checkbox";
 import { Pagination } from "../components/Pagination";
 import { TripModal } from "../components/TripModal";
 import { RegionFactoriesModal } from "../components/RegionFactoriesModal";
 import { api } from "../api/client";
+import { GEO_COUNTRIES, getRegionsForCountry } from "../data/geoRegions";
 import type {
   ClientRegionStatsItem,
   Paginated,
@@ -59,31 +64,85 @@ import { formatDateShort } from "../utils/format";
 
 const AVAILABLE_YEARS = [2026, 2025, 2024, 2023, 2022, 2021, 2020] as const;
 
+type ColumnKey = "date" | "region" | "factories" | "employee" | "purpose" | "actions";
+
+const DEFAULT_COLUMNS: Record<ColumnKey, boolean> = {
+  date: true,
+  region: true,
+  factories: true,
+  employee: true,
+  purpose: true,
+  actions: true,
+};
+
+const STORAGE_KEY_COLUMNS = "wtma_trips_columns_visibility";
+
 export function TripsPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { isAdmin } = useAuth();
 
-  // Default filter: "all" (Barchasi)
+  // Filters
   const [selectedYear, setSelectedYear] = useState<number | "all">("all");
+  const [countryFilter, setCountryFilter] = useState<string>("all");
+  const [regionFilter, setRegionFilter] = useState<string>("all");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(15);
+
   const [activeTab, setActiveTab] = useState<"table" | "regions">("table");
 
-  const [stats, setStats] = useState<TripStatsSummary | null>(null);
+  // Column Customizer state
+  const [columns, setColumns] = useState<Record<ColumnKey, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_COLUMNS);
+      if (saved) {
+        return { ...DEFAULT_COLUMNS, ...JSON.parse(saved) };
+      }
+    } catch {
+      // ignore
+    }
+    return DEFAULT_COLUMNS;
+  });
 
+  const [columnsMenuOpen, setColumnsMenuOpen] = useState(false);
+  const columnsMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        columnsMenuRef.current &&
+        !columnsMenuRef.current.contains(event.target as Node)
+      ) {
+        setColumnsMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const toggleColumn = (key: ColumnKey) => {
+    setColumns((prev) => {
+      const updated = { ...prev, [key]: !prev[key] };
+      localStorage.setItem(STORAGE_KEY_COLUMNS, JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const visibleColumnsCount = useMemo(
+    () => Object.values(columns).filter(Boolean).length,
+    [columns],
+  );
+
+  // Data states
+  const [stats, setStats] = useState<TripStatsSummary | null>(null);
   const [tripsData, setTripsData] = useState<Paginated<Trip>>({
     items: [],
     total: 0,
     skip: 0,
     limit: 20,
   });
-
   const [regionSummaries, setRegionSummaries] = useState<RegionTripsSummary[]>([]);
   const [regionStats, setRegionStats] = useState<ClientRegionStatsItem[]>([]);
-
-  // Filters
-  const [search, setSearch] = useState("");
-  const [regionFilter, setRegionFilter] = useState("all");
-  const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(15);
 
   // Modals
   const [tripModalOpen, setTripModalOpen] = useState(false);
@@ -97,20 +156,45 @@ export function TripsPage() {
 
   const [deletingTripId, setDeletingTripId] = useState<number | null>(null);
 
+  // Dynamic regions for selected country
+  const dynamicRegionsForCountry = useMemo(() => {
+    if (countryFilter === "all") {
+      // Return all regions across all countries
+      const list: { value: string; label: string }[] = [];
+      GEO_COUNTRIES.forEach((c) => {
+        const regs = getRegionsForCountry(c.value);
+        regs.forEach((r) => {
+          list.push({
+            value: r.value,
+            label: `${r.value} (${locale === "ru" ? c.labelRu : c.labelUz})`,
+          });
+        });
+      });
+      return list;
+    }
+    const regs = getRegionsForCountry(countryFilter);
+    return regs.map((r) => ({
+      value: r.value,
+      label: locale === "ru" ? r.labelRu : r.labelUz,
+    }));
+  }, [countryFilter, locale]);
+
   // Load KPI Stats
   const loadStats = useCallback(() => {
     const yr = selectedYear === "all" ? undefined : selectedYear;
+    const cntry = countryFilter === "all" ? undefined : countryFilter;
     api.trips
-      .summary(yr)
+      .summary(yr, cntry)
       .then(setStats)
       .catch(() => {});
-  }, [selectedYear]);
+  }, [selectedYear, countryFilter]);
 
   // Load Trips List
   const loadTrips = useCallback(() => {
     api.trips
       .list({
         year: selectedYear === "all" ? undefined : selectedYear,
+        country: countryFilter === "all" ? undefined : countryFilter,
         region: regionFilter === "all" ? undefined : regionFilter,
         search: search.trim() || undefined,
         skip: page * pageSize,
@@ -118,40 +202,27 @@ export function TripsPage() {
       })
       .then(setTripsData)
       .catch(() => {});
-  }, [selectedYear, regionFilter, search, page, pageSize]);
+  }, [selectedYear, countryFilter, regionFilter, search, page, pageSize]);
 
   // Load Region Summaries & Dashboard region stats (for factories list)
   const loadRegionData = useCallback(() => {
+    const yr = selectedYear === "all" ? null : selectedYear;
+    const cntry = countryFilter === "all" ? null : countryFilter;
     api.trips
-      .byRegion(selectedYear === "all" ? null : selectedYear)
+      .byRegion(yr, cntry)
       .then(setRegionSummaries)
       .catch(() => {});
 
     api.dashboardClientsByRegion()
       .then(setRegionStats)
       .catch(() => {});
-  }, [selectedYear]);
+  }, [selectedYear, countryFilter]);
 
   useEffect(() => {
     loadStats();
     loadTrips();
     loadRegionData();
   }, [loadStats, loadTrips, loadRegionData]);
-
-  const uniqueRegions = useMemo(() => {
-    const set = new Set<string>();
-    tripsData.items.forEach((t) => {
-      if (t.region) {
-        set.add(t.country && t.country !== "O'zbekiston" ? `${t.region} (${t.country})` : t.region);
-      }
-    });
-    regionSummaries.forEach((r) => {
-      if (r.region) {
-        set.add(r.country && r.country !== "O'zbekiston" ? `${r.region} (${r.country})` : r.region);
-      }
-    });
-    return Array.from(set).sort();
-  }, [tripsData.items, regionSummaries]);
 
   const handleDeleteTrip = async (id: number) => {
     if (!confirm(t("trips.confirmDelete"))) return;
@@ -170,16 +241,19 @@ export function TripsPage() {
 
   const handleOpenRegionModal = (regionName: string, countryName?: string) => {
     const matchCountry = (countryName || "O'zbekiston").toLowerCase();
-    const regStat = regionStats.find(
-      (r) =>
-        (r.country.toLowerCase().includes(matchCountry) || matchCountry.includes(r.country.toLowerCase())) &&
-        (r.city.toLowerCase().includes(regionName.toLowerCase()) ||
-          regionName.toLowerCase().includes(r.city.toLowerCase())),
-    ) || regionStats.find(
-      (r) =>
-        r.city.toLowerCase().includes(regionName.toLowerCase()) ||
-        regionName.toLowerCase().includes(r.city.toLowerCase()),
-    );
+    const regStat =
+      regionStats.find(
+        (r) =>
+          (r.country.toLowerCase().includes(matchCountry) ||
+            matchCountry.includes(r.country.toLowerCase())) &&
+          (r.city.toLowerCase().includes(regionName.toLowerCase()) ||
+            regionName.toLowerCase().includes(r.city.toLowerCase())),
+      ) ||
+      regionStats.find(
+        (r) =>
+          r.city.toLowerCase().includes(regionName.toLowerCase()) ||
+          regionName.toLowerCase().includes(r.city.toLowerCase()),
+      );
 
     const summary = regionSummaries.find(
       (r) => r.region.toLowerCase() === regionName.toLowerCase(),
@@ -193,9 +267,18 @@ export function TripsPage() {
     });
   };
 
+  const columnLabels: { key: ColumnKey; label: string }[] = [
+    { key: "date", label: t("trips.colDate") },
+    { key: "region", label: t("trips.colRegion") },
+    { key: "factories", label: t("trips.colFactories") },
+    { key: "employee", label: t("trips.colEmployee") },
+    { key: "purpose", label: t("trips.colPurpose") },
+    { key: "actions", label: t("trips.colActions") },
+  ];
+
   return (
     <PageShell>
-      {/* Top Page Header */}
+      {/* ── Top Page Header (Clean, only export & add actions) ── */}
       <PageHeader
         title={t("trips.pageTitle")}
         subtitle={
@@ -204,96 +287,47 @@ export function TripsPage() {
             : t("trips.pageSubtitle").replace("{year}", String(selectedYear))
         }
       >
-        <div className="flex flex-wrap items-center gap-2.5">
-          {/* Year Segmented Control (Default: Barchasi) */}
-          <div className="segmented-control max-w-full overflow-x-auto">
-            <Button
-              type="button"
-              size="sm"
-              variant={selectedYear === "all" ? "default" : "ghost"}
-              className="h-8 px-3 text-xs font-semibold"
-              onClick={() => {
-                setSelectedYear("all");
-                setPage(0);
-              }}
-            >
-              {t("common.all")}
-            </Button>
-            {AVAILABLE_YEARS.slice(0, 4).map((yr) => (
-              <Button
-                key={yr}
-                type="button"
-                size="sm"
-                variant={selectedYear === yr ? "default" : "ghost"}
-                className="h-8 px-3 text-xs font-semibold"
-                onClick={() => {
-                  setSelectedYear(yr);
-                  setPage(0);
-                }}
-              >
-                {yr}
-              </Button>
-            ))}
-            {/* More years select */}
-            <Select
-              value={typeof selectedYear === "number" && selectedYear < 2023 ? String(selectedYear) : ""}
-              onValueChange={(val) => {
-                if (val) {
-                  setSelectedYear(Number(val));
-                  setPage(0);
-                }
-              }}
-            >
-              <SelectTrigger className="h-8 text-xs border-0 bg-transparent px-2 shadow-none focus:ring-0">
-                <SelectValue placeholder={t("trips.otherYears")} />
-              </SelectTrigger>
-              <SelectContent>
-                {AVAILABLE_YEARS.slice(4).map((yr) => (
-                  <SelectItem key={yr} value={String(yr)}>
-                    {yr}-yil
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
+        <div className="flex items-center gap-2">
           {/* Export Buttons */}
-          <div className="hidden sm:flex items-center gap-1.5">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8 gap-1.5 px-3 text-xs"
-              onClick={() =>
-                api.trips.export("xlsx", {
-                  year: selectedYear === "all" ? undefined : selectedYear,
-                })
-              }
-            >
-              <FileSpreadsheetIcon className="size-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span>Excel</span>
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8 gap-1.5 px-3 text-xs"
-              onClick={() =>
-                api.trips.export("pdf", {
-                  year: selectedYear === "all" ? undefined : selectedYear,
-                })
-              }
-            >
-              <FileTextIcon className="size-3.5 text-red-500" />
-              <span>PDF</span>
-            </Button>
-          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-9 gap-1.5 px-3 text-xs"
+            onClick={() =>
+              api.trips.export("xlsx", {
+                year: selectedYear === "all" ? undefined : selectedYear,
+                country: countryFilter === "all" ? undefined : countryFilter,
+                region: regionFilter === "all" ? undefined : regionFilter,
+              })
+            }
+          >
+            <FileSpreadsheetIcon className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span>Excel</span>
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-9 gap-1.5 px-3 text-xs"
+            onClick={() =>
+              api.trips.export("pdf", {
+                year: selectedYear === "all" ? undefined : selectedYear,
+                country: countryFilter === "all" ? undefined : countryFilter,
+                region: regionFilter === "all" ? undefined : regionFilter,
+              })
+            }
+          >
+            <FileTextIcon className="size-3.5 text-red-500" />
+            <span>PDF</span>
+          </Button>
 
           {/* New Trip Button */}
           <Button
             type="button"
             size="sm"
-            className="h-8 gap-1.5 px-3.5 text-xs shadow-md shadow-brand-500/20"
+            className="h-9 gap-1.5 px-3.5 text-xs shadow-md shadow-brand-500/20"
             onClick={() => {
               setEditingTrip(null);
               setTripModalOpen(true);
@@ -305,7 +339,7 @@ export function TripsPage() {
         </div>
       </PageHeader>
 
-      {/* KPI Stats Cards */}
+      {/* ── KPI Stats Cards ── */}
       <StaggerContainer className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StaggerItem>
           <StatCard
@@ -356,9 +390,8 @@ export function TripsPage() {
         </StaggerItem>
       </StaggerContainer>
 
-      {/* View Switcher & Toolbar */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b pb-4 pt-2">
-        {/* Tab switcher */}
+      {/* ── Tab Switcher ── */}
+      <div className="flex items-center justify-between pt-1">
         <div className="segmented-control w-fit">
           <Button
             type="button"
@@ -368,7 +401,9 @@ export function TripsPage() {
             onClick={() => setActiveTab("table")}
           >
             <LayersIcon className="size-3.5" />
-            <span>{t("trips.tabs.allTrips")} ({tripsData.total})</span>
+            <span>
+              {t("trips.tabs.allTrips")} ({tripsData.total})
+            </span>
           </Button>
 
           <Button
@@ -379,199 +414,323 @@ export function TripsPage() {
             onClick={() => setActiveTab("regions")}
           >
             <GlobeIcon className="size-3.5" />
-            <span>{t("trips.tabs.byRegion")} ({regionSummaries.length})</span>
-          </Button>
-        </div>
-
-        {/* Search & Region filter */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          <div className="relative min-w-[200px] max-w-xs">
-            <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(0);
-              }}
-              placeholder={t("trips.searchPlaceholder")}
-              className="h-8 pl-9 text-xs"
-            />
-          </div>
-
-          <Select
-            value={regionFilter}
-            onValueChange={(val) => {
-              setRegionFilter(val || "all");
-              setPage(0);
-            }}
-          >
-            <SelectTrigger className="h-8 text-xs min-w-[160px]">
-              <SelectValue placeholder={t("trips.allRegionsFilter")} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem value="all">{t("trips.allRegionsFilter")}</SelectItem>
-                {uniqueRegions.map((reg) => {
-                  const rawVal = reg.split(" (")[0];
-                  return (
-                    <SelectItem key={reg} value={rawVal}>
-                      {reg}
-                    </SelectItem>
-                  );
-                })}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-8 size-8 p-0"
-            onClick={() => {
-              loadTrips();
-              loadStats();
-              loadRegionData();
-            }}
-            title={t("common.reload")}
-          >
-            <RefreshCwIcon className="size-3.5" />
+            <span>
+              {t("trips.tabs.byRegion")} ({regionSummaries.length})
+            </span>
           </Button>
         </div>
       </div>
 
-      {/* TAB 1: ALL TRIPS TABLE */}
+      {/* ── Dedicated Filter Bar (Boshida Qidiruv, Yillar dropdown, Mamlakat & Viloyat, Ustunlar sozlash) ── */}
+      <div className="flex flex-wrap items-center gap-2.5 rounded-2xl border border-border/80 bg-card p-3 shadow-xs">
+        {/* 1. BOSHIDA: Qidiruv inputi (bir xil o'lchamda) */}
+        <div className="relative min-w-[220px] flex-1 max-w-sm">
+          <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(0);
+            }}
+            placeholder={t("trips.searchFactoriesPlaceholder")}
+            className="h-10 pl-9 pr-8 text-xs font-normal bg-background"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearch("");
+                setPage(0);
+              }}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <XIcon className="size-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* 2. Yillar filtri Dropdown */}
+        <Select
+          value={String(selectedYear)}
+          onValueChange={(val) => {
+            setSelectedYear(val === "all" ? "all" : Number(val));
+            setPage(0);
+          }}
+        >
+          <SelectTrigger className="h-10 min-w-[130px] text-xs bg-background">
+            <SelectValue placeholder={t("trips.allYearsFilter")} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem value="all">{t("trips.allYearsFilter")}</SelectItem>
+              {AVAILABLE_YEARS.map((yr) => (
+                <SelectItem key={yr} value={String(yr)}>
+                  {yr}-yil
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+
+        {/* 3. Mamlakat tanlash Dropdown */}
+        <Select
+          value={countryFilter}
+          onValueChange={(val) => {
+            setCountryFilter(val || "all");
+            setRegionFilter("all");
+            setPage(0);
+          }}
+        >
+          <SelectTrigger className="h-10 min-w-[150px] text-xs bg-background">
+            <SelectValue placeholder={t("trips.allCountriesFilter")} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem value="all">{t("trips.allCountriesFilter")}</SelectItem>
+              {GEO_COUNTRIES.map((c) => (
+                <SelectItem key={c.value} value={c.value}>
+                  {locale === "ru" ? c.labelRu : c.labelUz}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+
+        {/* 4. Viloyat / Shahar tanlash (Mamlakat tanlanganda mos viloyatlari chiqadi) */}
+        <Select
+          value={regionFilter}
+          onValueChange={(val) => {
+            setRegionFilter(val || "all");
+            setPage(0);
+          }}
+        >
+          <SelectTrigger className="h-10 min-w-[160px] text-xs bg-background">
+            <SelectValue placeholder={t("trips.allRegionsFilter")} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem value="all">{t("trips.allRegionsFilter")}</SelectItem>
+              {dynamicRegionsForCountry.map((reg) => (
+                <SelectItem key={reg.value} value={reg.value}>
+                  {reg.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+
+        {/* 5. Ustunlar (Columns Visibility Customizer) Popover/Dropdown */}
+        <div className="relative" ref={columnsMenuRef}>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-10 gap-2 px-3 text-xs bg-background"
+            onClick={() => setColumnsMenuOpen((prev) => !prev)}
+            title={t("trips.columnsCustomizer")}
+          >
+            <Columns3Icon className="size-4 text-muted-foreground" />
+            <span>{t("trips.columns")}</span>
+            <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
+              {visibleColumnsCount}/{columnLabels.length}
+            </span>
+            <ChevronDownIcon className="size-3 text-muted-foreground" />
+          </Button>
+
+          <AnimatePresence>
+            {columnsMenuOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: 6, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 4, scale: 0.96 }}
+                transition={{ duration: 0.15 }}
+                className="absolute right-0 z-50 mt-2 w-56 rounded-2xl border border-border/80 bg-popover p-2 shadow-xl backdrop-blur-md"
+              >
+                <div className="px-2 py-1.5 text-xs font-semibold text-foreground border-b mb-1">
+                  {t("trips.columnsCustomizer")}
+                </div>
+                <div className="space-y-1">
+                  {columnLabels.map(({ key, label }) => (
+                    <label
+                      key={key}
+                      className="flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted/60 cursor-pointer transition select-none"
+                    >
+                      <Checkbox
+                        checked={columns[key]}
+                        onCheckedChange={() => toggleColumn(key)}
+                      />
+                      <span>{label}</span>
+                    </label>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* 6. Qayta yuklash (Refresh) */}
+        <Button
+          type="button"
+          variant="outline"
+          className="h-10 size-10 p-0 bg-background"
+          onClick={() => {
+            loadTrips();
+            loadStats();
+            loadRegionData();
+          }}
+          title={t("common.reload")}
+        >
+          <RefreshCwIcon className="size-4 text-muted-foreground" />
+        </Button>
+      </div>
+
+      {/* ── TAB 1: ALL TRIPS TABLE (With dynamic column toggles) ── */}
       {activeTab === "table" && (
         <div className="space-y-4">
           <PremiumDataTable
             empty={tripsData.items.length === 0}
             emptyMessage={t("trips.noTripsFound")}
-            skeletonCols={6}
+            skeletonCols={visibleColumnsCount}
           >
             <TableHeader>
               <TableRow>
-                <TableHead>{t("trips.tripDate")}</TableHead>
-                <TableHead>{t("trips.region")}</TableHead>
-                <TableHead>{t("trips.employee")}</TableHead>
-                <TableHead>{t("trips.factoriesVisited")}</TableHead>
-                <TableHead>{t("trips.purposeAndResults")}</TableHead>
-                <TableHead className="w-20 text-right">{t("common.actions")}</TableHead>
+                {columns.date && <TableHead>{t("trips.colDate")}</TableHead>}
+                {columns.region && <TableHead>{t("trips.colRegion")}</TableHead>}
+                {columns.factories && <TableHead>{t("trips.colFactories")}</TableHead>}
+                {columns.employee && <TableHead>{t("trips.colEmployee")}</TableHead>}
+                {columns.purpose && <TableHead>{t("trips.colPurpose")}</TableHead>}
+                {columns.actions && (
+                  <TableHead className="w-20 text-right">{t("trips.colActions")}</TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
               {tripsData.items.map((item, idx) => (
                 <MotionTableRow key={item.id} {...rowEnter(idx)}>
-                  {/* Dates */}
-                  <TableCell>
-                    <div className="flex flex-col text-xs font-mono tabular-nums">
-                      <span className="font-semibold text-foreground">
-                        {formatDateShort(item.start_date)}
-                      </span>
-                      {item.start_date !== item.end_date && (
-                        <span className="text-[11px] text-muted-foreground">
-                          — {formatDateShort(item.end_date)}
+                  {/* 1. Safar sanasi */}
+                  {columns.date && (
+                    <TableCell>
+                      <div className="flex flex-col text-xs font-mono tabular-nums">
+                        <span className="font-semibold text-foreground">
+                          {formatDateShort(item.start_date)}
                         </span>
-                      )}
-                    </div>
-                  </TableCell>
+                        {item.start_date !== item.end_date && (
+                          <span className="text-[11px] text-muted-foreground">
+                            — {formatDateShort(item.end_date)}
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
+                  )}
 
-                  {/* Region & Country */}
-                  <TableCell>
-                    <button
-                      type="button"
-                      onClick={() => handleOpenRegionModal(item.region, item.country)}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-border/80 bg-muted/40 px-2.5 py-1 text-xs font-semibold text-foreground transition hover:border-brand-500 hover:bg-brand-500/10 hover:text-brand-600 dark:hover:text-brand-400 group"
-                    >
-                      <MapPinIcon className="size-3.5 text-brand-500 shrink-0" />
-                      <span>{item.region}</span>
-                      {item.country && item.country !== "O'zbekiston" && (
-                        <span className="rounded bg-brand-500/15 px-1.5 py-0.2 text-[10px] font-bold text-brand-600 dark:text-brand-400">
-                          {item.country}
-                        </span>
-                      )}
-                    </button>
-                  </TableCell>
-
-                  {/* Employee */}
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <span className="flex size-7 items-center justify-center rounded-full bg-brand-500/10 text-xs font-semibold text-brand-600 dark:bg-brand-500/20 dark:text-brand-400 shrink-0">
-                        {item.employee_name.charAt(0)}
-                      </span>
-                      <span className="text-xs font-medium text-foreground truncate max-w-[140px]">
-                        {item.employee_name}
-                      </span>
-                    </div>
-                  </TableCell>
-
-                  {/* Factories (visited factories list) */}
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1 max-w-md">
-                      {item.factories.map((f, fIdx) => (
-                        <span
-                          key={fIdx}
-                          className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-background px-2 py-0.5 text-[11px] font-medium text-foreground shadow-2xs"
-                        >
-                          <Building2Icon className="size-2.5 text-muted-foreground" />
-                          <span>{f.factory_name}</span>
-                        </span>
-                      ))}
-                      {item.factories.length === 0 && (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
-                    </div>
-                  </TableCell>
-
-                  {/* Purpose & Results */}
-                  <TableCell>
-                    <div className="max-w-xs space-y-0.5 text-xs">
-                      {item.purpose && (
-                        <p className="line-clamp-1 text-foreground">{item.purpose}</p>
-                      )}
-                      {item.results && (
-                        <p className="line-clamp-1 text-emerald-600 dark:text-emerald-400 text-[11px] flex items-center gap-1">
-                          <CheckCircle2Icon className="size-3 shrink-0" />
-                          <span>{item.results}</span>
-                        </p>
-                      )}
-                      {!item.purpose && !item.results && (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </div>
-                  </TableCell>
-
-                  {/* Actions */}
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
+                  {/* 2. Viloyat & Mamlakat */}
+                  {columns.region && (
+                    <TableCell>
+                      <button
                         type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="size-7 p-0"
-                        onClick={() => {
-                          setEditingTrip(item);
-                          setTripModalOpen(true);
-                        }}
-                        title={t("common.edit")}
+                        onClick={() => handleOpenRegionModal(item.region, item.country)}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-border/80 bg-muted/40 px-2.5 py-1 text-xs font-semibold text-foreground transition hover:border-brand-500 hover:bg-brand-500/10 hover:text-brand-600 dark:hover:text-brand-400 group"
                       >
-                        <Edit2Icon className="size-3.5" />
-                      </Button>
+                        <MapPinIcon className="size-3.5 text-brand-500 shrink-0" />
+                        <span>{item.region}</span>
+                        {item.country && item.country !== "O'zbekiston" && (
+                          <span className="rounded bg-brand-500/15 px-1.5 py-0.2 text-[10px] font-bold text-brand-600 dark:text-brand-400">
+                            {item.country}
+                          </span>
+                        )}
+                      </button>
+                    </TableCell>
+                  )}
 
-                      {isAdmin && (
+                  {/* 3. Fabrikalar / Shahar */}
+                  {columns.factories && (
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1.5 max-w-md">
+                        {item.factories.map((f, fIdx) => (
+                          <span
+                            key={fIdx}
+                            className="inline-flex items-center gap-1 rounded-md border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium text-foreground shadow-2xs"
+                          >
+                            <Building2Icon className="size-3 text-muted-foreground shrink-0" />
+                            <span>{f.factory_name}</span>
+                          </span>
+                        ))}
+                        {item.factories.length === 0 && (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </div>
+                    </TableCell>
+                  )}
+
+                  {/* 4. Mas'ul xodim */}
+                  {columns.employee && (
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <span className="flex size-7 items-center justify-center rounded-full bg-brand-500/10 text-xs font-bold text-brand-600 dark:bg-brand-500/20 dark:text-brand-400 shrink-0">
+                          {item.employee_name.charAt(0)}
+                        </span>
+                        <span className="text-xs font-semibold text-foreground truncate max-w-[140px]">
+                          {item.employee_name}
+                        </span>
+                      </div>
+                    </TableCell>
+                  )}
+
+                  {/* 5. Maqsad va Natija */}
+                  {columns.purpose && (
+                    <TableCell>
+                      <div className="max-w-xs space-y-1 text-xs">
+                        {item.purpose && (
+                          <p className="line-clamp-2 text-foreground font-normal">
+                            {item.purpose}
+                          </p>
+                        )}
+                        {item.results && (
+                          <p className="line-clamp-2 text-emerald-600 dark:text-emerald-400 text-[11px] font-medium flex items-center gap-1">
+                            <CheckCircle2Icon className="size-3 shrink-0" />
+                            <span>{item.results}</span>
+                          </p>
+                        )}
+                        {!item.purpose && !item.results && (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </div>
+                    </TableCell>
+                  )}
+
+                  {/* 6. Amallar */}
+                  {columns.actions && (
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="size-7 p-0 text-muted-foreground hover:bg-red-500/10 hover:text-red-600"
-                          onClick={() => handleDeleteTrip(item.id)}
-                          disabled={deletingTripId === item.id}
-                          title={t("common.delete")}
+                          className="size-8 p-0"
+                          onClick={() => {
+                            setEditingTrip(item);
+                            setTripModalOpen(true);
+                          }}
+                          title={t("common.edit")}
                         >
-                          <Trash2Icon className="size-3.5" />
+                          <Edit2Icon className="size-3.5" />
                         </Button>
-                      )}
-                    </div>
-                  </TableCell>
+
+                        {isAdmin && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="size-8 p-0 text-muted-foreground hover:bg-red-500/10 hover:text-red-600"
+                            onClick={() => handleDeleteTrip(item.id)}
+                            disabled={deletingTripId === item.id}
+                            title={t("common.delete")}
+                          >
+                            <Trash2Icon className="size-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  )}
                 </MotionTableRow>
               ))}
             </TableBody>
@@ -593,7 +752,7 @@ export function TripsPage() {
         </div>
       )}
 
-      {/* TAB 2: BY REGION BREAKDOWN */}
+      {/* ── TAB 2: BY REGION BREAKDOWN CARDS ── */}
       {activeTab === "regions" && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
@@ -708,7 +867,7 @@ export function TripsPage() {
         </div>
       )}
 
-      {/* Trip Modal */}
+      {/* ── Trip Modal ── */}
       <TripModal
         open={tripModalOpen}
         onClose={() => {
@@ -724,7 +883,7 @@ export function TripsPage() {
         defaultYear={typeof selectedYear === "number" ? selectedYear : new Date().getFullYear()}
       />
 
-      {/* Region Factories Details Modal */}
+      {/* ── Region Factories Details Modal (Statuslarsiz) ── */}
       {selectedRegionDetails && (
         <RegionFactoriesModal
           open={Boolean(selectedRegionDetails)}

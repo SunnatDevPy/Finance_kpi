@@ -32,10 +32,14 @@ def get_trip_or_404(db: Session, trip_id: int) -> Trip:
     return trip
 
 
-def get_trip_stats_summary(db: Session, year: int | None = None) -> TripStatsSummary:
+def get_trip_stats_summary(
+    db: Session, year: int | None = None, country: str | None = None
+) -> TripStatsSummary:
     trip_filters = [Trip.deleted_at.is_(None)]
     if year is not None:
         trip_filters.append(extract("year", Trip.start_date) == year)
+    if country is not None and country.strip() and country != "all":
+        trip_filters.append(Trip.country.ilike(f"%{country.strip()}%"))
 
     total_trips = db.scalar(
         select(func.count(Trip.id)).where(*trip_filters)
@@ -65,11 +69,13 @@ def get_trip_stats_summary(db: Session, year: int | None = None) -> TripStatsSum
 
 
 def get_trips_by_region_summary(
-    db: Session, year: int | None = None
+    db: Session, year: int | None = None, country: str | None = None
 ) -> list[RegionTripsSummary]:
     trip_filters = [Trip.deleted_at.is_(None)]
     if year is not None:
         trip_filters.append(extract("year", Trip.start_date) == year)
+    if country is not None and country.strip() and country != "all":
+        trip_filters.append(Trip.country.ilike(f"%{country.strip()}%"))
 
     trips = list(
         db.scalars(

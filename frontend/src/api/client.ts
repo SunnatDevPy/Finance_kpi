@@ -835,6 +835,7 @@ export const api = {
   trips: {
     list: (params?: {
       year?: number;
+      country?: string;
       region?: string;
       user_id?: number;
       search?: string;
@@ -845,7 +846,8 @@ export const api = {
     }) => {
       const q = new URLSearchParams();
       if (params?.year) q.set("year", String(params.year));
-      if (params?.region) q.set("region", params.region);
+      if (params?.country && params.country !== "all") q.set("country", params.country);
+      if (params?.region && params.region !== "all") q.set("region", params.region);
       if (params?.user_id) q.set("user_id", String(params.user_id));
       if (params?.search) q.set("search", params.search);
       if (params?.date_from) q.set("date_from", params.date_from);
@@ -870,19 +872,26 @@ export const api = {
       request<void>(`/trips/${id}`, {
         method: "DELETE",
       }),
-    summary: (year?: number | null) => {
-      const qs = year ? `?year=${year}` : "";
-      return request<TripStatsSummary>(`/trips/summary${qs}`);
+    summary: (year?: number | null, country?: string | null) => {
+      const q = new URLSearchParams();
+      if (year) q.set("year", String(year));
+      if (country && country !== "all") q.set("country", country);
+      const qs = q.toString();
+      return request<TripStatsSummary>(`/trips/summary${qs ? `?${qs}` : ""}`);
     },
-    byRegion: (year?: number | null) => {
-      const qs = year ? `?year=${year}` : "";
-      return request<RegionTripsSummary[]>(`/trips/by-region${qs}`);
+    byRegion: (year?: number | null, country?: string | null) => {
+      const q = new URLSearchParams();
+      if (year) q.set("year", String(year));
+      if (country && country !== "all") q.set("country", country);
+      const qs = q.toString();
+      return request<RegionTripsSummary[]>(`/trips/by-region${qs ? `?${qs}` : ""}`);
     },
-    export: (format: "xlsx" | "pdf", params?: { year?: number; region?: string }) => {
+    export: (format: "xlsx" | "pdf", params?: { year?: number; country?: string; region?: string }) => {
       const q = new URLSearchParams();
       q.set("format", format);
       if (params?.year) q.set("year", String(params.year));
-      if (params?.region) q.set("region", params.region);
+      if (params?.country && params.country !== "all") q.set("country", params.country);
+      if (params?.region && params.region !== "all") q.set("region", params.region);
       const filename = `safarlar_${params?.year || "barchasi"}.${format}`;
       return download(`/trips/export?${q.toString()}`, filename);
     },

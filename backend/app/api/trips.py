@@ -35,6 +35,7 @@ router = APIRouter(prefix="/trips", dependencies=[Depends(get_current_user)])
 def list_trips(
     db: Session = Depends(get_db),
     year: int | None = Query(default=None),
+    country: str | None = Query(default=None),
     region: str | None = Query(default=None),
     user_id: int | None = Query(default=None),
     search: str | None = Query(default=None),
@@ -46,6 +47,8 @@ def list_trips(
     filters = [Trip.deleted_at.is_(None)]
     if year is not None:
         filters.append(extract("year", Trip.start_date) == year)
+    if country is not None and country.strip() and country != "all":
+        filters.append(Trip.country.ilike(f"%{country.strip()}%"))
     if region is not None and region.strip() and region != "all":
         filters.append(Trip.region.ilike(f"%{region.strip()}%"))
     if user_id is not None:
@@ -56,12 +59,13 @@ def list_trips(
         filters.append(Trip.start_date <= date_to)
     if search and search.strip():
         pattern = f"%{search.strip()}%"
-        # Search in title, region, employee_name, purpose, or factory_name
+        # Search in title, region, country, employee_name, purpose, or factory_name
         sub_factory = select(TripFactory.trip_id).where(TripFactory.factory_name.ilike(pattern))
         filters.append(
             or_(
                 Trip.title.ilike(pattern),
                 Trip.region.ilike(pattern),
+                Trip.country.ilike(pattern),
                 Trip.employee_name.ilike(pattern),
                 Trip.purpose.ilike(pattern),
                 Trip.id.in_(sub_factory),
@@ -88,18 +92,20 @@ def list_trips(
 def trip_summary(
     db: Session = Depends(get_db),
     year: int | None = Query(default=None),
+    country: str | None = Query(default=None),
 ) -> TripStatsSummary:
-    """Returns aggregated KPI numbers for trips across all years or a given year."""
-    return get_trip_stats_summary(db, year=year)
+    """Returns aggregated KPI numbers for trips across all years or a given year and country."""
+    return get_trip_stats_summary(db, year=year, country=country)
 
 
 @router.get("/by-region", response_model=list[RegionTripsSummary])
 def trips_by_region(
     db: Session = Depends(get_db),
     year: int | None = Query(default=None),
+    country: str | None = Query(default=None),
 ) -> list[RegionTripsSummary]:
     """Returns region-aggregated trip statistics."""
-    return get_trips_by_region_summary(db, year=year)
+    return get_trips_by_region_summary(db, year=year, country=country)
 
 
 @router.get("/export")
@@ -107,11 +113,14 @@ def export_trips(
     db: Session = Depends(get_db),
     file_format: Literal["xlsx", "pdf"] = Query(alias="format"),
     year: int | None = Query(default=None),
+    country: str | None = Query(default=None),
     region: str | None = Query(default=None),
 ) -> StreamingResponse:
     filters = [Trip.deleted_at.is_(None)]
     if year is not None:
         filters.append(extract("year", Trip.start_date) == year)
+    if country is not None and country.strip() and country != "all":
+        filters.append(Trip.country.ilike(f"%{country.strip()}%"))
     if region is not None and region.strip() and region != "all":
         filters.append(Trip.region.ilike(f"%{region.strip()}%"))
 

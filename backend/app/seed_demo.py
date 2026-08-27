@@ -111,6 +111,14 @@ CLIENTS: list[dict] = [
     {"company_name": "Moskva Tekstil Alyans", "city": "Moskva", "activity_type": "Tekstil xomashyosi importi va distribyutsiyasi", "website": "mos-tekstil.ru", "country": "Rossiya"},
     {"company_name": "Nord-Tex MCHJ", "city": "Moskva", "activity_type": "Uy tekstili va choyshablar", "website": "nordtex.ru", "country": "Rossiya"},
     {"company_name": "Chimkent Denim JV", "city": "Shymkent", "activity_type": "Denim matolari va jinsi shimlari", "website": "shymkent-denim.kz", "country": "Qozog'iston"},
+    {"company_name": "Bahmal Group", "city": "Urganch", "activity_type": "Ipak va gazlama ishlab chiqarish", "website": "bahmal.uz", "country": "O'zbekiston"},
+    {"company_name": "Gurlan Global Teks", "city": "Urganch", "activity_type": "To'qimachilik fabrikasi", "website": "gurlan-teks.uz", "country": "O'zbekiston"},
+    {"company_name": "Artatex", "city": "Urganch", "activity_type": "Trikotaj va gazlamalar", "website": "artatex.uz", "country": "O'zbekiston"},
+    {"company_name": "Bogishamol Tekstil Lyuks", "city": "Andijon", "activity_type": "Tayyor kiyim-kechak va trikotaj", "website": "bogishamol-tekstil.uz", "country": "O'zbekiston"},
+    {"company_name": "Milana", "city": "Andijon", "activity_type": "Tikuvchilik va moda liboslari", "website": "milana-fashion.uz", "country": "O'zbekiston"},
+    {"company_name": "Oltin Mato", "city": "Andijon", "activity_type": "Paxta va jinsi gazlamalari", "website": "oltin-mato.uz", "country": "O'zbekiston"},
+    {"company_name": "Jizzax Eco Textile", "city": "Jizzax", "activity_type": "Eko-paxta va trikotaj mahsulotlari", "website": "jizzax-eco.uz", "country": "O'zbekiston"},
+    {"company_name": "A - Umar Textile", "city": "Andijon", "activity_type": "Trikotaj matolari eksporti", "website": "a-umar.uz", "country": "O'zbekiston"},
 ]
 
 TRASH_CLIENTS: list[dict] = [
@@ -1020,6 +1028,8 @@ def seed_login_history(db: Session, users: list[User]) -> None:
 def seed_extra_users(db: Session) -> list[User]:
     demo_users = [
         ("admin", "Administrator", UserRole.ADMIN),
+        ("shamsiddin", "Shamsiddin", UserRole.MENEJER),
+        ("nodir", "Nodir", UserRole.MENEJER),
         ("d.yusupova", "Dilnoza Yusupova", UserRole.MENEJER),
         ("s.ergashev", "Sardor Ergashev", UserRole.MENEJER),
         ("m.nazarova", "Malika Nazarova", UserRole.MENEJER),
@@ -1079,9 +1089,67 @@ def seed_settings(db: Session) -> None:
 
 def seed_trips(db: Session, users: list[User], clients: list[Client]) -> list[Trip]:
     client_map = {c.company_name.lower(): c for c in clients}
-    user_map = {u.full_name: u for u in users}
+    user_map = {u.full_name.lower(): u for u in users}
 
     trips_data = [
+        {
+            "title": "Xorazm viloyati to'qimachilik fabrikalari safari",
+            "region": "Xorazm viloyati",
+            "country": "O'zbekiston",
+            "start_date": date(2026, 3, 2),
+            "end_date": date(2026, 3, 5),
+            "employee_name": "Shamsiddin",
+            "purpose": "Sayt va raqamli marketing xizmatlarini taqdim etish",
+            "results": "28 000 000 kontrakt - Sayt Gurlan Global Teks",
+            "factories": [
+                {"factory_name": "Bahmal Group", "notes": "Ipak va gazlama"},
+                {"factory_name": "Gurlan Global Teks", "notes": "Sayt ishlab chiqish shartnomasi"},
+                {"factory_name": "Artatex", "notes": "Trikotaj fabrikasi"},
+            ],
+        },
+        {
+            "title": "Andijon viloyati brending safari",
+            "region": "Andijon viloyati",
+            "country": "O'zbekiston",
+            "start_date": date(2026, 4, 10),
+            "end_date": date(2026, 4, 13),
+            "employee_name": "Shamsiddin",
+            "purpose": "Brendbuk va korporativ uslub xizmatlari",
+            "results": "30 000 000 kontrakt - Brendbuk Bogishamol Tekstil Lyuks",
+            "factories": [
+                {"factory_name": "Bogishamol Tekstil Lyuks", "notes": "Brendbuk shartnomasi"},
+                {"factory_name": "Milana", "notes": "Moda liboslari fabrikasi"},
+                {"factory_name": "Oltin Mato", "notes": "Mato ishlab chiqaruvchi"},
+            ],
+        },
+        {
+            "title": "Jizzax viloyati korxonalari tashrifi",
+            "region": "Jizzax viloyati",
+            "country": "O'zbekiston",
+            "start_date": date(2026, 5, 18),
+            "end_date": date(2026, 5, 19),
+            "employee_name": "Shamsiddin/Nodir",
+            "purpose": "Eko-tekstil korxonalari ehtiyojlarini o'rganish",
+            "results": "yo'q",
+            "factories": [
+                {"factory_name": "Jizzax Eco Textile", "notes": "Dastlabki uchrashuv"},
+            ],
+        },
+        {
+            "title": "Andijon viloyati foto-video safari",
+            "region": "Andijon viloyati",
+            "country": "O'zbekiston",
+            "start_date": date(2026, 6, 20),
+            "end_date": date(2026, 6, 23),
+            "employee_name": "Shamsiddin",
+            "purpose": "Foto suratga olish va media kontent xizmatlari",
+            "results": "25 000 000 kontrakt - Foto - Bogishamol Tekstil Lyuks",
+            "factories": [
+                {"factory_name": "Bogishamol Tekstil Lyuks", "notes": "Foto xizmati shartnomasi"},
+                {"factory_name": "Oltin Mato", "notes": "Suratga olish rejalashtirildi"},
+                {"factory_name": "A - Umar Textile", "notes": "Yangi fabrika taqdimoti"},
+            ],
+        },
         {
             "title": "Namangan viloyati to'qimachilik klasterlari va eksportyorlariga xizmat safari",
             "region": "Namangan viloyati",
