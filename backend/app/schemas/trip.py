@@ -22,14 +22,21 @@ class TripFactoryRead(TripFactoryBase):
 
 class TripBase(BaseModel):
     title: str = Field(..., min_length=1, max_length=255)
+    meeting_format: str = Field(default="live", max_length=50)
+    company_name: str | None = Field(default=None, max_length=255)
+    client_id: int | None = None
     region: str = Field(..., min_length=1, max_length=100)
     country: str = Field(default="O'zbekiston", max_length=100)
     start_date: date
-    end_date: date
+    end_date: date | None = None
     user_id: int | None = None
     employee_name: str = Field(..., min_length=1, max_length=150)
+    services_discussed: str | None = None
     purpose: str | None = None
     results: str | None = None
+    next_step: str | None = None
+    status: str = Field(default="in_progress", max_length=50)
+    deal_potential: Decimal = Field(default=Decimal("0"))
 
 
 class TripCreate(TripBase):
@@ -38,14 +45,21 @@ class TripCreate(TripBase):
 
 class TripUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=255)
+    meeting_format: str | None = Field(default=None, max_length=50)
+    company_name: str | None = Field(default=None, max_length=255)
+    client_id: int | None = None
     region: str | None = Field(default=None, min_length=1, max_length=100)
     country: str | None = Field(default=None, max_length=100)
     start_date: date | None = None
     end_date: date | None = None
     user_id: int | None = None
     employee_name: str | None = Field(default=None, min_length=1, max_length=150)
+    services_discussed: str | None = None
     purpose: str | None = None
     results: str | None = None
+    next_step: str | None = None
+    status: str | None = Field(default=None, max_length=50)
+    deal_potential: Decimal | None = None
     factories: list[TripFactoryCreate] | None = None
 
 
@@ -57,6 +71,35 @@ class TripRead(TripBase):
     created_at: datetime
     updated_at: datetime
     deleted_at: datetime | None = None
+
+
+class ExecutorMeetingStat(BaseModel):
+    employee_name: str
+    meetings_count: int
+    zoom_count: int = 0
+    live_count: int = 0
+    deal_potential: Decimal = Decimal("0")
+
+
+class RegionMeetingStat(BaseModel):
+    region: str
+    meetings_count: int
+    zoom_count: int = 0
+    live_count: int = 0
+    deal_potential: Decimal = Decimal("0")
+
+
+class B2BMeetingMonthlyStats(BaseModel):
+    year: int | None = None
+    month: int | None = None
+    total_meetings: int = 0
+    zoom_meetings: int = 0
+    live_meetings: int = 0
+    unique_companies: int = 0
+    total_deal_potential: Decimal = Decimal("0")
+    by_executor: list[ExecutorMeetingStat] = Field(default_factory=list)
+    by_region: list[RegionMeetingStat] = Field(default_factory=list)
+    by_status: dict[str, int] = Field(default_factory=dict)
 
 
 class TripStatsSummary(BaseModel):
@@ -93,3 +136,8 @@ class RegionFactoryDetail(BaseModel):
     visited_count: int = 0
     visited_by: list[str] = Field(default_factory=list)
     last_visit_date: date | None = None
+
+
+B2BMeetingCreate = TripCreate
+B2BMeetingUpdate = TripUpdate
+B2BMeetingRead = TripRead

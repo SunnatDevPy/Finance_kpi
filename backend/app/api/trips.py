@@ -11,6 +11,7 @@ from app.database import get_db
 from app.models import Trip, TripFactory, User
 from app.schemas.pagination import Page
 from app.schemas.trip import (
+    B2BMeetingMonthlyStats,
     RegionTripsSummary,
     TripCreate,
     TripRead,
@@ -22,6 +23,7 @@ from app.services.trips import (
     delete_trip,
     export_trips_pdf,
     export_trips_xlsx,
+    get_b2b_monthly_stats,
     get_trip_or_404,
     get_trip_stats_summary,
     get_trips_by_region_summary,
@@ -35,8 +37,12 @@ router = APIRouter(prefix="/trips", dependencies=[Depends(get_current_user)])
 def list_trips(
     db: Session = Depends(get_db),
     year: int | None = Query(default=None),
+    month: int | None = Query(default=None, ge=1, le=12),
     country: str | None = Query(default=None),
     region: str | None = Query(default=None),
+    meeting_format: str | None = Query(default=None),
+    status: str | None = Query(default=None),
+    employee_name: str | None = Query(default=None),
     user_id: int | None = Query(default=None),
     search: str | None = Query(default=None),
     date_from: date | None = Query(default=None),
@@ -47,10 +53,18 @@ def list_trips(
     filters = [Trip.deleted_at.is_(None)]
     if year is not None:
         filters.append(extract("year", Trip.start_date) == year)
+    if month is not None:
+        filters.append(extract("month", Trip.start_date) == month)
     if country is not None and country.strip() and country != "all":
         filters.append(Trip.country.ilike(f"%{country.strip()}%"))
     if region is not None and region.strip() and region != "all":
         filters.append(Trip.region.ilike(f"%{region.strip()}%"))
+    if meeting_format is not None and meeting_format.strip() and meeting_format != "all":
+        filters.append(Trip.meeting_format == meeting_format.strip())
+    if status is not None and status.strip() and status != "all":
+        filters.append(Trip.status == status.strip())
+    if employee_name is not None and employee_name.strip() and employee_name != "all":
+        filters.append(Trip.employee_name.ilike(f"%{employee_name.strip()}%"))
     if user_id is not None:
         filters.append(Trip.user_id == user_id)
     if date_from is not None:
@@ -59,15 +73,18 @@ def list_trips(
         filters.append(Trip.start_date <= date_to)
     if search and search.strip():
         pattern = f"%{search.strip()}%"
-        # Search in title, region, country, employee_name, purpose, or factory_name
         sub_factory = select(TripFactory.trip_id).where(TripFactory.factory_name.ilike(pattern))
         filters.append(
             or_(
                 Trip.title.ilike(pattern),
+                Trip.company_name.ilike(pattern),
                 Trip.region.ilike(pattern),
                 Trip.country.ilike(pattern),
                 Trip.employee_name.ilike(pattern),
+                Trip.services_discussed.ilike(pattern),
                 Trip.purpose.ilike(pattern),
+                Trip.results.ilike(pattern),
+                Trip.next_step.ilike(pattern),
                 Trip.id.in_(sub_factory),
             )
         )
@@ -80,12 +97,25 @@ def list_trips(
         .options(
             selectinload(Trip.factories).selectinload(TripFactory.client),
             selectinload(Trip.user),
+            selectinload(Trip.client),
         )
         .where(*filters)
         .order_by(Trip.start_date.desc(), Trip.id.desc())
     )
     items = list(db.scalars(stmt.offset(skip).limit(limit)).all())
     return Page(items=items, total=total, skip=skip, limit=limit)
+
+
+@router.get("/monthly-stats", response_model=B2BMeetingMonthlyStats)
+def b2b_meeting_monthly_stats(
+    db: Session = Depends(get_db),
+    year: int | None = Query(default=None),
+    month: int | None = Query(default=None, ge=1, le=12),
+    country: str | None = Query(default=None),
+    region: str | None = Query(default=None),
+) -> B2BMeetingMonthlyStats:
+    """Returns monthly B2B meeting statistics (Zoom vs live, unique factories, deal potential, by executor and region)."""
+    return get_b2b_monthly_stats(db, year=year, month=month, country=country, region=region)
 
 
 @router.get("/summary", response_model=TripStatsSummary)
@@ -113,36 +143,49 @@ def export_trips(
     db: Session = Depends(get_db),
     file_format: Literal["xlsx", "pdf"] = Query(alias="format"),
     year: int | None = Query(default=None),
+    month: int | None = Query(default=None),
     country: str | None = Query(default=None),
     region: str | None = Query(default=None),
+    meeting_format: str | None = Query(default=None),
+    status: str | None = Query(default=None),
+    employee_name: str | None = Query(default=None),
 ) -> StreamingResponse:
     filters = [Trip.deleted_at.is_(None)]
     if year is not None:
         filters.append(extract("year", Trip.start_date) == year)
+    if month is not None:
+        filters.append(extract("month", Trip.start_date) == month)
     if country is not None and country.strip() and country != "all":
         filters.append(Trip.country.ilike(f"%{country.strip()}%"))
     if region is not None and region.strip() and region != "all":
         filters.append(Trip.region.ilike(f"%{region.strip()}%"))
+    if meeting_format is not None and meeting_format.strip() and meeting_format != "all":
+        filters.append(Trip.meeting_format == meeting_format.strip())
+    if status is not None and status.strip() and status != "all":
+        filters.append(Trip.status == status.strip())
+    if employee_name is not None and employee_name.strip() and employee_name != "all":
+        filters.append(Trip.employee_name.ilike(f"%{employee_name.strip()}%"))
 
     stmt = (
         select(Trip)
         .options(
             selectinload(Trip.factories),
             selectinload(Trip.user),
+            selectinload(Trip.client),
         )
         .where(*filters)
-        .order_by(Trip.start_date.desc())
+        .order_by(Trip.start_date.desc(), Trip.id.desc())
     )
     trips = list(db.scalars(stmt).all())
 
     if file_format == "xlsx":
         buffer = export_trips_xlsx(trips, year=year)
         media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        filename = f"safarlar_{year or 'barchasi'}.xlsx"
+        filename = f"b2b_uchrashuvlar_{year or 'barchasi'}.xlsx"
     else:
         buffer = export_trips_pdf(trips, year=year)
         media_type = "application/pdf"
-        filename = f"safarlar_{year or 'barchasi'}.pdf"
+        filename = f"b2b_uchrashuvlar_{year or 'barchasi'}.pdf"
 
     return StreamingResponse(
         buffer,

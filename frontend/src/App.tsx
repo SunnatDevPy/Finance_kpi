@@ -68,6 +68,7 @@ export default function App() {
                       <Route path="debts" element={<Navigate to="/clients?debtors=1" replace />} />
                       <Route path="service-types" element={<ServiceTypesPage />} />
                       <Route path="trips" element={<TripsPage />} />
+                      <Route path="b2b-meetings" element={<TripsPage />} />
                       <Route path="profile" element={<ProfilePage />} />
                       <Route element={<AdminRoute />}>
                         <Route path="employees" element={<EmployeesPage />} />

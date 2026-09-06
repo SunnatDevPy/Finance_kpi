@@ -13,14 +13,13 @@ Set-Location $Root
 $Mode = if ($Prod) { "production" } else { "development" }
 
 function Invoke-Compose {
-  param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Args)
   if ($Prod -or $EnvFile) {
     $base = @("compose")
     if ($Prod) { $base += @("-f", "docker-compose.prod.yml") }
     if ($EnvFile) { $base += @("--env-file", $EnvFile) }
-    & docker @base @Args
+    & docker @base $args
   } else {
-    & docker compose @Args
+    & docker compose $args
   }
 }
 
@@ -53,9 +52,9 @@ function Show-Status {
     Write-Host "--- docker compose ps ---"
   }
 
-  Invoke-Compose @("ps")
+  Invoke-Compose ps
 
-  $services = @(Invoke-Compose @("ps", "--services") | Where-Object { $_ })
+  $services = @(Invoke-Compose ps --services | Where-Object { $_ })
   if ($services.Count -eq 0) {
     $issues += "Hech qanday compose servisi topilmadi"
   }
@@ -66,13 +65,13 @@ function Show-Status {
   }
 
   foreach ($service in $services) {
-    $running = Invoke-Compose @("ps", "--status", "running", "--services") | Where-Object { $_ -eq $service }
+    $running = Invoke-Compose ps --status running --services | Where-Object { $_ -eq $service }
     if (-not $running) {
-      if (-not $Quiet) { Write-Host "  [FAIL] $service — ishlamayapti" }
+      if (-not $Quiet) { Write-Host "  [FAIL] $service - ishlamayapti" }
       $issues += "$service ishlamayapti"
       continue
     }
-    if (-not $Quiet) { Write-Host "  [ OK ] $service — running" }
+    if (-not $Quiet) { Write-Host "  [ OK ] $service - running" }
   }
 
   if (-not $Quiet) {
@@ -104,25 +103,25 @@ function Show-Status {
     if (Test-HttpOk "http://127.0.0.1:5173/") {
       if (-not $Quiet) { Write-Host "  [ OK ] Web http://127.0.0.1:5173/" }
     } elseif (-not $Quiet) {
-      Write-Host "  [WARN] Web http://127.0.0.1:5173/ — javob yo'q"
+      Write-Host "  [WARN] Web http://127.0.0.1:5173/ - javob yoq"
     }
   }
 
   if ($issues.Count -eq 0) {
     if ($Quiet) {
-      Write-Host "OK: WTMA Docker ($Mode) — barcha servislar yaxshi"
+      Write-Host "OK: WTMA Docker ($Mode) - barcha servislar yaxshi"
     } elseif (-not $Quiet) {
       Write-Host ""
-      Write-Host "RESULT: OK — barcha muhim servislar ishlayapti"
+      Write-Host "RESULT: OK - barcha muhim servislar ishlayapti"
     }
     return 0
   }
 
   if ($Quiet) {
-    Write-Host ("FAIL: WTMA Docker ($Mode) — {0} muammo: {1}" -f $issues.Count, ($issues -join ", "))
+    Write-Host ("FAIL: WTMA Docker ($Mode) - {0} muammo: {1}" -f $issues.Count, ($issues -join ", "))
   } elseif (-not $Quiet) {
     Write-Host ""
-    Write-Host "RESULT: FAIL — muammolar:"
+    Write-Host "RESULT: FAIL - muammolar:"
     foreach ($issue in $issues) { Write-Host "  - $issue" }
   }
   return 1

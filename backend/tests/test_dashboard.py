@@ -230,7 +230,7 @@ def test_revenue_trend_default_12_months(client, auth_headers, sample_contract):
             "category": "sale",
             "title": "Qo'lda tushum",
             "amount": "500000.00",
-            "income_date": "2026-03-15",
+            "income_date": date.today().isoformat(),
         },
     )
     response = client.get("/api/v1/dashboard/revenue-trend", headers=auth_headers)
@@ -248,7 +248,7 @@ def test_revenue_trend_6_months(client, auth_headers, sample_contract):
             "category": "sale",
             "title": "Qo'lda tushum",
             "amount": "500000.00",
-            "income_date": "2026-03-15",
+            "income_date": date.today().isoformat(),
         },
     )
     response = client.get(

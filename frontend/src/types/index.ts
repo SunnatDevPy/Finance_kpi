@@ -303,17 +303,27 @@ export interface TripFactoryFormItem {
   notes?: string | null;
 }
 
+export type B2BMeetingFormat = "zoom" | "live";
+export type B2BMeetingStatus = "in_progress" | "negotiation" | "won" | "cancelled";
+
 export interface Trip {
   id: number;
   title: string;
+  meeting_format?: B2BMeetingFormat;
+  company_name?: string | null;
+  client_id?: number | null;
   region: string;
   country: string;
   start_date: string;
   end_date: string;
   user_id: number | null;
   employee_name: string;
+  services_discussed?: string | null;
   purpose: string | null;
   results: string | null;
+  next_step?: string | null;
+  status?: B2BMeetingStatus;
+  deal_potential?: number | string;
   factories: TripFactory[];
   created_at: string;
   updated_at: string;
@@ -321,29 +331,76 @@ export interface Trip {
 
 export interface TripCreatePayload {
   title: string;
+  meeting_format?: B2BMeetingFormat;
+  company_name?: string;
+  client_id?: number | null;
   region: string;
   country?: string;
   start_date: string;
-  end_date: string;
+  end_date?: string;
   user_id?: number | null;
   employee_name: string;
+  services_discussed?: string | null;
   purpose?: string | null;
   results?: string | null;
+  next_step?: string | null;
+  status?: B2BMeetingStatus;
+  deal_potential?: number | string;
   factories?: TripFactoryFormItem[];
 }
 
 export interface TripUpdatePayload {
   title?: string;
+  meeting_format?: B2BMeetingFormat;
+  company_name?: string;
+  client_id?: number | null;
   region?: string;
   country?: string;
   start_date?: string;
   end_date?: string;
   user_id?: number | null;
   employee_name?: string;
+  services_discussed?: string | null;
   purpose?: string | null;
   results?: string | null;
+  next_step?: string | null;
+  status?: B2BMeetingStatus;
+  deal_potential?: number | string;
   factories?: TripFactoryFormItem[];
 }
+
+export interface ExecutorMeetingStat {
+  employee_name: string;
+  meetings_count: number;
+  zoom_count: number;
+  live_count: number;
+  deal_potential: number | string;
+}
+
+export interface RegionMeetingStat {
+  region: string;
+  meetings_count: number;
+  zoom_count: number;
+  live_count: number;
+  deal_potential: number | string;
+}
+
+export interface B2BMeetingMonthlyStats {
+  year?: number | null;
+  month?: number | null;
+  total_meetings: number;
+  zoom_meetings: number;
+  live_meetings: number;
+  unique_companies: number;
+  total_deal_potential: number | string;
+  by_executor: ExecutorMeetingStat[];
+  by_region: RegionMeetingStat[];
+  by_status: Record<string, number>;
+}
+
+export type B2BMeeting = Trip;
+export type B2BMeetingCreatePayload = TripCreatePayload;
+export type B2BMeetingUpdatePayload = TripUpdatePayload;
 
 export interface TripStatsSummary {
   year?: number | null;

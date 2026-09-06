@@ -5,11 +5,11 @@ import {
   ArchiveIcon,
   CreditCardIcon,
   FileTextIcon,
+  HandshakeIcon,
   HistoryIcon,
   LayoutDashboardIcon,
   LayersIcon,
   LogOutIcon,
-  PlaneIcon,
   ScaleIcon,
   UserCircleIcon,
   UserCogIcon,
@@ -115,7 +115,7 @@ export function Layout() {
     { to: "/payments", label: t("nav.payments"), icon: CreditCardIcon },
     { to: "/finance", label: t("nav.finance"), icon: ScaleIcon },
     { to: "/service-types", label: t("nav.serviceTypes"), icon: LayersIcon },
-    { to: "/trips", label: t("nav.trips"), icon: PlaneIcon },
+    { to: "/trips", label: t("nav.trips"), icon: HandshakeIcon },
   ];
 
   return (

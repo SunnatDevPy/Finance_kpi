@@ -440,7 +440,7 @@ class AuditLog(Base):
 
 
 class Trip(Base):
-    """Xizmat safari (viloyatlar va mijoz fabrikalarga tashrif)."""
+    """B2B uchrashuv yoki xizmat safari (viloyatlar va mijoz fabrikalarga tashrif)."""
 
     __tablename__ = "trips"
     __table_args__ = (
@@ -448,19 +448,29 @@ class Trip(Base):
         Index("ix_trips_start_date", "start_date"),
         Index("ix_trips_end_date", "end_date"),
         Index("ix_trips_user_id", "user_id"),
+        Index("ix_trips_meeting_format", "meeting_format"),
+        Index("ix_trips_status", "status"),
+        Index("ix_trips_client_id", "client_id"),
         Index("ix_trips_deleted_at", "deleted_at"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
+    meeting_format: Mapped[str] = mapped_column(String(50), default="live", nullable=False)
+    company_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    client_id: Mapped[int | None] = mapped_column(ForeignKey("clients.id", ondelete="SET NULL"), nullable=True)
     region: Mapped[str] = mapped_column(String(100), nullable=False)
     country: Mapped[str] = mapped_column(String(100), default="O'zbekiston", nullable=False)
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
     end_date: Mapped[date] = mapped_column(Date, nullable=False)
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     employee_name: Mapped[str] = mapped_column(String(150), nullable=False)
+    services_discussed: Mapped[str | None] = mapped_column(Text)
     purpose: Mapped[str | None] = mapped_column(Text)
     results: Mapped[str | None] = mapped_column(Text)
+    next_step: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(50), default="in_progress", nullable=False)
+    deal_potential: Mapped[Decimal] = mapped_column(Numeric(15, 2), default=Decimal("0"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -473,11 +483,15 @@ class Trip(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     user: Mapped["User | None"] = relationship()
+    client: Mapped["Client | None"] = relationship()
     factories: Mapped[list["TripFactory"]] = relationship(
         back_populates="trip",
         cascade="all, delete-orphan",
         order_by="TripFactory.id",
     )
+
+
+B2BMeeting = Trip
 
 
 class TripFactory(Base):

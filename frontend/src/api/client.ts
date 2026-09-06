@@ -38,6 +38,7 @@ import type {
   Paginated,
   ServiceType,
   ServiceTypeStats,
+  B2BMeetingMonthlyStats,
   TopClientItem,
   TopClientLtvItem,
   Trip,
@@ -835,8 +836,12 @@ export const api = {
   trips: {
     list: (params?: {
       year?: number;
+      month?: number;
       country?: string;
       region?: string;
+      meeting_format?: string;
+      status?: string;
+      employee_name?: string;
       user_id?: number;
       search?: string;
       date_from?: string;
@@ -846,8 +851,12 @@ export const api = {
     }) => {
       const q = new URLSearchParams();
       if (params?.year) q.set("year", String(params.year));
+      if (params?.month) q.set("month", String(params.month));
       if (params?.country && params.country !== "all") q.set("country", params.country);
       if (params?.region && params.region !== "all") q.set("region", params.region);
+      if (params?.meeting_format && params.meeting_format !== "all") q.set("meeting_format", params.meeting_format);
+      if (params?.status && params.status !== "all") q.set("status", params.status);
+      if (params?.employee_name && params.employee_name !== "all") q.set("employee_name", params.employee_name);
       if (params?.user_id) q.set("user_id", String(params.user_id));
       if (params?.search) q.set("search", params.search);
       if (params?.date_from) q.set("date_from", params.date_from);
@@ -872,6 +881,20 @@ export const api = {
       request<void>(`/trips/${id}`, {
         method: "DELETE",
       }),
+    monthlyStats: (params?: {
+      year?: number | null;
+      month?: number | null;
+      country?: string | null;
+      region?: string | null;
+    }) => {
+      const q = new URLSearchParams();
+      if (params?.year) q.set("year", String(params.year));
+      if (params?.month) q.set("month", String(params.month));
+      if (params?.country && params.country !== "all") q.set("country", params.country);
+      if (params?.region && params.region !== "all") q.set("region", params.region);
+      const qs = q.toString();
+      return request<B2BMeetingMonthlyStats>(`/trips/monthly-stats${qs ? `?${qs}` : ""}`);
+    },
     summary: (year?: number | null, country?: string | null) => {
       const q = new URLSearchParams();
       if (year) q.set("year", String(year));
@@ -886,13 +909,25 @@ export const api = {
       const qs = q.toString();
       return request<RegionTripsSummary[]>(`/trips/by-region${qs ? `?${qs}` : ""}`);
     },
-    export: (format: "xlsx" | "pdf", params?: { year?: number; country?: string; region?: string }) => {
+    export: (format: "xlsx" | "pdf", params?: {
+      year?: number;
+      month?: number;
+      country?: string;
+      region?: string;
+      meeting_format?: string;
+      status?: string;
+      employee_name?: string;
+    }) => {
       const q = new URLSearchParams();
       q.set("format", format);
       if (params?.year) q.set("year", String(params.year));
+      if (params?.month) q.set("month", String(params.month));
       if (params?.country && params.country !== "all") q.set("country", params.country);
       if (params?.region && params.region !== "all") q.set("region", params.region);
-      const filename = `safarlar_${params?.year || "barchasi"}.${format}`;
+      if (params?.meeting_format && params.meeting_format !== "all") q.set("meeting_format", params.meeting_format);
+      if (params?.status && params.status !== "all") q.set("status", params.status);
+      if (params?.employee_name && params.employee_name !== "all") q.set("employee_name", params.employee_name);
+      const filename = `b2b_uchrashuvlar_${params?.year || "barchasi"}.${format}`;
       return download(`/trips/export?${q.toString()}`, filename);
     },
   },

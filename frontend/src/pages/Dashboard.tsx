@@ -46,6 +46,7 @@ import { TableViewLink } from "../components/TableViewLink";
 import { usePersistedState } from "../hooks/usePersistedState";
 import { StaggerContainer, StaggerItem } from "../components/Stagger";
 import { PageShell, SectionHeader } from "../components/PageHeader";
+import { Pagination } from "../components/Pagination";
 import {
   MotionTableRow,
   PremiumDataTable,
@@ -327,6 +328,8 @@ export function DashboardPage() {
   const [regionCountryFilter, setRegionCountryFilter] = useState("all");
   const [regionCityFilter, setRegionCityFilter] = useState("all");
   const [selectedRegionModal, setSelectedRegionModal] = useState<ClientRegionStatsItem | null>(null);
+  const [regionPage, setRegionPage] = useState(1);
+  const [regionPageSize, setRegionPageSize] = useState(15);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [horizon, setHorizon] = usePersistedState<Horizon>("wtma.dashboard.horizon", "month");
@@ -359,6 +362,8 @@ export function DashboardPage() {
   const [tripRegions, setTripRegions] = useState<RegionTripsSummary[]>([]);
   const [tripLoading, setTripLoading] = useState(true);
   const [tripError, setTripError] = useState("");
+  const [tripRegionPage, setTripRegionPage] = useState(1);
+  const [tripRegionPageSize, setTripRegionPageSize] = useState(15);
 
   const revenueConfig = useMemo(
     () =>
@@ -465,6 +470,38 @@ export function DashboardPage() {
     });
     return next;
   }, [filteredRegionStats, regionSortBy, regionSortOrder]);
+
+  const pagedRegionStats = useMemo(() => {
+    const start = (regionPage - 1) * regionPageSize;
+    return sortedRegionStats.slice(start, start + regionPageSize);
+  }, [sortedRegionStats, regionPage, regionPageSize]);
+
+  useEffect(() => {
+    setRegionPage(1);
+  }, [regionCountryFilter, regionCityFilter, regionSortBy, regionSortOrder]);
+
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(sortedRegionStats.length / regionPageSize));
+    if (regionPage > maxPage) {
+      setRegionPage(maxPage);
+    }
+  }, [sortedRegionStats.length, regionPage, regionPageSize]);
+
+  const pagedTripRegions = useMemo(() => {
+    const start = (tripRegionPage - 1) * tripRegionPageSize;
+    return tripRegions.slice(start, start + tripRegionPageSize);
+  }, [tripRegions, tripRegionPage, tripRegionPageSize]);
+
+  useEffect(() => {
+    setTripRegionPage(1);
+  }, [tripYear]);
+
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(tripRegions.length / tripRegionPageSize));
+    if (tripRegionPage > maxPage) {
+      setTripRegionPage(maxPage);
+    }
+  }, [tripRegions.length, tripRegionPage, tripRegionPageSize]);
 
   useEffect(() => {
     setRankedLoading(true);
@@ -1180,6 +1217,22 @@ export function DashboardPage() {
               empty={filteredRegionStats.length === 0}
               emptyMessage={t("dashboard.noRegionData")}
               skeletonCols={6}
+              footer={
+                sortedRegionStats.length > 0 ? (
+                  <Pagination
+                    embedded
+                    page={regionPage}
+                    pageSize={regionPageSize}
+                    total={sortedRegionStats.length}
+                    onPageChange={setRegionPage}
+                    onPageSizeChange={(s) => {
+                      setRegionPageSize(s);
+                      setRegionPage(1);
+                    }}
+                    pageSizeOptions={[15, 30, 50]}
+                  />
+                ) : undefined
+              }
             >
               <TableHeader>
                 <TableRow>
@@ -1228,7 +1281,7 @@ export function DashboardPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedRegionStats.map((item, index) => (
+                {pagedRegionStats.map((item, index) => (
                   <MotionTableRow
                     key={`${item.country}-${item.city}`}
                     {...rowEnter(index)}
@@ -1364,6 +1417,22 @@ export function DashboardPage() {
                 empty={!tripLoading && tripRegions.length === 0}
                 emptyMessage={t("dashboard.noTrips")}
                 skeletonCols={4}
+                footer={
+                  !tripLoading && tripRegions.length > 0 ? (
+                    <Pagination
+                      embedded
+                      page={tripRegionPage}
+                      pageSize={tripRegionPageSize}
+                      total={tripRegions.length}
+                      onPageChange={setTripRegionPage}
+                      onPageSizeChange={(s) => {
+                        setTripRegionPageSize(s);
+                        setTripRegionPage(1);
+                      }}
+                      pageSizeOptions={[15, 30, 50]}
+                    />
+                  ) : undefined
+                }
               >
                 <TableHeader>
                   <TableRow>
@@ -1374,7 +1443,7 @@ export function DashboardPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {tripRegions.map((row, index) => {
+                  {pagedTripRegions.map((row, index) => {
                     const shownFactories = row.factories.slice(0, 5);
                     const extraFactories = row.factories.length - shownFactories.length;
                     return (

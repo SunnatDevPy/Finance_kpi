@@ -221,3 +221,117 @@ def test_foreign_trips_and_all_years_summary(client, auth_headers):
     assert kz_region["country"] == "Qozog'iston"
     assert kz_region["trips_count"] == 1
     assert "Almaty QazTextile" in kz_region["factories"]
+
+
+def test_b2b_meeting_creation_and_monthly_stats(client, auth_headers):
+    # 1. Create Zoom meeting
+    res1 = client.post(
+        "/api/v1/trips",
+        json={
+            "title": "X Textile (Zoom)",
+            "meeting_format": "zoom",
+            "company_name": "X Textile",
+            "region": "Toshkent shahri",
+            "country": "O'zbekiston",
+            "start_date": "2026-08-05",
+            "end_date": "2026-08-05",
+            "employee_name": "Shamsiddin",
+            "services_discussed": "Brending, sayt",
+            "results": "Xizmatlarga qiziqish bildirdi",
+            "next_step": "Taklif tayyorlash",
+            "status": "in_progress",
+            "deal_potential": "30000000",
+        },
+        headers=auth_headers,
+    )
+    assert res1.status_code == 201
+    d1 = res1.json()
+    assert d1["meeting_format"] == "zoom"
+    assert d1["company_name"] == "X Textile"
+    assert float(d1["deal_potential"]) == 30000000
+
+    # 2. Create Live meeting
+    res2 = client.post(
+        "/api/v1/trips",
+        json={
+            "title": "ABC Textile (Jonli)",
+            "meeting_format": "live",
+            "company_name": "ABC Textile",
+            "region": "Andijon viloyati",
+            "country": "O'zbekiston",
+            "start_date": "2026-08-08",
+            "end_date": "2026-08-08",
+            "employee_name": "Menejer 1",
+            "services_discussed": "Marketing",
+            "results": "Shartlar muhokamasi",
+            "next_step": "Qayta uchrashuv",
+            "status": "negotiation",
+            "deal_potential": "15000000",
+        },
+        headers=auth_headers,
+    )
+    assert res2.status_code == 201
+
+    # 3. Create another Zoom meeting
+    res3 = client.post(
+        "/api/v1/trips",
+        json={
+            "title": "Textile Group (Zoom)",
+            "meeting_format": "zoom",
+            "company_name": "Textile Group",
+            "region": "Farg'ona viloyati",
+            "country": "O'zbekiston",
+            "start_date": "2026-08-15",
+            "end_date": "2026-08-15",
+            "employee_name": "Shamsiddin",
+            "services_discussed": "To'liq paket",
+            "results": "KP yuborildi",
+            "next_step": "Javob kutish",
+            "status": "in_progress",
+            "deal_potential": "50000000",
+        },
+        headers=auth_headers,
+    )
+    assert res3.status_code == 201
+
+    # Test monthly stats for August 2026
+    m_stats_res = client.get(
+        "/api/v1/trips/monthly-stats",
+        params={"year": 2026, "month": 8},
+        headers=auth_headers,
+    )
+    assert m_stats_res.status_code == 200
+    m_stats = m_stats_res.json()
+    assert m_stats["total_meetings"] == 3
+    assert m_stats["zoom_meetings"] == 2
+    assert m_stats["live_meetings"] == 1
+    assert m_stats["unique_companies"] == 3
+    assert float(m_stats["total_deal_potential"]) == 95000000
+
+    # Check executor stats
+    executors = m_stats["by_executor"]
+    assert len(executors) == 2
+    shamsiddin_stat = next(e for e in executors if e["employee_name"] == "Shamsiddin")
+    assert shamsiddin_stat["meetings_count"] == 2
+    assert shamsiddin_stat["zoom_count"] == 2
+    assert float(shamsiddin_stat["deal_potential"]) == 80000000
+
+    # Filter meetings by meeting_format=zoom
+    zoom_res = client.get(
+        "/api/v1/trips",
+        params={"year": 2026, "month": 8, "meeting_format": "zoom"},
+        headers=auth_headers,
+    )
+    assert zoom_res.status_code == 200
+    assert zoom_res.json()["total"] == 2
+
+    # Filter meetings by status=negotiation
+    neg_res = client.get(
+        "/api/v1/trips",
+        params={"year": 2026, "month": 8, "status": "negotiation"},
+        headers=auth_headers,
+    )
+    assert neg_res.status_code == 200
+    assert neg_res.json()["total"] == 1
+    assert neg_res.json()["items"][0]["company_name"] == "ABC Textile"
+
