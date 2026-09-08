@@ -113,7 +113,6 @@ export function TripModal({
   const [servicesDiscussed, setServicesDiscussed] = useState("");
   const [status, setStatus] = useState<B2BMeetingStatus>("in_progress");
   const [results, setResults] = useState("");
-  const [nextStep, setNextStep] = useState("");
   const [purpose, setPurpose] = useState("");
 
   const [selectedFactories, setSelectedFactories] = useState<FactoryItem[]>([
@@ -135,14 +134,13 @@ export function TripModal({
     [clients],
   );
 
-  const employeeOptions = useMemo(
-    () =>
-      users.map((item) => ({
-        value: item.full_name,
-        label: item.full_name,
-      })),
-    [users],
-  );
+  const employeeOptions = useMemo(() => {
+    const userOpts = users.map((item) => ({
+      value: item.full_name,
+      label: item.full_name,
+    }));
+    return [{ value: "Jamoa", label: "Jamoa" }, ...userOpts];
+  }, [users]);
 
   const addFactoryRow = (client?: Client) => {
     setSelectedFactories((prev) => {
@@ -231,7 +229,6 @@ export function TripModal({
       setServicesDiscussed(trip.services_discussed || "");
       setStatus(trip.status || "in_progress");
       setResults(trip.results || "");
-      setNextStep(trip.next_step || "");
       setPurpose(trip.purpose || "");
     } else {
       setSelectedFactories([{ factory_name: "", client_id: null, deal_potential: "", notes: "" }]);
@@ -239,12 +236,11 @@ export function TripModal({
       setCountry(DEFAULT_COUNTRY);
       setRegion("");
       setTripDate(todayInYear(defaultYear || new Date().getFullYear()));
-      setEmployeeName(user?.full_name || "");
-      setUserId(user?.id ?? null);
+      setEmployeeName("Jamoa");
+      setUserId(null);
       setServicesDiscussed("");
       setStatus("in_progress");
       setResults("");
-      setNextStep("");
       setPurpose("");
     }
     setError("");
@@ -252,6 +248,10 @@ export function TripModal({
 
   const handleEmployeeSelect = (name: string) => {
     setEmployeeName(name);
+    if (name === "Jamoa") {
+      setUserId(null);
+      return;
+    }
     const matched = users.find((item) => item.full_name === name || item.username === name);
     setUserId(matched ? matched.id : null);
   };
@@ -309,7 +309,7 @@ export function TripModal({
       deal_potential: totalPotential,
       status,
       results: results.trim() || null,
-      next_step: nextStep.trim() || null,
+      next_step: trip?.next_step ?? null,
       purpose: purpose.trim() || null,
       factories: validFactories.map((f) => ({
         factory_name: f.factory_name.trim(),
@@ -602,16 +602,6 @@ export function TripModal({
             label={t("trips.results")}
             value={results}
             onChange={(e) => setResults(e.target.value)}
-            rows={2}
-            placeholder=" "
-          />
-
-          {/* Next Step */}
-          <FloatingLabelTextarea
-            id="trip-next-step"
-            label={t("trips.nextStep")}
-            value={nextStep}
-            onChange={(e) => setNextStep(e.target.value)}
             rows={2}
             placeholder=" "
           />

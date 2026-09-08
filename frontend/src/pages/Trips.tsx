@@ -85,7 +85,7 @@ const TRIP_OPTIONAL_COLUMNS = [
   { id: "services", labelKey: "trips.colServices", defaultVisible: true },
   { id: "employee", labelKey: "trips.colEmployee", defaultVisible: true },
   { id: "results", labelKey: "trips.colResults", defaultVisible: true },
-  { id: "nextStep", labelKey: "trips.colNextStep", defaultVisible: true },
+  { id: "nextStep", labelKey: "trips.colNextStep", defaultVisible: false },
   { id: "status", labelKey: "trips.colStatus", defaultVisible: true },
   { id: "potential", labelKey: "trips.colPotential", defaultVisible: true },
 ] as const;
@@ -137,6 +137,7 @@ export function TripsPage() {
 
   const employeeOptions = useMemo(() => {
     const names = new Set<string>();
+    names.add("Jamoa");
     users.forEach((u) => {
       if (u.full_name) names.add(u.full_name);
     });
@@ -146,7 +147,11 @@ export function TripsPage() {
     tripsData.items.forEach((t) => {
       if (t.employee_name) names.add(t.employee_name);
     });
-    return Array.from(names).sort((a, b) => a.localeCompare(b, "uz"));
+    return Array.from(names).sort((a, b) => {
+      if (a === "Jamoa") return -1;
+      if (b === "Jamoa") return 1;
+      return a.localeCompare(b, "uz");
+    });
   }, [users, monthlyStats, tripsData.items]);
 
   const dynamicRegionsForCountry = useMemo(() => {
