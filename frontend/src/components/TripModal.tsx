@@ -1,5 +1,12 @@
 import { useState, useEffect, useMemo } from "react";
-import { Building2Icon, PlusIcon, VideoIcon, UsersIcon, XIcon } from "lucide-react";
+import {
+  Building2Icon,
+  PlusIcon,
+  VideoIcon,
+  UsersIcon,
+  XIcon,
+  CircleDollarSignIcon,
+} from "lucide-react";
 import { Modal } from "./Modal";
 import { SearchableSelect } from "./SearchableSelect";
 import { CancelIcon, LoadingIconBtn, SaveIconBtn } from "./ButtonIcons";
@@ -35,10 +42,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { formatMoney } from "../utils/format";
 
 export interface FactoryItem {
   factory_name: string;
   client_id?: number | null;
+  notes?: string;
+  deal_potential?: string;
 }
 
 interface TripModalProps {
@@ -75,14 +85,14 @@ function resolveRegion(city: string | null | undefined, country: string): string
 }
 
 const COMMON_SERVICES = [
-  "Brending",
-  "Veb-sayt",
+  "Audit",
+  "Bozor Tahlili",
+  "Brendbuk",
+  "Foto",
   "SMM",
-  "Marketing",
-  "SEO",
-  "ERP / CRM",
-  "Konsalting",
-  "To'liq paket",
+  "Veb-sayt",
+  "Veb-sayt tahriri",
+  "Video",
 ];
 
 export function TripModal({
@@ -101,16 +111,14 @@ export function TripModal({
   const [employeeName, setEmployeeName] = useState("");
   const [userId, setUserId] = useState<number | null>(null);
   const [servicesDiscussed, setServicesDiscussed] = useState("");
-  const [dealPotential, setDealPotential] = useState("");
   const [status, setStatus] = useState<B2BMeetingStatus>("in_progress");
   const [results, setResults] = useState("");
   const [nextStep, setNextStep] = useState("");
   const [purpose, setPurpose] = useState("");
 
-  const [selectedFactories, setSelectedFactories] = useState<FactoryItem[]>([]);
-  const [clientSearchValue, setClientSearchValue] = useState("");
-  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
-  const [quickAddName, setQuickAddName] = useState("");
+  const [selectedFactories, setSelectedFactories] = useState<FactoryItem[]>([
+    { factory_name: "", client_id: null, notes: "", deal_potential: "" },
+  ]);
 
   const [users, setUsers] = useState<User[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -123,7 +131,7 @@ export function TripModal({
     () =>
       [...clients]
         .sort((a, b) => a.company_name.localeCompare(b.company_name, "uz"))
-        .map((client) => ({ value: String(client.id), label: client.company_name })),
+        .map((client) => ({ value: client.company_name, label: client.company_name })),
     [clients],
   );
 
@@ -136,57 +144,50 @@ export function TripModal({
     [users],
   );
 
-  const addFactory = (client: Client) => {
-    const nextCountry = client.country || country || DEFAULT_COUNTRY;
-    setCountry(nextCountry);
-    if (!region && client.city) {
-      setRegion(resolveRegion(client.city, nextCountry));
-    }
+  const addFactoryRow = (client?: Client) => {
     setSelectedFactories((prev) => {
-      if (
-        prev.some(
-          (f) =>
-            f.client_id === client.id ||
-            f.factory_name.toLowerCase() === client.company_name.toLowerCase(),
-        )
-      ) {
-        return prev;
+      const nextCountry = client?.country || country || DEFAULT_COUNTRY;
+      if (client?.country) setCountry(nextCountry);
+      if (client?.city && !region) {
+        setRegion(resolveRegion(client.city, nextCountry));
       }
-      return [...prev, { factory_name: client.company_name, client_id: client.id }];
+      return [
+        ...prev,
+        {
+          factory_name: client ? client.company_name : "",
+          client_id: client ? client.id : null,
+          notes: "",
+          deal_potential: "",
+        },
+      ];
     });
-    setClientSearchValue("");
   };
 
-  const handleCreateAndAddClient = async (name: string) => {
-    const cleanName = name.trim();
-    if (!cleanName) return;
-    setError("");
-    try {
-      const created = await api.clients.create({
-        company_name: cleanName,
-        country,
-        city: region || undefined,
-        status: "faol",
-      });
-      setClients((prev) => [...prev, created]);
-      addFactory(created);
-      setIsQuickAddOpen(false);
-      setQuickAddName("");
-    } catch {
-      setSelectedFactories((prev) => {
-        if (prev.some((f) => f.factory_name.toLowerCase() === cleanName.toLowerCase())) {
-          return prev;
-        }
-        return [...prev, { factory_name: cleanName, client_id: null }];
-      });
-      setIsQuickAddOpen(false);
-      setQuickAddName("");
-    }
+  const updateFactoryRow = (index: number, patch: Partial<FactoryItem>) => {
+    setSelectedFactories((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, ...patch } : item)),
+    );
   };
 
-  const removeFactory = (indexToRemove: number) => {
-    setSelectedFactories((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+  const removeFactoryRow = (indexToRemove: number) => {
+    setSelectedFactories((prev) => {
+      if (prev.length <= 1) {
+        return [{ factory_name: "", client_id: null, notes: "", deal_potential: "" }];
+      }
+      return prev.filter((_, idx) => idx !== indexToRemove);
+    });
   };
+
+  const totalPotential = useMemo(() => {
+    return selectedFactories.reduce((sum, f) => {
+      const val = Number(f.deal_potential) || 0;
+      return sum + val;
+    }, 0);
+  }, [selectedFactories]);
+
+  const validFactoriesCount = useMemo(() => {
+    return selectedFactories.filter((f) => f.factory_name.trim()).length;
+  }, [selectedFactories]);
 
   useEffect(() => {
     if (!open) return;
@@ -198,22 +199,27 @@ export function TripModal({
       .catch(() => {});
 
     if (trip) {
-      const factories: FactoryItem[] = [];
+      let factories: FactoryItem[] = [];
       if (trip.factories && trip.factories.length > 0) {
-        trip.factories.forEach((f) => {
-          factories.push({
-            factory_name: f.factory_name,
-            client_id: f.client_id,
-          });
-        });
+        factories = trip.factories.map((f) => ({
+          factory_name: f.factory_name,
+          client_id: f.client_id,
+          deal_potential: f.deal_potential ? String(Math.round(Number(f.deal_potential))) : "",
+          notes: f.notes || "",
+        }));
       } else if (trip.company_name) {
         const parts = trip.company_name.split(",").map((p) => p.trim()).filter(Boolean);
-        parts.forEach((p) => {
-          factories.push({
-            factory_name: p,
-            client_id: trip.client_id,
-          });
-        });
+        factories = parts.map((p, idx) => ({
+          factory_name: p,
+          client_id: idx === 0 ? trip.client_id : null,
+          deal_potential: idx === 0 && trip.deal_potential ? String(Math.round(Number(trip.deal_potential))) : "",
+          notes: idx === 0 ? (trip.results || "") : "",
+        }));
+      }
+      if (factories.length === 0) {
+        factories = [{ factory_name: "", client_id: null, deal_potential: "", notes: "" }];
+      } else if (factories.length === 1 && !factories[0].deal_potential && trip.deal_potential) {
+        factories[0].deal_potential = String(Math.round(Number(trip.deal_potential)));
       }
       setSelectedFactories(factories);
       setMeetingFormat(trip.meeting_format === "zoom" ? "zoom" : "live");
@@ -223,16 +229,12 @@ export function TripModal({
       setEmployeeName(trip.employee_name);
       setUserId(trip.user_id);
       setServicesDiscussed(trip.services_discussed || "");
-      setDealPotential(trip.deal_potential ? String(Math.round(Number(trip.deal_potential))) : "");
       setStatus(trip.status || "in_progress");
       setResults(trip.results || "");
       setNextStep(trip.next_step || "");
       setPurpose(trip.purpose || "");
     } else {
-      setSelectedFactories([]);
-      setClientSearchValue("");
-      setIsQuickAddOpen(false);
-      setQuickAddName("");
+      setSelectedFactories([{ factory_name: "", client_id: null, deal_potential: "", notes: "" }]);
       setMeetingFormat("live");
       setCountry(DEFAULT_COUNTRY);
       setRegion("");
@@ -240,7 +242,6 @@ export function TripModal({
       setEmployeeName(user?.full_name || "");
       setUserId(user?.id ?? null);
       setServicesDiscussed("");
-      setDealPotential("");
       setStatus("in_progress");
       setResults("");
       setNextStep("");
@@ -249,33 +250,31 @@ export function TripModal({
     setError("");
   }, [open, trip, defaultYear, user]);
 
-  const handleClientSelect = (id: string) => {
-    const matched = clients.find((c) => String(c.id) === id);
-    if (!matched) return;
-    addFactory(matched);
-  };
-
   const handleEmployeeSelect = (name: string) => {
     setEmployeeName(name);
     const matched = users.find((item) => item.full_name === name || item.username === name);
     setUserId(matched ? matched.id : null);
   };
 
-  const addServiceTag = (svc: string) => {
-    const current = servicesDiscussed.trim();
-    if (!current) {
-      setServicesDiscussed(svc);
-      return;
-    }
-    const tags = current.split(",").map((s) => s.trim().toLowerCase());
-    if (!tags.includes(svc.toLowerCase())) {
-      setServicesDiscussed(`${current}, ${svc}`);
+  const toggleServiceTag = (svc: string) => {
+    const currentList = servicesDiscussed
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const index = currentList.findIndex((s) => s.toLowerCase() === svc.toLowerCase());
+    if (index >= 0) {
+      currentList.splice(index, 1);
+      setServicesDiscussed(currentList.join(", "));
+    } else {
+      currentList.push(svc);
+      setServicesDiscussed(currentList.join(", "));
     }
   };
 
   const handleSubmit = guard(async (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedFactories.length === 0) {
+    const validFactories = selectedFactories.filter((f) => f.factory_name.trim());
+    if (validFactories.length === 0) {
       setError(t("trips.validation.clientRequired"));
       return;
     }
@@ -292,8 +291,8 @@ export function TripModal({
       return;
     }
 
-    const companyNames = selectedFactories.map((f) => f.factory_name.trim()).join(", ");
-    const primaryFactory = selectedFactories[0];
+    const companyNames = validFactories.map((f) => f.factory_name.trim()).join(", ");
+    const primaryFactory = validFactories[0];
     const formatTitle = meetingFormat === "zoom" ? "Zoom" : "Jonli uchrashuv";
     const payload: TripCreatePayload = {
       title: `${companyNames} (${formatTitle})`.slice(0, 255),
@@ -307,15 +306,16 @@ export function TripModal({
       employee_name: employeeName.trim(),
       user_id: userId,
       services_discussed: servicesDiscussed.trim() || null,
-      deal_potential: dealPotential ? Number(dealPotential) : 0,
+      deal_potential: totalPotential,
       status,
       results: results.trim() || null,
       next_step: nextStep.trim() || null,
       purpose: purpose.trim() || null,
-      factories: selectedFactories.map((f) => ({
+      factories: validFactories.map((f) => ({
         factory_name: f.factory_name.trim(),
         client_id: f.client_id || null,
-        notes: results.trim() || null,
+        deal_potential: Number(f.deal_potential) || 0,
+        notes: f.notes?.trim() || null,
       })),
     };
 
@@ -337,6 +337,8 @@ export function TripModal({
       title={trip ? t("trips.editTrip") : t("trips.newTrip")}
       open={open}
       onClose={onClose}
+      extraWide
+      className="sm:max-w-4xl"
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         {error && (
@@ -345,79 +347,43 @@ export function TripModal({
           </div>
         )}
 
-        {/* Format Selector: Zoom vs Jonli uchrashuv */}
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-semibold text-muted-foreground">
-            {t("trips.meetingFormat")}
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => setMeetingFormat("live")}
-              className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                meetingFormat === "live"
-                  ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-700 dark:border-emerald-500/40 dark:text-emerald-300"
-                  : "border-border bg-background text-muted-foreground hover:bg-muted"
-              }`}
-            >
-              <UsersIcon className="size-4" />
-              {t("trips.formatLive")}
-            </button>
-            <button
-              type="button"
-              onClick={() => setMeetingFormat("zoom")}
-              className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                meetingFormat === "zoom"
-                  ? "border-blue-500/50 bg-blue-500/10 text-blue-700 dark:border-blue-500/40 dark:text-blue-300"
-                  : "border-border bg-background text-muted-foreground hover:bg-muted"
-              }`}
-            >
-              <VideoIcon className="size-4" />
-              {t("trips.formatZoom")}
-            </button>
-          </div>
-        </div>
-
-        {/* Company / Factories & Date */}
-        <div className="space-y-2 rounded-xl border border-border/70 bg-card/40 p-3.5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <label className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-              <Building2Icon className="size-3.5 text-brand-600 dark:text-brand-400" />
-              <span>{t("trips.colFactories")} *</span>
-              {selectedFactories.length > 0 && (
-                <span className="rounded-full bg-brand-500/10 px-2 py-0.5 text-[11px] font-bold text-brand-700 dark:text-brand-300">
-                  {t("trips.selectedFactoriesCount").replace("{count}", String(selectedFactories.length))}
-                </span>
-              )}
+        {/* Top bar: Format & Sana */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:items-center">
+          {/* Format Selector: Zoom vs Jonli uchrashuv */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-muted-foreground">
+              {t("trips.meetingFormat")}
             </label>
-            <button
-              type="button"
-              onClick={() => setIsQuickAddOpen((prev) => !prev)}
-              className="inline-flex items-center gap-1 rounded-md border border-brand-500/30 bg-brand-500/10 px-2.5 py-1 text-xs font-medium text-brand-700 hover:bg-brand-500/20 dark:text-brand-300 transition-colors"
-              title="Yangi fabrika qo'shish"
-            >
-              <PlusIcon className="size-3" />
-              <span>{t("trips.quickAddFactory")}</span>
-            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setMeetingFormat("live")}
+                className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                  meetingFormat === "live"
+                    ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-700 dark:border-emerald-500/40 dark:text-emerald-300"
+                    : "border-border bg-background text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                <UsersIcon className="size-4 text-emerald-600" />
+                <span>{t("trips.formatLive")}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMeetingFormat("zoom")}
+                className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                  meetingFormat === "zoom"
+                    ? "border-blue-500/50 bg-blue-500/10 text-blue-700 dark:border-blue-500/40 dark:text-blue-300"
+                    : "border-border bg-background text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                <VideoIcon className="size-4 text-blue-600" />
+                <span>{t("trips.formatZoom")}</span>
+              </button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_12rem]">
-            <SearchableSelect
-              id="trip-client"
-              label={t("trips.client")}
-              variant="floating"
-              value={clientSearchValue}
-              options={clientOptions.filter(
-                (opt) => !selectedFactories.some((f) => String(f.client_id) === opt.value),
-              )}
-              placeholder={t("trips.addFactoryPlaceholder")}
-              onValueChange={handleClientSelect}
-              allowCreate
-              onCreate={(name) => {
-                void handleCreateAndAddClient(name);
-              }}
-              createLabel={(name) => t("trips.createClientOption").replace("{name}", name)}
-            />
+          {/* Sana (Trip Date) */}
+          <div>
             <FloatingLabelDatePicker
               id="trip-date"
               label={t("trips.tripDate")}
@@ -426,77 +392,6 @@ export function TripModal({
               required
             />
           </div>
-
-          {/* Quick Add Inline Form */}
-          {isQuickAddOpen && (
-            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-brand-500/30 bg-brand-500/5 p-2.5">
-              <input
-                type="text"
-                autoFocus
-                placeholder="Yangi fabrika / korxona nomi..."
-                value={quickAddName}
-                onChange={(e) => setQuickAddName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    void handleCreateAndAddClient(quickAddName);
-                  }
-                }}
-                className="h-8 flex-1 min-w-[180px] rounded-md border border-border bg-background px-3 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-brand-500"
-              />
-              <MotionButton
-                type="button"
-                size="sm"
-                className="h-8 px-3 text-xs font-medium"
-                disabled={!quickAddName.trim()}
-                onClick={() => void handleCreateAndAddClient(quickAddName)}
-                {...motionTap}
-              >
-                <PlusIcon className="mr-1 size-3.5" />
-                Qo'shish
-              </MotionButton>
-              <MotionButton
-                type="button"
-                size="sm"
-                variant="ghost"
-                className="h-8 px-2.5 text-xs text-muted-foreground"
-                onClick={() => {
-                  setIsQuickAddOpen(false);
-                  setQuickAddName("");
-                }}
-                {...motionTap}
-              >
-                Bekor
-              </MotionButton>
-            </div>
-          )}
-
-          {/* Selected Factories Chips */}
-          {selectedFactories.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-1.5 pt-1">
-              {selectedFactories.map((f, idx) => (
-                <span
-                  key={`${f.factory_name}-${idx}`}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-brand-500/30 bg-brand-500/10 py-1 pl-2.5 pr-1.5 text-xs font-medium text-brand-700 dark:text-brand-300 shadow-sm"
-                >
-                  <Building2Icon className="size-3.5 opacity-70" />
-                  <span>{f.factory_name}</span>
-                  <button
-                    type="button"
-                    onClick={() => removeFactory(idx)}
-                    className="rounded p-0.5 text-brand-600/70 hover:bg-destructive/10 hover:text-destructive transition-colors"
-                    title="O'chirish"
-                  >
-                    <XIcon className="size-3" />
-                  </button>
-                </span>
-              ))}
-            </div>
-          ) : (
-            <p className="text-[11px] text-muted-foreground italic">
-              Bir kunda bir nechta fabrikalarni tanlash mumkin (3-4 yoki undan ko'p).
-            </p>
-          )}
         </div>
 
         {/* Region & Assignee */}
@@ -523,6 +418,129 @@ export function TripModal({
           />
         </div>
 
+        {/* Kompaniyalar ro'yxati (har biri alohida: Kompaniya + Kelishildi haqida + Summa + X) */}
+        <div className="space-y-3 rounded-xl border border-border/70 bg-card/40 p-3.5 sm:p-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <label className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+              <Building2Icon className="size-3.5 text-brand-600 dark:text-brand-400" />
+              <span>{t("trips.colFactories")} *</span>
+              {validFactoriesCount > 0 && (
+                <span className="rounded-full bg-brand-500/10 px-2 py-0.5 text-[11px] font-bold text-brand-700 dark:text-brand-300">
+                  {validFactoriesCount} ta kompaniya
+                </span>
+              )}
+            </label>
+            <MotionButton
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => addFactoryRow()}
+              className="h-8 gap-1.5 border-brand-500/30 bg-brand-500/10 text-xs font-medium text-brand-700 hover:bg-brand-500/20 dark:text-brand-300 transition-colors"
+              {...motionTap}
+            >
+              <PlusIcon className="size-3.5" />
+              <span>Kompaniya qo'shish</span>
+            </MotionButton>
+          </div>
+
+          {/* List of company rows */}
+          <div className="space-y-2.5">
+            {selectedFactories.map((item, index) => {
+              const rowOptions = item.factory_name &&
+                !clientOptions.some((opt) => opt.value.toLowerCase() === item.factory_name.toLowerCase())
+                ? [{ value: item.factory_name, label: item.factory_name }, ...clientOptions]
+                : clientOptions;
+
+              return (
+                <div
+                  key={index}
+                  className="grid grid-cols-1 gap-2.5 rounded-xl border border-border/60 bg-background/95 p-3 shadow-xs sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1.3fr)_minmax(11rem,13rem)_auto] sm:items-center sm:gap-3"
+                >
+                  {/* Kompaniya / Fabrika */}
+                  <div className="min-w-0">
+                    <SearchableSelect
+                      id={`trip-factory-${index}`}
+                      label="Kompaniya / Fabrika"
+                      required
+                      variant="floating"
+                      value={item.factory_name}
+                      options={rowOptions}
+                      placeholder="Tanlang yoki nom yozing..."
+                      onValueChange={(companyName) => {
+                        const matched = clients.find((c) => c.company_name === companyName);
+                        updateFactoryRow(index, {
+                          factory_name: companyName,
+                          client_id: matched ? matched.id : null,
+                        });
+                        if (matched?.city && !region) {
+                          setRegion(resolveRegion(matched.city, matched.country || country));
+                        }
+                        if (matched?.country && (!country || country === DEFAULT_COUNTRY)) {
+                          setCountry(matched.country);
+                        }
+                      }}
+                      allowCreate
+                      onCreate={(typedName) => {
+                        const trimmed = typedName.trim();
+                        if (!trimmed) return;
+                        const matched = clients.find(
+                          (c) => c.company_name.toLowerCase() === trimmed.toLowerCase(),
+                        );
+                        updateFactoryRow(index, {
+                          factory_name: trimmed,
+                          client_id: matched ? matched.id : null,
+                        });
+                      }}
+                      createLabel={(name) => `Yangi: "${name}"`}
+                    />
+                  </div>
+
+                  {/* Kelishildi haqida */}
+                  <div className="min-w-0">
+                    <FloatingLabelInput
+                      label="Kelishildi haqida"
+                      value={item.notes || ""}
+                      onChange={(e) => updateFactoryRow(index, { notes: e.target.value })}
+                      placeholder=" "
+                    />
+                  </div>
+
+                  {/* Summa */}
+                  <div className="min-w-0">
+                    <FloatingLabelMoneyInput
+                      label="Summa (so'm)"
+                      value={item.deal_potential || ""}
+                      onValueChange={(val) => updateFactoryRow(index, { deal_potential: val })}
+                      placeholder=" "
+                    />
+                  </div>
+
+                  {/* O'chirish (X) */}
+                  <div className="flex items-center justify-end sm:justify-center">
+                    <MotionButton
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="size-10 shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                      onClick={() => removeFactoryRow(index)}
+                      title="O'chirish"
+                      {...motionTap}
+                    >
+                      <XIcon className="size-4" />
+                    </MotionButton>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {selectedFactories.length === 0 && (
+            <p className="text-[11px] text-muted-foreground italic pt-1">
+              Kamida bitta kompaniya / fabrikani kiriting.
+            </p>
+          )}
+        </div>
+
         {/* Services Discussed & Quick Suggestions */}
         <div className="space-y-1.5">
           <FloatingLabelInput
@@ -533,26 +551,31 @@ export function TripModal({
           />
           <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
             <span className="text-[11px] text-muted-foreground">Tavsiya:</span>
-            {COMMON_SERVICES.map((svc) => (
-              <button
-                key={svc}
-                type="button"
-                onClick={() => addServiceTag(svc)}
-                className="rounded-md border border-border/60 bg-muted/40 px-2 py-0.5 text-xs text-foreground/80 transition-colors hover:bg-muted hover:text-foreground"
-              >
-                + {svc}
-              </button>
-            ))}
+            {COMMON_SERVICES.map((svc) => {
+              const isSelected = servicesDiscussed
+                .split(",")
+                .map((s) => s.trim().toLowerCase())
+                .includes(svc.toLowerCase());
+              return (
+                <button
+                  key={svc}
+                  type="button"
+                  onClick={() => toggleServiceTag(svc)}
+                  className={`rounded-md border px-2 py-0.5 text-xs transition-colors ${
+                    isSelected
+                      ? "border-brand-500/50 bg-brand-500/15 font-medium text-brand-700 dark:text-brand-300"
+                      : "border-border/60 bg-muted/40 text-foreground/80 hover:bg-muted hover:text-foreground"
+                  }`}
+                >
+                  {isSelected ? "✓ " : "+ "}{svc}
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        {/* Deal Potential & Status */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <FloatingLabelMoneyInput
-            label={t("trips.dealPotential")}
-            value={dealPotential}
-            onValueChange={setDealPotential}
-          />
+        {/* Holat & Uchrashuv natijalari */}
+        <div className="space-y-3">
           <div className="relative pt-3">
             <Select
               value={status}
@@ -572,27 +595,53 @@ export function TripModal({
               {t("trips.status")}
             </label>
           </div>
+
+          {/* Meeting Outcome (Results) */}
+          <FloatingLabelTextarea
+            id="trip-results"
+            label={t("trips.results")}
+            value={results}
+            onChange={(e) => setResults(e.target.value)}
+            rows={2}
+            placeholder=" "
+          />
+
+          {/* Next Step */}
+          <FloatingLabelTextarea
+            id="trip-next-step"
+            label={t("trips.nextStep")}
+            value={nextStep}
+            onChange={(e) => setNextStep(e.target.value)}
+            rows={2}
+            placeholder=" "
+          />
         </div>
 
-        {/* Meeting Outcome (Results) */}
-        <FloatingLabelTextarea
-          id="trip-results"
-          label={t("trips.results")}
-          value={results}
-          onChange={(e) => setResults(e.target.value)}
-          rows={2}
-          placeholder=" "
-        />
-
-        {/* Next Step */}
-        <FloatingLabelTextarea
-          id="trip-next-step"
-          label={t("trips.nextStep")}
-          value={nextStep}
-          onChange={(e) => setNextStep(e.target.value)}
-          rows={2}
-          placeholder=" "
-        />
+        {/* Umumiy summa (Pastda avtomatik jamlanuvchi kartochka) */}
+        <div className="flex flex-col gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 sm:flex-row sm:items-center sm:justify-between shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-emerald-500/10 p-2.5 text-emerald-600 dark:text-emerald-400">
+              <CircleDollarSignIcon className="size-6" />
+            </div>
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Umumiy summa
+              </div>
+              <div className="text-2xl font-bold font-mono tracking-tight text-emerald-600 dark:text-emerald-400">
+                {formatMoney(totalPotential)} <span className="text-sm font-medium text-muted-foreground">so'm</span>
+              </div>
+            </div>
+          </div>
+          <div className="text-left sm:text-right">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-background/80 px-3 py-1 text-xs font-medium text-foreground border border-border/50">
+              <Building2Icon className="size-3.5 text-brand-600 dark:text-brand-400" />
+              <span>{validFactoriesCount} ta kompaniya kiritildi</span>
+            </span>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Kompaniyalar summasi avtomatik jamlanadi
+            </p>
+          </div>
+        </div>
 
         {/* Actions */}
         <div className="flex items-center justify-end gap-2 pt-2">

@@ -873,7 +873,7 @@ export function TripsPage() {
                       <TableCell className="w-28 text-center">{getStatusBadge(item.status)}</TableCell>
                     )}
 
-                    {/* Bitim potensiali */}
+                    {/* Summa */}
                     {isVisible("potential") && (
                       <TableCell className="w-32 text-right">
                         {Number(item.deal_potential) > 0 ? (

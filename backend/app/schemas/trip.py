@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class TripFactoryBase(BaseModel):
     factory_name: str = Field(..., min_length=1, max_length=255)
     client_id: int | None = None
+    deal_potential: Decimal = Field(default=Decimal("0"))
     notes: str | None = None
 
 

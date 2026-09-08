@@ -304,6 +304,7 @@ def create_trip(db: Session, payload: TripCreate, current_user: User | None = No
                 TripFactory(
                     factory_name=f.factory_name.strip(),
                     client_id=cid,
+                    deal_potential=f.deal_potential or Decimal("0"),
                     notes=f.notes,
                 )
             )
@@ -346,6 +347,7 @@ def update_trip(db: Session, trip: Trip, payload: TripUpdate, current_user: User
                 TripFactory(
                     factory_name=factory_name,
                     client_id=cid,
+                    deal_potential=f_dict.get("deal_potential", Decimal("0")) or Decimal("0"),
                     notes=f_dict.get("notes"),
                 )
             )
@@ -389,7 +391,7 @@ B2B_EXPORT_HEADERS = [
     "Uchrashuv natijasi",
     "Keyingi qadam",
     "Holat",
-    "Bitim potensiali (so'm)",
+    "Summa (so'm)",
 ]
 
 

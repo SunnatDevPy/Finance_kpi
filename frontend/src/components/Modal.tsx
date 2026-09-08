@@ -15,6 +15,7 @@ interface ModalProps {
   children: ReactNode;
   wide?: boolean;
   extraWide?: boolean;
+  className?: string;
   /** Dialog ochilganda birinchi maydonga fokus bermaslik uchun false */
   initialFocus?: boolean;
 }
@@ -26,6 +27,7 @@ export function Modal({
   children,
   wide,
   extraWide,
+  className,
   initialFocus = true,
 }: ModalProps) {
   const scrollYRef = useRef(0);
@@ -46,6 +48,7 @@ export function Modal({
           "max-h-[90vh] overflow-y-auto border-border/70 shadow-xl sm:max-w-lg",
           wide && "sm:max-w-2xl",
           extraWide && "sm:max-w-3xl",
+          className,
         )}
       >
         <DialogHeader className="border-b border-border/60 pb-4">

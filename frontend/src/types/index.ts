@@ -294,12 +294,14 @@ export interface TripFactory {
   trip_id: number;
   factory_name: string;
   client_id: number | null;
+  deal_potential?: number | string | null;
   notes: string | null;
 }
 
 export interface TripFactoryFormItem {
   factory_name: string;
   client_id?: number | null;
+  deal_potential?: number | string | null;
   notes?: string | null;
 }
 

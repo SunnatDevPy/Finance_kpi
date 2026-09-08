@@ -507,6 +507,7 @@ class TripFactory(Base):
     trip_id: Mapped[int] = mapped_column(ForeignKey("trips.id", ondelete="CASCADE"), nullable=False)
     client_id: Mapped[int | None] = mapped_column(ForeignKey("clients.id", ondelete="SET NULL"), nullable=True)
     factory_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    deal_potential: Mapped[Decimal] = mapped_column(Numeric(15, 2), default=Decimal("0"), server_default="0")
     notes: Mapped[str | None] = mapped_column(Text)
 
     trip: Mapped["Trip"] = relationship(back_populates="factories")
