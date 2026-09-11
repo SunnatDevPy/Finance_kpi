@@ -172,7 +172,7 @@ Birinchi ishga tushishda migratsiya, boshlang‘ich admin va xizmat turlari avto
 
 | Xizmat | Manzil |
 |--------|--------|
-| Panel | [http://localhost:5173](http://localhost:5173) |
+| Panel | [http://localhost:3000](http://localhost:3000) |
 | API (Swagger) | [http://localhost:8002/docs](http://localhost:8002/docs) |
 | PostgreSQL | `localhost:5433` → `finance` / `finance` / `finance_db` |
 

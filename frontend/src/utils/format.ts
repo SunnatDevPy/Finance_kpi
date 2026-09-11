@@ -44,6 +44,80 @@ export function formatPercent(value: number | null | undefined): string {
   return `${sign}${value.toFixed(1)}%`;
 }
 
+/** Y-o'qi uchun chiroyli yaxlitlangan summa (masalan: 200 mln, 400 mln, 600 mln) */
+export function formatYAxisMoney(value: string | number): string {
+  const num = typeof value === "string" ? parseFloat(value) : value;
+  if (!Number.isFinite(num) || num === 0) return "0";
+  if (num >= 1_000_000_000) {
+    const v = num / 1_000_000_000;
+    return `${v >= 10 ? Math.round(v) : v.toFixed(1).replace(/\.0$/, "")} mlrd`;
+  }
+  if (num >= 1_000_000) {
+    const v = num / 1_000_000;
+    return `${v >= 10 ? Math.round(v) : v.toFixed(1).replace(/\.0$/, "")} mln`;
+  }
+  if (num >= 1_000) {
+    const v = num / 1_000;
+    return `${v >= 10 ? Math.round(v) : v.toFixed(1).replace(/\.0$/, "")} ming`;
+  }
+  return `${Math.round(num)}`;
+}
+
+/** Diagramma ustunlari (bar) tepasidagi qisqartirilgan summa */
+export function formatChartBarValue(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  const num = typeof value === "number" ? value : parseFloat(String(value));
+  if (!Number.isFinite(num) || num <= 0) return "";
+  if (num >= 1_000_000_000) {
+    const val = num / 1_000_000_000;
+    return `${val >= 10 ? Math.round(val) : val.toFixed(1).replace(/\.0$/, "")} mlrd`;
+  }
+  if (num >= 1_000_000) {
+    const val = num / 1_000_000;
+    return `${val >= 10 ? Math.round(val) : val.toFixed(1).replace(/\.0$/, "")} mln`;
+  }
+  if (num >= 1_000) {
+    return `${Math.round(num / 1_000)} ming`;
+  }
+  return `${Math.round(num)}`;
+}
+
+/** Y-o'qi uchun toza, tekis va chiroyli round tick'lar va domain max hisoblaydi */
+export function calculateNiceTicks(dataMax: number): { ticks: number[]; domainMax: number } {
+  const max = Math.max(dataMax, 0);
+  if (max === 0) {
+    return {
+      ticks: [0, 25_000_000, 50_000_000, 75_000_000, 100_000_000],
+      domainMax: 100_000_000,
+    };
+  }
+
+  // 3D ustunlar va teglar uchun kamida 25% yuqori zaxira
+  const target = max * 1.25;
+  const numSteps = 4;
+  const rawStep = target / numSteps;
+
+  const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
+  const normalized = rawStep / magnitude;
+
+  let niceStepFactor = 10;
+  if (normalized <= 1.2) niceStepFactor = 1;
+  else if (normalized <= 2.2) niceStepFactor = 2;
+  else if (normalized <= 3.5) niceStepFactor = 2.5;
+  else if (normalized <= 7) niceStepFactor = 5;
+  else niceStepFactor = 10;
+
+  const step = niceStepFactor * magnitude;
+  const domainMax = Math.ceil(target / step) * step;
+
+  const ticks: number[] = [];
+  for (let val = 0; val <= domainMax + step * 0.01; val += step) {
+    ticks.push(Math.round(val));
+  }
+
+  return { ticks, domainMax };
+}
+
 export function toNumber(value: string | number): number {
   return typeof value === "string" ? parseFloat(value) : value;
 }

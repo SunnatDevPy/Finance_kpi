@@ -16,7 +16,17 @@ import {
   UploadCloudIcon,
   XCircleIcon,
 } from "lucide-react";
-import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  LabelList,
+  Line,
+  LineChart,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { Bar2DLabel } from "../components/Bar3D";
 import { api } from "../api/client";
 import { CancelIcon, DeleteIconBtn, LoadingIconBtn, SaveIconBtn } from "../components/ButtonIcons";
 import { DateRangePicker } from "../components/DateRangePicker";
@@ -101,9 +111,12 @@ import { useTableSort } from "@/hooks/useTableSort";
 import { EXPENSE_CATEGORIES, expenseCategoryLabel } from "../utils/expenseCategory";
 import { INCOME_CATEGORIES, incomeCategoryLabel } from "../utils/incomeCategory";
 import {
+  calculateNiceTicks,
+  formatChartBarValue,
   formatCompactMoney,
   formatDateWithWeekday,
   formatMoney,
+  formatYAxisMoney,
   toNumber,
 } from "../utils/format";
 import { cn } from "@/lib/utils";
@@ -190,6 +203,11 @@ export function FinancePage() {
     "wtma.finance.turnoverPeriod",
     "full",
   );
+  type ChartMode = "line" | "bar";
+  const [chartMode, setChartMode] = usePersistedState<ChartMode>(
+    "wtma.finance.chartMode",
+    "bar",
+  );
   const [entryType, setEntryType] = useState<FinanceEntryType | "all">("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -244,11 +262,20 @@ export function FinancePage() {
     return years;
   }, []);
 
+  const selectedYear: FinanceTurnoverYear =
+    turnoverYear === TURNOVER_YEAR_ALL
+      ? TURNOVER_YEAR_ALL
+      : Number.parseInt(turnoverYear, 10) || new Date().getFullYear();
+
+  const isMonthlyChart = selectedYear !== TURNOVER_YEAR_ALL;
+
   const annualChartConfig = useMemo(
     () =>
       ({
         total_revenue: {
-          label: t("finance.turnover.annualRevenue"),
+          label: isMonthlyChart
+            ? t("finance.turnover.totalInflow")
+            : t("finance.turnover.annualRevenue"),
           color: "hsl(160 72% 38%)",
         },
         total_expense: {
@@ -256,15 +283,8 @@ export function FinancePage() {
           color: "hsl(0 72% 51%)",
         },
       }) satisfies ChartConfig,
-    [t],
+    [t, isMonthlyChart],
   );
-
-  const selectedYear: FinanceTurnoverYear =
-    turnoverYear === TURNOVER_YEAR_ALL
-      ? TURNOVER_YEAR_ALL
-      : Number.parseInt(turnoverYear, 10) || new Date().getFullYear();
-
-  const isMonthlyChart = selectedYear !== TURNOVER_YEAR_ALL;
 
   const annualChartData = useMemo(() => {
     if (isMonthlyChart) {
@@ -280,6 +300,15 @@ export function FinancePage() {
       total_expense: toNumber(point.total_expense),
     }));
   }, [isMonthlyChart, turnoverMonthlyTrend, turnoverTrend, t]);
+
+  const chartScale = useMemo(() => {
+    let maxVal = 0;
+    for (const item of annualChartData) {
+      if (item.total_revenue > maxVal) maxVal = item.total_revenue;
+      if (item.total_expense > maxVal) maxVal = item.total_expense;
+    }
+    return calculateNiceTicks(maxVal);
+  }, [annualChartData]);
 
   const expenseBreakdown = useMemo(() => {
     const items = (turnover?.expenses_by_category ?? []).map((item) => ({
@@ -557,65 +586,156 @@ export function FinancePage() {
                       .replace("{to}", String(TURNOVER_TREND_END_YEAR))}
               </CardDescription>
             </div>
-            <Select
-              value={turnoverYear}
-              onValueChange={handleYearChange}
-              className="w-full sm:w-44"
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t("finance.turnover.year")} />
-              </SelectTrigger>
-              <SelectContent className="max-h-60">
-                <SelectGroup>
-                  <SelectItem value={TURNOVER_YEAR_ALL}>
-                    {t("finance.turnover.allYears")}
-                  </SelectItem>
-                  {yearOptions.map((year) => (
-                    <SelectItem key={year} value={String(year)}>
-                      {year}
+            <div className="flex flex-wrap items-center gap-2">
+              <div
+                className="flex items-center rounded-lg border bg-muted/40 p-0.5 text-xs shadow-2xs"
+                role="group"
+                aria-label="Chart type"
+              >
+                <button
+                  type="button"
+                  onClick={() => setChartMode("bar")}
+                  className={cn(
+                    "rounded-md px-2.5 py-1 text-xs font-medium transition-all",
+                    chartMode === "bar"
+                      ? "bg-background text-foreground shadow-xs font-semibold text-primary"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {t("finance.turnover.chartBar")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChartMode("line")}
+                  className={cn(
+                    "rounded-md px-2.5 py-1 text-xs font-medium transition-all",
+                    chartMode === "line"
+                      ? "bg-background text-foreground shadow-xs font-semibold text-primary"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {t("finance.turnover.chartLine")}
+                </button>
+              </div>
+
+              <Select
+                value={turnoverYear}
+                onValueChange={handleYearChange}
+                className="w-full sm:w-44"
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={t("finance.turnover.year")} />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  <SelectGroup>
+                    <SelectItem value={TURNOVER_YEAR_ALL}>
+                      {t("finance.turnover.allYears")}
                     </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+                    {yearOptions.map((year) => (
+                      <SelectItem key={year} value={String(year)}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardHeader>
         <CardContent className={cn("pt-5", turnoverLoading && "opacity-60")}>
           {annualChartData.length === 0 ? (
             <p className="py-10 text-center text-sm text-muted-foreground">{t("common.noData")}</p>
           ) : (
-            <ChartContainer config={annualChartConfig} className="h-[300px] w-full">
-              <LineChart data={annualChartData} margin={{ left: 8, right: 8, top: 8, bottom: 0 }}>
-                <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
-                <YAxis
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={8}
-                  width={72}
-                  tickFormatter={formatCompactMoney}
-                />
-                <ChartTooltip
-                  content={<ChartTooltipContent formatter={(value) => moneyTooltip(value)} />}
-                />
-                <ChartLegend content={<ChartLegendContent />} />
-                <Line
-                  type="monotone"
-                  dataKey="total_revenue"
-                  stroke="var(--color-total_revenue)"
-                  strokeWidth={2}
-                  dot={{ r: 3 }}
-                  activeDot={{ r: 5 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="total_expense"
-                  stroke="var(--color-total_expense)"
-                  strokeWidth={2}
-                  dot={{ r: 3 }}
-                  activeDot={{ r: 5 }}
-                />
-              </LineChart>
+            <ChartContainer config={annualChartConfig} className="h-[340px] w-full">
+              {chartMode === "line" ? (
+                <LineChart
+                  data={annualChartData}
+                  margin={{ left: 8, right: 16, top: 16, bottom: 0 }}
+                >
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                  <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                    width={68}
+                    ticks={chartScale.ticks}
+                    domain={[0, chartScale.domainMax]}
+                    tickFormatter={formatYAxisMoney}
+                  />
+                  <ChartTooltip
+                    content={<ChartTooltipContent formatter={(value) => moneyTooltip(value)} />}
+                  />
+                  <ChartLegend content={<ChartLegendContent />} />
+                  <Line
+                    type="monotone"
+                    dataKey="total_revenue"
+                    stroke="var(--color-total_revenue)"
+                    strokeWidth={2.5}
+                    dot={{ r: 4, fill: "var(--color-total_revenue)" }}
+                    activeDot={{ r: 6 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="total_expense"
+                    stroke="var(--color-total_expense)"
+                    strokeWidth={2.5}
+                    dot={{ r: 4, fill: "var(--color-total_expense)" }}
+                    activeDot={{ r: 6 }}
+                  />
+                </LineChart>
+              ) : (
+                <BarChart
+                  data={annualChartData}
+                  margin={{ left: 8, right: 16, top: 32, bottom: 0 }}
+                  barGap={4}
+                  barCategoryGap="20%"
+                >
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                  <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                    width={68}
+                    ticks={chartScale.ticks}
+                    domain={[0, chartScale.domainMax]}
+                    tickFormatter={formatYAxisMoney}
+                  />
+                  <ChartTooltip
+                    content={<ChartTooltipContent formatter={(value) => moneyTooltip(value)} />}
+                  />
+                  <ChartLegend content={<ChartLegendContent />} />
+                  <Bar
+                    dataKey="total_revenue"
+                    fill="var(--color-total_revenue)"
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={36}
+                  >
+                    <LabelList
+                      dataKey="total_revenue"
+                      content={Bar2DLabel}
+                      position="top"
+                      offset={6}
+                      formatter={formatChartBarValue}
+                    />
+                  </Bar>
+                  <Bar
+                    dataKey="total_expense"
+                    fill="var(--color-total_expense)"
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={36}
+                  >
+                    <LabelList
+                      dataKey="total_expense"
+                      content={Bar2DLabel}
+                      position="top"
+                      offset={6}
+                      formatter={formatChartBarValue}
+                    />
+                  </Bar>
+                </BarChart>
+              )}
             </ChartContainer>
           )}
         </CardContent>

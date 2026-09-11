@@ -491,8 +491,27 @@ export const api = {
   },
 
   serviceTypes: {
-    list: (activeOnly = false) =>
-      request<ServiceType[]>(`/service-types${activeOnly ? "?active_only=true" : ""}`),
+    list: (
+      params?:
+        | boolean
+        | {
+            activeOnly?: boolean;
+            dateFrom?: string;
+            dateTo?: string;
+            year?: number | string;
+          },
+    ) => {
+      if (typeof params === "boolean") {
+        return request<ServiceType[]>(`/service-types${params ? "?active_only=true" : ""}`);
+      }
+      const q = new URLSearchParams();
+      if (params?.activeOnly) q.set("active_only", "true");
+      if (params?.dateFrom) q.set("date_from", params.dateFrom);
+      if (params?.dateTo) q.set("date_to", params.dateTo);
+      if (params?.year && params.year !== "all") q.set("year", String(params.year));
+      const qs = q.toString();
+      return request<ServiceType[]>(`/service-types${qs ? `?${qs}` : ""}`);
+    },
     create: (data: { name: string; is_active?: boolean }) =>
       request<ServiceType>("/service-types", {
         method: "POST",
@@ -504,7 +523,17 @@ export const api = {
         body: JSON.stringify(data),
       }),
     delete: (id: number) => request<void>(`/service-types/${id}`, { method: "DELETE" }),
-    stats: (id: number) => request<ServiceTypeStats>(`/service-types/${id}/stats`),
+    stats: (
+      id: number,
+      params?: { dateFrom?: string; dateTo?: string; year?: number | string },
+    ) => {
+      const q = new URLSearchParams();
+      if (params?.dateFrom) q.set("date_from", params.dateFrom);
+      if (params?.dateTo) q.set("date_to", params.dateTo);
+      if (params?.year && params.year !== "all") q.set("year", String(params.year));
+      const qs = q.toString();
+      return request<ServiceTypeStats>(`/service-types/${id}/stats${qs ? `?${qs}` : ""}`);
+    },
   },
 
   contracts: {

@@ -30,8 +30,14 @@ import {
   TableRow,
 } from "../components/PremiumDataTable";
 import { useI18n } from "../context/I18nContext";
+import { TrendBadge } from "./TrendBadge";
 import type { ServiceType, ServiceTypeStats } from "../types";
-import { formatDateWithWeekday, formatMoney, toNumber } from "../utils/format";
+import {
+  formatCompactMoney,
+  formatDateWithWeekday,
+  formatMoney,
+  toNumber,
+} from "../utils/format";
 import { Button, MotionButton, motionTap } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +49,11 @@ interface ServiceTypeDetailModalProps {
   onSetActive: (item: ServiceType, active: boolean) => void;
   onRename: (item: ServiceType, name: string) => Promise<void>;
   onDelete: (id: number) => void;
+  periodParams?: {
+    dateFrom?: string;
+    dateTo?: string;
+    year?: string | number;
+  };
 }
 
 type TopClientSortKey = "company_name" | "usage_count" | "total_amount";
@@ -86,6 +97,7 @@ export function ServiceTypeDetailModal({
   onSetActive,
   onRename,
   onDelete,
+  periodParams,
 }: ServiceTypeDetailModalProps) {
   const { t } = useI18n();
   const [stats, setStats] = useState<ServiceTypeStats | null>(null);
@@ -98,7 +110,7 @@ export function ServiceTypeDetailModal({
   const [topClientsPageSize, setTopClientsPageSize] = useState(10);
   const [topClientsSortKey, setTopClientsSortKey] = useState<TopClientSortKey>("total_amount");
   const [topClientsSortOrder, setTopClientsSortOrder] = useState<TableSortOrder>("desc");
-  const statsCacheRef = useRef<Map<number, ServiceTypeStats>>(new Map());
+  const statsCacheRef = useRef<Map<string, ServiceTypeStats>>(new Map());
   const activeItemIdRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -109,7 +121,8 @@ export function ServiceTypeDetailModal({
 
     activeItemIdRef.current = item.id;
     setEditingName(false);
-    const cached = statsCacheRef.current.get(item.id);
+    const cacheKey = `${item.id}_${periodParams?.year ?? ""}_${periodParams?.dateFrom ?? ""}_${periodParams?.dateTo ?? ""}`;
+    const cached = statsCacheRef.current.get(cacheKey);
     if (cached) {
       setStats(cached);
       setLoading(false);
@@ -121,10 +134,10 @@ export function ServiceTypeDetailModal({
     setLoading(true);
     setError("");
     api.serviceTypes
-      .stats(item.id)
+      .stats(item.id, periodParams)
       .then((data) => {
         if (cancelled || activeItemIdRef.current !== item.id) return;
-        statsCacheRef.current.set(item.id, data);
+        statsCacheRef.current.set(cacheKey, data);
         setStats(data);
       })
       .catch((e) => {
@@ -137,7 +150,7 @@ export function ServiceTypeDetailModal({
     return () => {
       cancelled = true;
     };
-  }, [open, item?.id]);
+  }, [open, item?.id, periodParams?.year, periodParams?.dateFrom, periodParams?.dateTo]);
 
   useEffect(() => {
     if (!open) return;
@@ -334,6 +347,47 @@ export function ServiceTypeDetailModal({
                 <div className="mt-4 flex items-center gap-2 rounded-lg border border-amber-200/60 bg-amber-500/5 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:text-amber-200">
                   <XCircleIcon className="size-4 shrink-0" />
                   {t("services.cancelledCount")}: {displayStats.cancelled_count}
+                </div>
+              )}
+
+              {item.yearly_breakdown && item.yearly_breakdown.length > 0 && (
+                <div className="mt-5 rounded-xl border border-border/70 bg-card p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-semibold text-foreground">
+                        {t("services.yearlyHistory")}
+                      </h4>
+                      <p className="text-xs text-muted-foreground">
+                        {t("services.vsPreviousYear")}
+                      </p>
+                    </div>
+                    {item.growth_rate !== null && item.growth_rate !== undefined && (
+                      <TrendBadge value={item.growth_rate} size="md" />
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7">
+                    {item.yearly_breakdown.map((pt) => (
+                      <div
+                        key={pt.year}
+                        className="flex flex-col gap-1 rounded-lg border border-border/50 bg-muted/20 p-2.5 text-center"
+                      >
+                        <span className="text-xs font-bold text-foreground">{pt.year}</span>
+                        <span className="text-xs font-semibold text-foreground tabular-nums">
+                          {formatCompactMoney(pt.revenue)}
+                        </span>
+                        <div className="mt-0.5 flex items-center justify-center gap-1">
+                          {pt.growth_rate !== null && pt.growth_rate !== undefined ? (
+                            <TrendBadge value={pt.growth_rate} size="sm" />
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground">—</span>
+                          )}
+                        </div>
+                        <span className="text-[10px] text-muted-foreground">
+                          {t("services.timesUsed").replace("{count}", String(pt.usage_count))}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 

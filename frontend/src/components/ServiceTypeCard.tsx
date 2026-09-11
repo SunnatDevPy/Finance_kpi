@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { BarChart3Icon, MoreHorizontalIcon, Trash2Icon } from "lucide-react";
 import { CompanyAvatar } from "./CompanyAvatar";
 import { ActiveStatusToggle } from "./ActiveStatusToggle";
+import { TrendBadge } from "./TrendBadge";
 import type { ServiceType } from "../types";
 import { formatCompactMoney } from "../utils/format";
 import { MotionButton, motionTap } from "@/components/ui/button";
@@ -85,9 +86,14 @@ export const ServiceTypeCard = memo(function ServiceTypeCard({
             </p>
           </div>
           <div>
-            <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              {labels.revenueShort}
-            </p>
+            <div className="flex items-center justify-between gap-1">
+              <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                {labels.revenueShort}
+              </p>
+              {item.growth_rate !== undefined && item.growth_rate !== null && (
+                <TrendBadge value={item.growth_rate} size="sm" />
+              )}
+            </div>
             <p className="mt-0.5 text-sm font-semibold text-foreground">
               {item.usage_count > 0 ? formatCompactMoney(item.total_revenue) : "—"}
             </p>

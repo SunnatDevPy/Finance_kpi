@@ -173,10 +173,12 @@ check_once() {
       fail "API :8002"
     fi
 
-    if http_ok "http://127.0.0.1:5173/"; then
+    if http_ok "http://127.0.0.1:3000/"; then
+      log "  [ OK ] Web http://127.0.0.1:3000/"
+    elif http_ok "http://127.0.0.1:5173/"; then
       log "  [ OK ] Web http://127.0.0.1:5173/"
     else
-      log "  [WARN] Web http://127.0.0.1:5173/ — javob yo'q (build yoki npm dev hali tayyor emas)"
+      log "  [WARN] Web http://127.0.0.1:3000/ yoki :5173/ — javob yo'q (build yoki npm dev hali tayyor emas)"
     fi
   fi
   log ""

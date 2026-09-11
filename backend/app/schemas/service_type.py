@@ -18,6 +18,13 @@ class ServiceTypeUpdate(BaseModel):
     is_active: bool | None = None
 
 
+class ServiceTypeYearPoint(BaseModel):
+    year: int
+    revenue: Decimal = Decimal("0")
+    usage_count: int = 0
+    growth_rate: float | None = None
+
+
 class ServiceTypeRead(ServiceTypeBase):
     model_config = ConfigDict(from_attributes=True)
 
@@ -25,6 +32,9 @@ class ServiceTypeRead(ServiceTypeBase):
     created_at: datetime
     usage_count: int = 0
     total_revenue: Decimal = Decimal("0")
+    previous_revenue: Decimal = Decimal("0")
+    growth_rate: float | None = None
+    yearly_breakdown: list[ServiceTypeYearPoint] = []
 
 
 class ServiceTypeClientUsage(BaseModel):

@@ -73,6 +73,13 @@ export interface Client {
   total_paid: string;
 }
 
+export interface ServiceTypeYearPoint {
+  year: number;
+  revenue: string;
+  usage_count: number;
+  growth_rate?: number | null;
+}
+
 export interface ServiceType {
   id: number;
   name: string;
@@ -80,6 +87,9 @@ export interface ServiceType {
   created_at: string;
   usage_count: number;
   total_revenue: string;
+  previous_revenue?: string;
+  growth_rate?: number | null;
+  yearly_breakdown?: ServiceTypeYearPoint[];
 }
 
 export interface ServiceTypeClientUsage {

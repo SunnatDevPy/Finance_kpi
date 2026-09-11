@@ -100,10 +100,11 @@ function Show-Status {
       if (-not $Quiet) { Write-Host "  [FAIL] API http://127.0.0.1:8002/api/v1/health" }
       $issues += "API :8002"
     }
-    if (Test-HttpOk "http://127.0.0.1:5173/") {
-      if (-not $Quiet) { Write-Host "  [ OK ] Web http://127.0.0.1:5173/" }
+    $webUrl = if (Test-HttpOk "http://127.0.0.1:3000/") { "http://127.0.0.1:3000/" } elseif (Test-HttpOk "http://127.0.0.1:5173/") { "http://127.0.0.1:5173/" } else { $null }
+    if ($webUrl) {
+      if (-not $Quiet) { Write-Host "  [ OK ] Web $webUrl" }
     } elseif (-not $Quiet) {
-      Write-Host "  [WARN] Web http://127.0.0.1:5173/ - javob yoq"
+      Write-Host "  [WARN] Web http://127.0.0.1:3000/ yoki :5173/ - javob yoq"
     }
   }
 
