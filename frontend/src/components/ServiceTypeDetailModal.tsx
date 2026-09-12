@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ArrowRightIcon,
   Building2Icon,
   CalendarIcon,
   CheckIcon,
@@ -365,28 +366,47 @@ export function ServiceTypeDetailModal({
                       <TrendBadge value={item.growth_rate} size="md" />
                     )}
                   </div>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7">
-                    {item.yearly_breakdown.map((pt) => (
-                      <div
-                        key={pt.year}
-                        className="flex flex-col gap-1 rounded-lg border border-border/50 bg-muted/20 p-2.5 text-center"
-                      >
-                        <span className="text-xs font-bold text-foreground">{pt.year}</span>
-                        <span className="text-xs font-semibold text-foreground tabular-nums">
-                          {formatCompactMoney(pt.revenue)}
-                        </span>
-                        <div className="mt-0.5 flex items-center justify-center gap-1">
-                          {pt.growth_rate !== null && pt.growth_rate !== undefined ? (
-                            <TrendBadge value={pt.growth_rate} size="sm" />
-                          ) : (
-                            <span className="text-[10px] text-muted-foreground">—</span>
+                  <div className="flex items-center gap-2 overflow-x-auto py-2">
+                    {item.yearly_breakdown.map((pt, pIdx) => {
+                      const isLast = pIdx === item.yearly_breakdown!.length - 1;
+                      const prevPt = pIdx > 0 ? item.yearly_breakdown![pIdx - 1] : null;
+                      const diff = prevPt ? parseFloat(pt.revenue || "0") - parseFloat(prevPt.revenue || "0") : null;
+                      return (
+                        <div key={pt.year} className="flex items-center gap-2 shrink-0">
+                          <div
+                            className={cn(
+                              "flex flex-col gap-1 rounded-xl border p-3 text-center min-w-[115px] shadow-2xs transition-all",
+                              isLast ? "border-primary/40 bg-primary/5 font-bold" : "border-border/60 bg-muted/15",
+                            )}
+                          >
+                            <span className="text-xs font-bold text-foreground">{pt.year}-yil</span>
+                            <span className="text-sm font-bold text-foreground tabular-nums">
+                              {formatCompactMoney(pt.revenue)}
+                            </span>
+                            <div className="mt-0.5 flex items-center justify-center">
+                              {pt.growth_rate !== null && pt.growth_rate !== undefined ? (
+                                <TrendBadge
+                                  value={pt.growth_rate}
+                                  diffAmount={diff}
+                                  size="sm"
+                                  prominentArrow
+                                />
+                              ) : (
+                                <span className="text-[10px] text-muted-foreground/60">—</span>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-muted-foreground">
+                              {t("services.timesUsed").replace("{count}", String(pt.usage_count))}
+                            </span>
+                          </div>
+                          {!isLast && (
+                            <div className="flex flex-col items-center px-0.5">
+                              <ArrowRightIcon className="size-4 text-muted-foreground/60" />
+                            </div>
                           )}
                         </div>
-                        <span className="text-[10px] text-muted-foreground">
-                          {t("services.timesUsed").replace("{count}", String(pt.usage_count))}
-                        </span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}

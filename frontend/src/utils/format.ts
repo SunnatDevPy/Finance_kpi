@@ -74,7 +74,11 @@ export function formatChartBarValue(value: unknown): string {
   }
   if (num >= 1_000_000) {
     const val = num / 1_000_000;
-    return `${val >= 10 ? Math.round(val) : val.toFixed(1).replace(/\.0$/, "")} mln`;
+    return `${val >= 10 ? Math.round(val) : val.toFixed(1).replace(/\.0$/, "")}`;
+  }
+  if (num >= 100_000) {
+    const val = num / 1_000_000;
+    return `${val.toFixed(1).replace(/\.0$/, "")}`;
   }
   if (num >= 1_000) {
     return `${Math.round(num / 1_000)} ming`;

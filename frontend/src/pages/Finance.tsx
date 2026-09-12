@@ -689,7 +689,7 @@ export function FinancePage() {
                   data={annualChartData}
                   margin={{ left: 8, right: 16, top: 32, bottom: 0 }}
                   barGap={4}
-                  barCategoryGap="20%"
+                  barCategoryGap="12%"
                 >
                   <CartesianGrid vertical={false} strokeDasharray="3 3" />
                   <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
@@ -709,8 +709,8 @@ export function FinancePage() {
                   <Bar
                     dataKey="total_revenue"
                     fill="var(--color-total_revenue)"
-                    radius={[4, 4, 0, 0]}
-                    maxBarSize={36}
+                    radius={[5, 5, 0, 0]}
+                    maxBarSize={44}
                   >
                     <LabelList
                       dataKey="total_revenue"
@@ -723,8 +723,8 @@ export function FinancePage() {
                   <Bar
                     dataKey="total_expense"
                     fill="var(--color-total_expense)"
-                    radius={[4, 4, 0, 0]}
-                    maxBarSize={36}
+                    radius={[5, 5, 0, 0]}
+                    maxBarSize={44}
                   >
                     <LabelList
                       dataKey="total_expense"

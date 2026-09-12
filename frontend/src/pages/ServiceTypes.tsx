@@ -1,15 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowDownIcon,
-  ArrowUpIcon,
+  ArrowDownRightIcon,
+  ArrowRightIcon,
+  ArrowUpRightIcon,
   AwardIcon,
   BarChart3Icon,
   CalendarIcon,
   FilterIcon,
   LayersIcon,
+  LineChartIcon,
   PlusIcon,
   RotateCcwIcon,
+  TableIcon,
   Trash2Icon,
+  TrendingDownIcon,
   TrendingUpIcon,
 } from "lucide-react";
 import {
@@ -17,6 +21,8 @@ import {
   BarChart,
   CartesianGrid,
   LabelList,
+  Line,
+  LineChart,
   XAxis,
   YAxis,
 } from "recharts";
@@ -55,6 +61,8 @@ import { MotionButton, motionTap } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
@@ -80,11 +88,26 @@ import {
 import { cn } from "@/lib/utils";
 import type { ServiceType } from "../types";
 import {
-  formatChartBarValue,
   formatCompactMoney,
   formatMoney,
   formatYAxisMoney,
 } from "../utils/format";
+
+interface DynamicsHighlightItem {
+  item: ServiceType;
+  rate: number;
+  diff: number;
+  prevRev: number;
+  curRev: number;
+}
+
+interface DynamicsStats {
+  topGainer: DynamicsHighlightItem | null;
+  topDecliner: DynamicsHighlightItem | null;
+  totalGrowing: number;
+  totalFalling: number;
+  totalFlat: number;
+}
 
 const YEARS = [
   "2030",
@@ -101,10 +124,20 @@ const YEARS = [
   "2019",
 ];
 
+const SERVICE_COLORS = [
+  "#2563eb", // blue
+  "#10b981", // emerald
+  "#8b5cf6", // violet
+  "#f59e0b", // amber
+  "#ec4899", // pink
+  "#06b6d4", // cyan
+];
+
 function ServiceBarLabel(props: any) {
   const { x = 0, y = 0, width = 0, value } = props;
-  const text = formatChartBarValue(value);
-  if (!text) return null;
+  const num = typeof value === "number" ? value : parseFloat(String(value || 0));
+  if (!num || num <= 0) return null;
+  const text = formatCompactMoney(num);
   return (
     <text
       x={x + width / 2}
@@ -127,6 +160,7 @@ export function ServiceTypesPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [analyticsTab, setAnalyticsTab] = useState<"distribution" | "dynamics">("distribution");
+  const [dynamicsView, setDynamicsView] = useState<"both" | "chart" | "table">("both");
   const [trendFilter, setTrendFilter] = useState<"all" | "growing" | "falling">("all");
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [createActive, setCreateActive] = useState(true);
@@ -295,6 +329,75 @@ export function ServiceTypesPage() {
       color: "hsl(var(--primary))",
     },
   } satisfies ChartConfig;
+
+  const dynamicsStats: DynamicsStats = useMemo(() => {
+    let topGainer: DynamicsHighlightItem | null = null;
+    let topDecliner: DynamicsHighlightItem | null = null;
+    let totalGrowing = 0;
+    let totalFalling = 0;
+    let totalFlat = 0;
+
+    items.forEach((item) => {
+      const rate = item.growth_rate;
+      const curRev = parseFloat(item.total_revenue || "0");
+      const prevRev = parseFloat(item.previous_revenue || "0");
+      const diff = curRev - prevRev;
+
+      if (rate !== null && rate !== undefined) {
+        if (rate > 0) {
+          totalGrowing++;
+          if (!topGainer || rate > topGainer.rate) {
+            topGainer = { item, rate, diff, prevRev, curRev };
+          }
+        } else if (rate < 0) {
+          totalFalling++;
+          if (!topDecliner || rate < topDecliner.rate) {
+            topDecliner = { item, rate, diff, prevRev, curRev };
+          }
+        } else {
+          totalFlat++;
+        }
+      }
+    });
+
+    return {
+      topGainer,
+      topDecliner,
+      totalGrowing,
+      totalFalling,
+      totalFlat,
+    };
+  }, [items]);
+
+  const { topGainer, topDecliner, totalGrowing, totalFalling } = dynamicsStats;
+
+  const dynamicsChartConfig = useMemo(() => {
+    const topServices = allRankedServices.slice(0, 5);
+    const cfg: ChartConfig = {};
+    topServices.forEach((st, idx) => {
+      cfg[`service_${st.id}`] = {
+        label: st.name,
+        color: SERVICE_COLORS[idx % SERVICE_COLORS.length],
+      };
+    });
+    return cfg;
+  }, [allRankedServices]);
+
+  const dynamicsChartData = useMemo(() => {
+    if (availableYears.length === 0) return [];
+    const topServices = allRankedServices.slice(0, 5);
+    return availableYears.map((yr) => {
+      const pt: Record<string, any> = {
+        year: `${yr}-yil`,
+        yearNum: yr,
+      };
+      topServices.forEach((st) => {
+        const yearPt = st.yearly_breakdown?.find((p) => p.year === yr);
+        pt[`service_${st.id}`] = yearPt ? parseFloat(yearPt.revenue || "0") : 0;
+      });
+      return pt;
+    });
+  }, [availableYears, allRankedServices]);
 
   const filteredItems = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -576,8 +679,14 @@ export function ServiceTypesPage() {
             ) : (
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-start">
                 <div className="lg:col-span-8">
-                  <ChartContainer config={chartConfig} className="h-[300px] w-full">
+                  <ChartContainer config={chartConfig} className="h-[320px] w-full">
                     <BarChart data={chartData} margin={{ left: 8, right: 16, top: 24, bottom: 20 }}>
+                      <defs>
+                        <linearGradient id="serviceBarGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#2563eb" stopOpacity={0.95} />
+                          <stop offset="100%" stopColor="#1d4ed8" stopOpacity={0.8} />
+                        </linearGradient>
+                      </defs>
                       <CartesianGrid vertical={false} strokeDasharray="3 3" />
                       <XAxis
                         dataKey="name"
@@ -628,7 +737,7 @@ export function ServiceTypesPage() {
                       />
                       <Bar
                         dataKey="revenue"
-                        fill="hsl(var(--primary))"
+                        fill="url(#serviceBarGrad)"
                         radius={[6, 6, 0, 0]}
                         maxBarSize={44}
                       >
@@ -680,7 +789,7 @@ export function ServiceTypesPage() {
                           : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20",
                       )}
                     >
-                      <ArrowUpIcon className="size-3" />
+                      <ArrowUpRightIcon className="size-3" />
                       <span>{t("services.filterGrowing")}</span>
                       <span className="rounded-full bg-black/10 dark:bg-white/10 px-1.5 py-0.2 text-[10px] font-semibold">
                         {trendCounts.growing}
@@ -696,7 +805,7 @@ export function ServiceTypesPage() {
                           : "bg-rose-500/10 text-rose-700 dark:text-rose-400 hover:bg-rose-500/20",
                       )}
                     >
-                      <ArrowDownIcon className="size-3" />
+                      <ArrowDownRightIcon className="size-3" />
                       <span>{t("services.filterFalling")}</span>
                       <span className="rounded-full bg-black/10 dark:bg-white/10 px-1.5 py-0.2 text-[10px] font-semibold">
                         {trendCounts.falling}
@@ -705,7 +814,7 @@ export function ServiceTypesPage() {
                   </div>
 
                   {/* Scrollable list of ALL services */}
-                  <div className="flex max-h-[340px] flex-col gap-2 overflow-y-auto pr-1">
+                  <div className="flex max-h-[360px] flex-col gap-2 overflow-y-auto pr-1">
                     {filteredRankedServices.length === 0 ? (
                       <p className="py-6 text-center text-xs text-muted-foreground">
                         {t("services.notFound")}
@@ -713,6 +822,8 @@ export function ServiceTypesPage() {
                     ) : (
                       filteredRankedServices.map((item, idx) => {
                         const rev = parseFloat(item.total_revenue || "0");
+                        const prevRev = parseFloat(item.previous_revenue || "0");
+                        const diff = rev - prevRev;
                         const pct =
                           summary.totalRevenue > 0
                             ? Math.round((rev / summary.totalRevenue) * 100)
@@ -721,7 +832,7 @@ export function ServiceTypesPage() {
                           <div
                             key={item.id}
                             onClick={() => openDetail(item)}
-                            className="group flex flex-col gap-1.5 rounded-xl border border-border/50 bg-muted/20 p-2.5 transition-all hover:border-primary/40 hover:bg-muted/40 cursor-pointer"
+                            className="group flex flex-col gap-2 rounded-xl border border-border/50 bg-muted/20 p-2.5 transition-all hover:border-primary/40 hover:bg-muted/40 cursor-pointer shadow-2xs"
                           >
                             <div className="flex items-center justify-between text-xs">
                               <div className="flex items-center gap-2 min-w-0">
@@ -739,15 +850,33 @@ export function ServiceTypesPage() {
                                 <span>({pct}%)</span>
                               </div>
                             </div>
-                            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                              <span>
-                                {t("services.timesUsed").replace(
-                                  "{count}",
-                                  String(item.usage_count || 0),
+
+                            {/* Year-over-Year Progression with clear Arrow Flow */}
+                            <div className="flex items-center justify-between text-[11px]">
+                              <div className="flex items-center gap-1.5 text-muted-foreground">
+                                {prevRev > 0 ? (
+                                  <div className="flex items-center gap-1">
+                                    <span className="opacity-75">{formatCompactMoney(prevRev)}</span>
+                                    <ArrowRightIcon className="size-3 text-muted-foreground/60" />
+                                    <span className="font-semibold text-foreground">{formatCompactMoney(rev)}</span>
+                                  </div>
+                                ) : (
+                                  <span>
+                                    {t("services.timesUsed").replace(
+                                      "{count}",
+                                      String(item.usage_count || 0),
+                                    )}
+                                  </span>
                                 )}
-                              </span>
-                              <TrendBadge value={item.growth_rate} size="sm" />
+                              </div>
+                              <TrendBadge
+                                value={item.growth_rate}
+                                diffAmount={prevRev > 0 ? diff : undefined}
+                                size="sm"
+                                prominentArrow
+                              />
                             </div>
+
                             <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
                               <div
                                 className="h-full rounded-full bg-primary transition-all duration-500"
@@ -763,10 +892,112 @@ export function ServiceTypesPage() {
               </div>
             )
           ) : (
-            /* Multi-Year Dynamics Table */
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
-                {/* Trend Filter Chips */}
+            /* Multi-Year Dynamics: Top Highlights, Visual Chart and Stepper Flow Table with Arrows */
+            <div className="flex flex-col gap-6">
+              {/* 1. Top 3 Dynamics Highlights (KPI Cards with Arrows) */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                {/* Top Gainer */}
+                <div className="flex flex-col justify-between gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3.5 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                      <TrendingUpIcon className="size-4 text-emerald-600 dark:text-emerald-400" />
+                      {t("services.topGainer")}
+                    </span>
+                    {topGainer && (
+                      <TrendBadge
+                        value={topGainer.rate}
+                        diffAmount={topGainer.diff}
+                        size="sm"
+                        prominentArrow
+                      />
+                    )}
+                  </div>
+                  {topGainer ? (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-sm font-bold text-foreground">
+                        {topGainer.item.name}
+                      </span>
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <span className="font-medium text-foreground/80">
+                          {formatCompactMoney(topGainer.prevRev)}
+                        </span>
+                        <ArrowRightIcon className="size-3 text-emerald-600 dark:text-emerald-400" />
+                        <span className="font-bold text-emerald-700 dark:text-emerald-400">
+                          {formatCompactMoney(topGainer.curRev)}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">{t("services.noGrowthData")}</span>
+                  )}
+                </div>
+
+                {/* Top Decliner */}
+                <div className="flex flex-col justify-between gap-2 rounded-xl border border-rose-500/30 bg-rose-500/5 p-3.5 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-xs font-semibold text-rose-700 dark:text-rose-400">
+                      <TrendingDownIcon className="size-4 text-rose-600 dark:text-rose-400" />
+                      {t("services.topDecliner")}
+                    </span>
+                    {topDecliner && (
+                      <TrendBadge
+                        value={topDecliner.rate}
+                        diffAmount={topDecliner.diff}
+                        size="sm"
+                        prominentArrow
+                      />
+                    )}
+                  </div>
+                  {topDecliner ? (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-sm font-bold text-foreground">
+                        {topDecliner.item.name}
+                      </span>
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <span className="font-medium text-foreground/80">
+                          {formatCompactMoney(topDecliner.prevRev)}
+                        </span>
+                        <ArrowRightIcon className="size-3 text-rose-600 dark:text-rose-400" />
+                        <span className="font-bold text-rose-700 dark:text-rose-400">
+                          {formatCompactMoney(topDecliner.curRev)}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">{t("services.noGrowthData")}</span>
+                  )}
+                </div>
+
+                {/* Overall Dynamics Summary */}
+                <div className="flex flex-col justify-between gap-2 rounded-xl border border-border/70 bg-muted/20 p-3.5 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                      <LayersIcon className="size-4 text-primary" />
+                      {t("services.overallTrend")}
+                    </span>
+                    <Badge variant="outline" className="text-[10px] font-semibold">
+                      {dynamicsServices.length} {t("services.allServices").toLowerCase()}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-3 pt-1">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                      <span className="flex size-5 items-center justify-center rounded-full bg-emerald-500/15">
+                        <ArrowUpRightIcon className="size-3" />
+                      </span>
+                      <span>{totalGrowing} ta o'smoqda</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-rose-700 dark:text-rose-400">
+                      <span className="flex size-5 items-center justify-center rounded-full bg-rose-500/15">
+                        <ArrowDownRightIcon className="size-3" />
+                      </span>
+                      <span>{totalFalling} ta pasaymoqda</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. Sub-view switcher & Trend Filter Chips */}
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b pb-3">
                 <div className="flex flex-wrap items-center gap-1.5">
                   <button
                     type="button"
@@ -793,7 +1024,7 @@ export function ServiceTypesPage() {
                         : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20",
                     )}
                   >
-                    <ArrowUpIcon className="size-3" />
+                    <ArrowUpRightIcon className="size-3" />
                     <span>{t("services.filterGrowing")}</span>
                     <span className="rounded-full bg-black/10 dark:bg-white/10 px-1.5 py-0.2 text-[10px] font-semibold">
                       {trendCounts.growing}
@@ -809,7 +1040,7 @@ export function ServiceTypesPage() {
                         : "bg-rose-500/10 text-rose-700 dark:text-rose-400 hover:bg-rose-500/20",
                     )}
                   >
-                    <ArrowDownIcon className="size-3" />
+                    <ArrowDownRightIcon className="size-3" />
                     <span>{t("services.filterFalling")}</span>
                     <span className="rounded-full bg-black/10 dark:bg-white/10 px-1.5 py-0.2 text-[10px] font-semibold">
                       {trendCounts.falling}
@@ -817,93 +1048,319 @@ export function ServiceTypesPage() {
                   </button>
                 </div>
 
-                <span className="text-xs text-muted-foreground">
-                  {dynamicsServices.length} {t("services.allServices").toLowerCase()}
-                </span>
+                {/* View toggle: Both vs Chart vs Table */}
+                <div className="flex items-center rounded-lg border border-border/70 bg-muted/40 p-0.5 self-start sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => setDynamicsView("both")}
+                    className={cn(
+                      "rounded-md px-2.5 py-1 text-xs font-medium transition-all",
+                      dynamicsView === "both"
+                        ? "bg-background text-foreground shadow-xs font-semibold text-primary"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    Hamma ko'rinish
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDynamicsView("chart")}
+                    className={cn(
+                      "flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all",
+                      dynamicsView === "chart"
+                        ? "bg-background text-foreground shadow-xs font-semibold text-primary"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    <LineChartIcon className="size-3" />
+                    {t("services.dynamicsChart")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDynamicsView("table")}
+                    className={cn(
+                      "flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all",
+                      dynamicsView === "table"
+                        ? "bg-background text-foreground shadow-xs font-semibold text-primary"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    <TableIcon className="size-3" />
+                    {t("services.dynamicsTable")}
+                  </button>
+                </div>
               </div>
 
-              <div className="overflow-x-auto rounded-xl border border-border/70">
-                <Table variant="premium">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12 text-center">#</TableHead>
-                      <TableHead className="min-w-[160px]">{t("services.name")}</TableHead>
-                      <TableHead className="w-28 text-center">{t("services.growthRate")}</TableHead>
-                      {availableYears.map((year) => (
-                        <TableHead key={year} className="text-center min-w-[95px]">
-                          {year}-yil
-                        </TableHead>
-                      ))}
-                      <TableHead className="text-right min-w-[120px]">{t("services.revenueShort")}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {dynamicsServices.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={4 + availableYears.length} className="py-8 text-center text-sm text-muted-foreground">
-                          {t("services.notFound")}
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      dynamicsServices.map((item, idx) => {
-                        const totalRev = parseFloat(item.total_revenue || "0");
-                        return (
-                          <TableRow
-                            key={item.id}
-                            onClick={() => openDetail(item)}
-                            className="cursor-pointer group"
-                          >
-                            <TableCell className="font-semibold text-xs text-muted-foreground text-center">
-                              #{idx + 1}
+              {/* 3. Multi-Year Comparative Trend Line Chart */}
+              {(dynamicsView === "both" || dynamicsView === "chart") && (
+                <div className="rounded-xl border border-border/70 bg-card p-4 shadow-2xs">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div>
+                      <h4 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                        <LineChartIcon className="size-4 text-primary" />
+                        {t("services.dynamicsChart")}
+                      </h4>
+                      <p className="text-xs text-muted-foreground">
+                        Yetakchi xizmatlarning yillar bo'yicha daromad o'sish traektoriyasi
+                      </p>
+                    </div>
+                  </div>
+                  {dynamicsChartData.length === 0 ? (
+                    <p className="py-8 text-center text-xs text-muted-foreground">{t("services.noGrowthData")}</p>
+                  ) : (
+                    <ChartContainer config={dynamicsChartConfig} className="h-[280px] w-full">
+                      <LineChart data={dynamicsChartData} margin={{ left: 8, right: 24, top: 16, bottom: 8 }}>
+                        <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                        <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={8} />
+                        <YAxis
+                          tickLine={false}
+                          axisLine={false}
+                          tickMargin={8}
+                          width={68}
+                          tickFormatter={(val) => formatYAxisMoney(val)}
+                        />
+                        <ChartTooltip
+                          content={
+                            <ChartTooltipContent
+                              formatter={(value, name) => (
+                                <div className="flex items-center justify-between gap-3 text-xs">
+                                  <span className="font-semibold text-foreground">{name}:</span>
+                                  <span className="font-bold text-foreground tabular-nums">
+                                    {formatMoney(value as number)}
+                                  </span>
+                                </div>
+                              )}
+                            />
+                          }
+                        />
+                        <ChartLegend content={<ChartLegendContent />} />
+                        {allRankedServices.slice(0, 5).map((st, idx) => (
+                          <Line
+                            key={st.id}
+                            type="monotone"
+                            dataKey={`service_${st.id}`}
+                            name={st.name}
+                            stroke={SERVICE_COLORS[idx % SERVICE_COLORS.length]}
+                            strokeWidth={2.5}
+                            dot={{ r: 4, fill: SERVICE_COLORS[idx % SERVICE_COLORS.length] }}
+                            activeDot={{ r: 6 }}
+                          />
+                        ))}
+                      </LineChart>
+                    </ChartContainer>
+                  )}
+                </div>
+              )}
+
+              {/* 4. The Strelkali Oqim Jadvali (Detailed Stepper Flow Table with Arrows) */}
+              {(dynamicsView === "both" || dynamicsView === "table") && (
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                        <TableIcon className="size-4 text-primary" />
+                        {t("services.dynamicsTable")}
+                      </h4>
+                      <p className="text-xs text-muted-foreground">
+                        Har bir xizmat bo'yicha yillik o'zgarishlar, strelkali o'sish/pasayish ko'rsatkichlari
+                      </p>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {dynamicsServices.length} {t("services.allServices").toLowerCase()}
+                    </span>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-xl border border-border/70 shadow-2xs">
+                    <Table variant="premium">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-12 text-center">#</TableHead>
+                          <TableHead className="min-w-[170px]">{t("services.name")}</TableHead>
+                          <TableHead className="min-w-[130px] text-center">{t("services.growthRate")}</TableHead>
+                          {availableYears.map((year, idx) => (
+                            <TableHead key={year} className="text-center min-w-[125px]">
+                              {year}-yil
+                              {idx > 0 && <span className="block text-[10px] font-normal text-muted-foreground">vs {availableYears[idx - 1]}</span>}
+                            </TableHead>
+                          ))}
+                          <TableHead className="min-w-[220px]">{t("services.yearlyTrajectory")}</TableHead>
+                          <TableHead className="text-right min-w-[120px]">{t("services.revenueShort")}</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {dynamicsServices.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={5 + availableYears.length} className="py-8 text-center text-sm text-muted-foreground">
+                              {t("services.notFound")}
                             </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <span
-                                  className={cn(
-                                    "size-2 rounded-full shrink-0",
-                                    item.is_active ? "bg-emerald-500" : "bg-muted-foreground/40",
-                                  )}
-                                />
-                                <span className="font-semibold text-foreground group-hover:text-primary transition-colors">
-                                  {item.name}
-                                </span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <TrendBadge value={item.growth_rate} size="sm" />
-                            </TableCell>
-                            {availableYears.map((year) => {
-                              const pt = item.yearly_breakdown?.find((p) => p.year === year);
-                              const hasData = pt && (parseFloat(pt.revenue) > 0 || pt.usage_count > 0);
-                              return (
-                                <TableCell key={year} className="text-center">
-                                  {hasData ? (
-                                    <div className="flex flex-col items-center gap-0.5">
-                                      <span className="font-medium text-xs text-foreground tabular-nums">
-                                        {formatCompactMoney(pt.revenue)}
+                          </TableRow>
+                        ) : (
+                          dynamicsServices.map((item, idx) => {
+                            const totalRev = parseFloat(item.total_revenue || "0");
+                            const prevRev = parseFloat(item.previous_revenue || "0");
+                            const diff = totalRev - prevRev;
+                            const pct =
+                              summary.totalRevenue > 0
+                                ? Math.round((totalRev / summary.totalRevenue) * 100)
+                                : 0;
+                            return (
+                              <TableRow
+                                key={item.id}
+                                onClick={() => openDetail(item)}
+                                className="cursor-pointer group hover:bg-muted/30 transition-colors"
+                              >
+                                <TableCell className="font-semibold text-xs text-muted-foreground text-center">
+                                  #{idx + 1}
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex flex-col gap-1">
+                                    <div className="flex items-center gap-2">
+                                      <span
+                                        className={cn(
+                                          "size-2 rounded-full shrink-0",
+                                          item.is_active ? "bg-emerald-500" : "bg-muted-foreground/40",
+                                        )}
+                                      />
+                                      <span className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                                        {item.name}
                                       </span>
-                                      {pt.growth_rate !== null && pt.growth_rate !== undefined ? (
-                                        <TrendBadge value={pt.growth_rate} size="sm" />
-                                      ) : (
-                                        <span className="text-[10px] text-muted-foreground/60">—</span>
+                                    </div>
+                                    <span className="text-[11px] text-muted-foreground">
+                                      {t("services.timesUsed").replace("{count}", String(item.usage_count || 0))}
+                                    </span>
+                                  </div>
+                                </TableCell>
+
+                                {/* Latest Growth Trend with Arrow & Diff */}
+                                <TableCell className="text-center">
+                                  {item.growth_rate !== null && item.growth_rate !== undefined ? (
+                                    <div className="flex flex-col items-center gap-1">
+                                      <TrendBadge
+                                        value={item.growth_rate}
+                                        diffAmount={prevRev > 0 ? diff : undefined}
+                                        size="sm"
+                                        prominentArrow
+                                      />
+                                      {prevRev > 0 && (
+                                        <span className="text-[10px] text-muted-foreground font-medium">
+                                          {formatCompactMoney(prevRev)} → {formatCompactMoney(totalRev)}
+                                        </span>
                                       )}
                                     </div>
                                   ) : (
-                                    <span className="text-muted-foreground/40 text-xs">—</span>
+                                    <span className="inline-flex items-center rounded-md border border-border/60 bg-muted/40 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                      {t("services.trendNew")}
+                                    </span>
                                   )}
                                 </TableCell>
-                              );
-                            })}
-                            <TableCell className="text-right font-semibold text-xs text-foreground tabular-nums">
-                              {formatCompactMoney(totalRev)}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
+
+                                {/* Individual Year Columns with Arrows */}
+                                {availableYears.map((year, yIdx) => {
+                                  const pt = item.yearly_breakdown?.find((p) => p.year === year);
+                                  const hasData = pt && (parseFloat(pt.revenue) > 0 || pt.usage_count > 0);
+
+                                  const prevYear = availableYears[yIdx - 1];
+                                  const prevPt = prevYear ? item.yearly_breakdown?.find((p) => p.year === prevYear) : null;
+                                  const prevPtRev = prevPt ? parseFloat(prevPt.revenue || "0") : 0;
+                                  const curPtRev = pt ? parseFloat(pt.revenue || "0") : 0;
+                                  const yearDiff = prevPtRev > 0 ? curPtRev - prevPtRev : null;
+
+                                  return (
+                                    <TableCell key={year} className="text-center">
+                                      {hasData ? (
+                                        <div className="flex flex-col items-center gap-1 rounded-lg border border-border/50 bg-muted/15 p-2 transition-all group-hover:border-primary/30 group-hover:bg-background">
+                                          <span className="font-bold text-xs text-foreground tabular-nums">
+                                            {formatCompactMoney(pt.revenue)}
+                                          </span>
+                                          {pt.growth_rate !== null && pt.growth_rate !== undefined ? (
+                                            <TrendBadge
+                                              value={pt.growth_rate}
+                                              diffAmount={yearDiff}
+                                              size="sm"
+                                              prominentArrow
+                                            />
+                                          ) : yIdx === 0 ? (
+                                            <span className="text-[10px] font-medium text-muted-foreground/70">Boshlang'ich</span>
+                                          ) : (
+                                            <span className="text-[10px] text-muted-foreground/50">—</span>
+                                          )}
+                                          <span className="text-[10px] text-muted-foreground">
+                                            {pt.usage_count} marta
+                                          </span>
+                                        </div>
+                                      ) : (
+                                        <span className="text-muted-foreground/30 text-xs">—</span>
+                                      )}
+                                    </TableCell>
+                                  );
+                                })}
+
+                                {/* Visual Timeline Stepper with Arrows */}
+                                <TableCell>
+                                  {item.yearly_breakdown && item.yearly_breakdown.length > 1 ? (
+                                    <div className="flex items-center gap-1.5 overflow-x-auto py-1 text-xs">
+                                      {item.yearly_breakdown.map((pt, pIdx) => {
+                                        const isLast = pIdx === item.yearly_breakdown!.length - 1;
+                                        const hasRev = parseFloat(pt.revenue) > 0;
+                                        const nextPt = item.yearly_breakdown![pIdx + 1];
+                                        return (
+                                          <div key={pt.year} className="flex items-center gap-1.5 shrink-0">
+                                            <div
+                                              className={cn(
+                                                "flex flex-col rounded-md border px-2 py-1 text-center shadow-2xs transition-colors",
+                                                isLast
+                                                  ? "border-primary/40 bg-primary/10 font-bold text-primary"
+                                                  : "border-border/50 bg-muted/20 text-muted-foreground",
+                                              )}
+                                            >
+                                              <span className="text-[10px] font-semibold">{pt.year}</span>
+                                              <span className="text-[11px] tabular-nums font-semibold">
+                                                {hasRev ? formatCompactMoney(pt.revenue) : "0"}
+                                              </span>
+                                            </div>
+                                            {!isLast && (
+                                              <div className="flex flex-col items-center">
+                                                <ArrowRightIcon className="size-3.5 text-muted-foreground/70" />
+                                                {nextPt?.growth_rate !== null && nextPt?.growth_rate !== undefined && (
+                                                  <span
+                                                    className={cn(
+                                                      "text-[9px] font-bold tabular-nums",
+                                                      nextPt.growth_rate > 0
+                                                        ? "text-emerald-600 dark:text-emerald-400"
+                                                        : nextPt.growth_rate < 0
+                                                          ? "text-rose-600 dark:text-rose-400"
+                                                          : "text-muted-foreground",
+                                                    )}
+                                                  >
+                                                    {nextPt.growth_rate > 0 ? "↗+" : nextPt.growth_rate < 0 ? "↘" : ""}
+                                                    {nextPt.growth_rate.toFixed(0)}%
+                                                  </span>
+                                                )}
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground/60">—</span>
+                                  )}
+                                </TableCell>
+
+                                {/* Total Revenue */}
+                                <TableCell className="text-right font-bold text-xs text-foreground tabular-nums">
+                                  <div>{formatCompactMoney(totalRev)}</div>
+                                  <div className="text-[10px] font-normal text-muted-foreground">({pct}%)</div>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </CardContent>

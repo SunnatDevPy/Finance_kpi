@@ -152,36 +152,23 @@ export function Bar3DLabel(props: any) {
   );
 }
 
-/** 2D Bar Label with anti-collision vertical stagger */
+/** 2D Bar Label cleanly positioned above bar */
 export function Bar2DLabel(props: any) {
-  const { x = 0, y = 0, width = 0, value, dataKey, payload } = props;
+  const { x = 0, y = 0, width = 0, value } = props;
   const text = formatChartBarValue(value);
   if (!text) return null;
 
-  const isRev = dataKey === "total_revenue";
-  const revVal = Number(payload?.total_revenue || 0);
-  const expVal = Number(payload?.total_expense || 0);
-
-  let extraYOffset = 0;
-  if (revVal > 0 && expVal > 0) {
-    const maxVal = Math.max(revVal, expVal);
-    const minVal = Math.min(revVal, expVal);
-    if (minVal / maxVal >= 0.45) {
-      extraYOffset = isRev ? -14 : 0;
-    }
-  }
-
   const centerX = x + width / 2;
-  const labelY = y - 5 + extraYOffset;
+  const labelY = y - 6;
 
   return (
     <text
       x={centerX}
       y={labelY}
       textAnchor="middle"
-      fontSize={9.5}
+      fontSize={10}
       fontWeight={600}
-      className="fill-foreground font-semibold"
+      className="fill-foreground/90 font-semibold"
       style={{ pointerEvents: "none" }}
     >
       {text}
