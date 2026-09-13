@@ -309,7 +309,6 @@ export function TripModal({
       deal_potential: totalPotential,
       status,
       results: results.trim() || null,
-      next_step: trip?.next_step ?? null,
       purpose: purpose.trim() || null,
       factories: validFactories.map((f) => ({
         factory_name: f.factory_name.trim(),

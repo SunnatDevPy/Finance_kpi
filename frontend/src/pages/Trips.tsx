@@ -22,7 +22,6 @@ import {
   TableBody,
   TableCell,
   TableCellActions,
-  TableCellCompany,
   TableCellDate,
   TableCellMuted,
   TableHead,
@@ -85,7 +84,6 @@ const TRIP_OPTIONAL_COLUMNS = [
   { id: "services", labelKey: "trips.colServices", defaultVisible: true },
   { id: "employee", labelKey: "trips.colEmployee", defaultVisible: true },
   { id: "results", labelKey: "trips.colResults", defaultVisible: true },
-  { id: "nextStep", labelKey: "trips.colNextStep", defaultVisible: false },
   { id: "status", labelKey: "trips.colStatus", defaultVisible: true },
   { id: "potential", labelKey: "trips.colPotential", defaultVisible: true },
 ] as const;
@@ -748,7 +746,6 @@ export function TripsPage() {
                 {isVisible("services") && <TableHead className="min-w-[160px]">{t("trips.colServices")}</TableHead>}
                 {isVisible("employee") && <TableHead className="min-w-[140px]">{t("trips.colEmployee")}</TableHead>}
                 {isVisible("results") && <TableHead className="min-w-[200px]">{t("trips.colResults")}</TableHead>}
-                {isVisible("nextStep") && <TableHead className="min-w-[180px]">{t("trips.colNextStep")}</TableHead>}
                 {isVisible("status") && <TableHead className="w-28 text-center">{t("trips.colStatus")}</TableHead>}
                 {isVisible("potential") && (
                   <TableHead className="w-32 text-right">{t("trips.colPotential")}</TableHead>
@@ -787,20 +784,20 @@ export function TripsPage() {
                             <Building2Icon className="size-3" />
                             {item.factories.length} {t("trips.viewFactories").toLowerCase()}
                           </span>
-                          <div className="flex flex-wrap gap-1">
+                          <div className="flex flex-col gap-0.5">
                             {item.factories.map((f, fIdx) =>
                               f.client_id ? (
                                 <Link
                                   key={f.id || fIdx}
                                   to={`/clients/${f.client_id}`}
-                                  className="inline-flex items-center gap-1 rounded bg-muted/60 hover:bg-brand-500/15 hover:text-brand-600 px-1.5 py-0.5 text-xs font-medium text-foreground transition-colors"
+                                  className="font-semibold text-foreground hover:text-brand-600 transition-colors text-sm leading-snug"
                                 >
                                   {f.factory_name}
                                 </Link>
                               ) : (
                                 <span
                                   key={f.id || fIdx}
-                                  className="inline-flex items-center gap-1 rounded bg-muted/50 px-1.5 py-0.5 text-xs text-foreground/90"
+                                  className="font-semibold text-foreground text-sm leading-snug"
                                 >
                                   {f.factory_name}
                                 </span>
@@ -810,10 +807,22 @@ export function TripsPage() {
                         </div>
                       </TableCell>
                     ) : (
-                      <TableCellCompany
-                        to={clientId ? `/clients/${clientId}` : undefined}
-                        name={company}
-                      />
+                      <TableCell className="min-w-[200px]">
+                        <div className="flex flex-col gap-0.5 py-0.5">
+                          {clientId ? (
+                            <Link
+                              to={`/clients/${clientId}`}
+                              className="font-semibold text-foreground hover:text-brand-600 transition-colors text-sm leading-snug"
+                            >
+                              {company}
+                            </Link>
+                          ) : (
+                            <span className="font-semibold text-foreground text-sm leading-snug">
+                              {company}
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
                     )}
 
                     {/* Region */}
@@ -860,15 +869,6 @@ export function TripsPage() {
                       <TableCell className="max-w-[260px]">
                         <p className="line-clamp-2 text-xs leading-relaxed text-foreground/90">
                           {item.results || item.purpose || "—"}
-                        </p>
-                      </TableCell>
-                    )}
-
-                    {/* Keyingi qadam */}
-                    {isVisible("nextStep") && (
-                      <TableCell className="max-w-[220px]">
-                        <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">
-                          {item.next_step || "—"}
                         </p>
                       </TableCell>
                     )}

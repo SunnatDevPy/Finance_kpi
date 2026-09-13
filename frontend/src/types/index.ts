@@ -333,7 +333,6 @@ export interface Trip {
   services_discussed?: string | null;
   purpose: string | null;
   results: string | null;
-  next_step?: string | null;
   status?: B2BMeetingStatus;
   deal_potential?: number | string;
   factories: TripFactory[];
@@ -355,7 +354,6 @@ export interface TripCreatePayload {
   services_discussed?: string | null;
   purpose?: string | null;
   results?: string | null;
-  next_step?: string | null;
   status?: B2BMeetingStatus;
   deal_potential?: number | string;
   factories?: TripFactoryFormItem[];
@@ -375,7 +373,6 @@ export interface TripUpdatePayload {
   services_discussed?: string | null;
   purpose?: string | null;
   results?: string | null;
-  next_step?: string | null;
   status?: B2BMeetingStatus;
   deal_potential?: number | string;
   factories?: TripFactoryFormItem[];

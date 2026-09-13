@@ -389,7 +389,6 @@ B2B_EXPORT_HEADERS = [
     "Muhokama qilingan xizmatlar",
     "Mas'ul ijrochi",
     "Uchrashuv natijasi",
-    "Keyingi qadam",
     "Holat",
     "Summa (so'm)",
 ]
@@ -412,7 +411,6 @@ def export_trips_xlsx(trips: list[Trip], year: int | None = None) -> BytesIO:
             t.services_discussed or "—",
             t.employee_name,
             t.results or t.purpose or "—",
-            t.next_step or "—",
             st,
             pot,
         ])
@@ -436,7 +434,6 @@ def export_trips_pdf(trips: list[Trip], year: int | None = None) -> BytesIO:
             t.services_discussed or "—",
             t.employee_name,
             t.results or t.purpose or "—",
-            t.next_step or "—",
             st,
             pot,
         ])

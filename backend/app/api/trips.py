@@ -84,7 +84,6 @@ def list_trips(
                 Trip.services_discussed.ilike(pattern),
                 Trip.purpose.ilike(pattern),
                 Trip.results.ilike(pattern),
-                Trip.next_step.ilike(pattern),
                 Trip.id.in_(sub_factory),
             )
         )

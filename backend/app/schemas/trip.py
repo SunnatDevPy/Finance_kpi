@@ -35,7 +35,6 @@ class TripBase(BaseModel):
     services_discussed: str | None = None
     purpose: str | None = None
     results: str | None = None
-    next_step: str | None = None
     status: str = Field(default="in_progress", max_length=50)
     deal_potential: Decimal = Field(default=Decimal("0"))
 
@@ -58,7 +57,6 @@ class TripUpdate(BaseModel):
     services_discussed: str | None = None
     purpose: str | None = None
     results: str | None = None
-    next_step: str | None = None
     status: str | None = Field(default=None, max_length=50)
     deal_potential: Decimal | None = None
     factories: list[TripFactoryCreate] | None = None

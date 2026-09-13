@@ -5,6 +5,7 @@ import {
   ArrowDownCircleIcon,
   ArrowUpCircleIcon,
   CheckCircle2Icon,
+  CreditCardIcon,
   DownloadIcon,
   ExternalLinkIcon,
   FileUpIcon,
@@ -14,6 +15,7 @@ import {
   Trash2Icon,
   TrendingUpIcon,
   UploadCloudIcon,
+  WalletIcon,
   XCircleIcon,
 } from "lucide-react";
 import {
@@ -318,6 +320,46 @@ export function FinancePage() {
     const max = Math.max(1, ...items.map((item) => item.amount));
     return { items, max };
   }, [turnover]);
+
+  const monthsCount = useMemo(() => {
+    if (turnoverPeriod !== "full") {
+      return 3;
+    }
+    const currentYear = new Date().getFullYear();
+    const currentMonth = new Date().getMonth() + 1;
+
+    if (selectedYear === TURNOVER_YEAR_ALL) {
+      const pastYears = Math.max(0, currentYear - TURNOVER_YEAR_START);
+      return Math.max(1, pastYears * 12 + currentMonth);
+    }
+
+    if (selectedYear === currentYear) {
+      return Math.max(1, currentMonth);
+    }
+
+    if (typeof selectedYear === "number" && selectedYear > currentYear) {
+      return 12;
+    }
+
+    return 12;
+  }, [turnoverPeriod, selectedYear]);
+
+  const avgMonthlyRevenue = useMemo(() => {
+    const total = Number(turnover?.total_revenue ?? 0);
+    return monthsCount > 0 ? total / monthsCount : 0;
+  }, [turnover?.total_revenue, monthsCount]);
+
+  const avgMonthlyExpense = useMemo(() => {
+    const total = Number(turnover?.total_expense ?? 0);
+    return monthsCount > 0 ? total / monthsCount : 0;
+  }, [turnover?.total_expense, monthsCount]);
+
+  const avgPeriodSubtitle = useMemo(() => {
+    if (turnoverPeriod !== "full") {
+      return t("finance.turnover.avgQuarterSubtitle");
+    }
+    return t("finance.turnover.avgMonthsSubtitle").replace("{count}", String(monthsCount));
+  }, [turnoverPeriod, monthsCount, t]);
 
   const loadTurnover = (
     year: FinanceTurnoverYear = selectedYear,
@@ -626,7 +668,7 @@ export function FinancePage() {
                 <SelectTrigger>
                   <SelectValue placeholder={t("finance.turnover.year")} />
                 </SelectTrigger>
-                <SelectContent className="max-h-60">
+                <SelectContent className="max-h-72">
                   <SelectGroup>
                     <SelectItem value={TURNOVER_YEAR_ALL}>
                       {t("finance.turnover.allYears")}
@@ -753,7 +795,7 @@ export function FinancePage() {
                 <SelectTrigger>
                   <SelectValue placeholder={t("finance.turnover.period")} />
                 </SelectTrigger>
-                <SelectContent className="max-h-60">
+                <SelectContent className="max-h-72">
                   <SelectGroup>
                     {TURNOVER_PERIODS.map((period) => (
                       <SelectItem key={period} value={period}>
@@ -795,6 +837,36 @@ export function FinancePage() {
                 value={formatMoney(turnover?.net_balance ?? "0")}
                 accent={Number(turnover?.net_balance ?? 0) >= 0 ? "blue" : "amber"}
                 icon={ScaleIcon}
+              />
+            </StaggerItem>
+          </StaggerContainer>
+
+          <StaggerContainer
+            className={cn(
+              "grid grid-cols-1 gap-4 sm:grid-cols-2",
+              turnoverLoading && "opacity-60",
+            )}
+          >
+            <StaggerItem>
+              <StatCard
+                title={t("finance.turnover.avgMonthlyRevenue")}
+                value={formatMoney(Math.round(avgMonthlyRevenue))}
+                numericValue={Math.round(avgMonthlyRevenue)}
+                formatValue={formatMoney}
+                subtitle={avgPeriodSubtitle}
+                accent="green"
+                icon={WalletIcon}
+              />
+            </StaggerItem>
+            <StaggerItem>
+              <StatCard
+                title={t("finance.turnover.avgMonthlyExpense")}
+                value={formatMoney(Math.round(avgMonthlyExpense))}
+                numericValue={Math.round(avgMonthlyExpense)}
+                formatValue={formatMoney}
+                subtitle={avgPeriodSubtitle}
+                accent="red"
+                icon={CreditCardIcon}
               />
             </StaggerItem>
           </StaggerContainer>

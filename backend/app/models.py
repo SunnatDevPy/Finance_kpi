@@ -468,7 +468,6 @@ class Trip(Base):
     services_discussed: Mapped[str | None] = mapped_column(Text)
     purpose: Mapped[str | None] = mapped_column(Text)
     results: Mapped[str | None] = mapped_column(Text)
-    next_step: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(50), default="in_progress", nullable=False)
     deal_potential: Mapped[Decimal] = mapped_column(Numeric(15, 2), default=Decimal("0"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
