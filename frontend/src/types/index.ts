@@ -637,7 +637,7 @@ export interface FinanceImportResult {
   errors: FinanceImportError[];
 }
 
-export type FinancePeriod = "full" | "q1" | "q2" | "q3" | "q4";
+export type FinancePeriod = string;
 
 export type FinanceTurnoverYear = number | "all";
 

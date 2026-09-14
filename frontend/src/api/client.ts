@@ -844,8 +844,13 @@ export const api = {
       const qs = q.toString();
       return request<FinanceLedgerPage>(`/finance/ledger${qs ? `?${qs}` : ""}`);
     },
-    turnover: (year: FinanceTurnoverYear, period: FinancePeriod = "full") =>
-      request<FinanceTurnover>(`/finance/turnover?year=${year}&period=${period}`),
+    turnover: (year: FinanceTurnoverYear, period: FinancePeriod = "full", months?: string) => {
+      const q = new URLSearchParams();
+      q.set("year", String(year));
+      q.set("period", period);
+      if (months) q.set("months", months);
+      return request<FinanceTurnover>(`/finance/turnover?${q.toString()}`);
+    },
     turnoverTrend: (yearFrom = 2019, yearTo = new Date().getFullYear()) =>
       request<FinanceTurnoverTrend>(
         `/finance/turnover-trend?year_from=${yearFrom}&year_to=${yearTo}`,

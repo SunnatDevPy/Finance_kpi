@@ -59,10 +59,11 @@ def finance_ledger(
 def finance_turnover(
     db: Session = Depends(get_db),
     year: str = Query(default=str(date.today().year)),
-    period: FinancePeriod = Query(default="full"),
+    period: str = Query(default="full"),
+    months: str | None = Query(default=None),
 ) -> FinanceTurnoverRead:
     if year == "all":
-        return get_finance_turnover_all_years(db, period=period)
+        return get_finance_turnover_all_years(db, period=period, months=months)
     try:
         year_int = int(year)
     except ValueError as exc:
@@ -75,7 +76,7 @@ def finance_turnover(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Yil 2000–2035 oralig'ida bo'lishi kerak",
         )
-    return get_finance_turnover(db, year=year_int, period=period)
+    return get_finance_turnover(db, year=year_int, period=period, months=months)
 
 
 @router.get("/turnover-trend", response_model=FinanceTurnoverTrendRead)

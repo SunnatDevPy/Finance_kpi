@@ -95,12 +95,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { FinanceMonthSelect } from "@/components/FinanceMonthSelect";
 import type {
   ExpenseCategory,
   FinanceEntryType,
   FinanceImportResult,
   FinanceLedgerItem,
-  FinancePeriod,
   FinanceTurnoverYear,
   FinanceTurnover,
   FinanceTurnoverTrend,
@@ -128,7 +128,6 @@ const TURNOVER_YEAR_END = 2035;
 const TURNOVER_TREND_END_YEAR = new Date().getFullYear();
 const DEFAULT_FINANCE_AUTO_PAYMENTS_YEAR = 2026;
 const TURNOVER_YEAR_ALL = "all" as const;
-const TURNOVER_PERIODS: FinancePeriod[] = ["full", "q1", "q2", "q3", "q4"];
 
 const EXPENSE_BAR_COLORS = [
   "bg-blue-500",
@@ -201,9 +200,9 @@ export function FinancePage() {
     "wtma.finance.turnoverYear",
     String(new Date().getFullYear()),
   );
-  const [turnoverPeriod, setTurnoverPeriod] = usePersistedState<FinancePeriod>(
-    "wtma.finance.turnoverPeriod",
-    "full",
+  const [turnoverMonths, setTurnoverMonths] = usePersistedState<number[]>(
+    "wtma.finance.turnoverMonths",
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
   );
   type ChartMode = "line" | "bar";
   const [chartMode, setChartMode] = usePersistedState<ChartMode>(
@@ -322,8 +321,8 @@ export function FinancePage() {
   }, [turnover]);
 
   const monthsCount = useMemo(() => {
-    if (turnoverPeriod !== "full") {
-      return 3;
+    if (turnoverMonths.length < 12) {
+      return Math.max(1, turnoverMonths.length);
     }
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth() + 1;
@@ -342,7 +341,7 @@ export function FinancePage() {
     }
 
     return 12;
-  }, [turnoverPeriod, selectedYear]);
+  }, [turnoverMonths, selectedYear]);
 
   const avgMonthlyRevenue = useMemo(() => {
     const total = Number(turnover?.total_revenue ?? 0);
@@ -355,15 +354,12 @@ export function FinancePage() {
   }, [turnover?.total_expense, monthsCount]);
 
   const avgPeriodSubtitle = useMemo(() => {
-    if (turnoverPeriod !== "full") {
-      return t("finance.turnover.avgQuarterSubtitle");
-    }
     return t("finance.turnover.avgMonthsSubtitle").replace("{count}", String(monthsCount));
-  }, [turnoverPeriod, monthsCount, t]);
+  }, [monthsCount, t]);
 
   const loadTurnover = (
     year: FinanceTurnoverYear = selectedYear,
-    period: FinancePeriod = turnoverPeriod,
+    months: number[] = turnoverMonths,
   ) => {
     setTurnoverLoading(true);
     const chartRequest =
@@ -375,7 +371,10 @@ export function FinancePage() {
             .turnoverMonthlyTrend(year)
             .then((trend) => ({ kind: "monthly" as const, trend }));
 
-    Promise.all([api.finance.turnover(year, period), chartRequest])
+    const periodParam = months.length === 12 ? "full" : months.join(",");
+    const monthsParam = months.join(",");
+
+    Promise.all([api.finance.turnover(year, periodParam, monthsParam), chartRequest])
       .then(([summary, chart]) => {
         setTurnover(summary);
         if (chart.kind === "yearly") {
@@ -397,14 +396,12 @@ export function FinancePage() {
     setTurnoverYear(yearValue);
     const year: FinanceTurnoverYear =
       yearValue === TURNOVER_YEAR_ALL ? TURNOVER_YEAR_ALL : Number.parseInt(yearValue, 10);
-    loadTurnover(year, turnoverPeriod);
+    loadTurnover(year, turnoverMonths);
   };
 
-  const handlePeriodChange = (periodValue: string) => {
-    if (!periodValue) return;
-    const period = periodValue as FinancePeriod;
-    setTurnoverPeriod(period);
-    loadTurnover(selectedYear, period);
+  const handleMonthsChange = (newMonths: number[]) => {
+    setTurnoverMonths(newMonths);
+    loadTurnover(selectedYear, newMonths);
   };
 
   const load = (silent = true) => {
@@ -444,7 +441,7 @@ export function FinancePage() {
   }, []);
 
   useEffect(() => {
-    loadTurnover(selectedYear, turnoverPeriod);
+    loadTurnover(selectedYear, turnoverMonths);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -791,20 +788,10 @@ export function FinancePage() {
               <CardDescription className="text-xs">{t("finance.turnover.subtitle")}</CardDescription>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-              <Select value={turnoverPeriod} onValueChange={handlePeriodChange} className="w-full sm:w-52">
-                <SelectTrigger>
-                  <SelectValue placeholder={t("finance.turnover.period")} />
-                </SelectTrigger>
-                <SelectContent className="max-h-72">
-                  <SelectGroup>
-                    {TURNOVER_PERIODS.map((period) => (
-                      <SelectItem key={period} value={period}>
-                        {t(`finance.turnover.periods.${period}`)}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+              <FinanceMonthSelect
+                value={turnoverMonths}
+                onChange={handleMonthsChange}
+              />
             </div>
           </div>
         </CardHeader>

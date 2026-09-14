@@ -1,8 +1,8 @@
+from calendar import monthrange
 from datetime import date
 from decimal import Decimal
-from typing import Literal
 
-FinancePeriod = Literal["full", "q1", "q2", "q3", "q4"]
+FinancePeriod = str
 
 TURNOVER_YEAR_START = 2019
 TURNOVER_YEAR_END = 2035
@@ -19,24 +19,92 @@ DEFAULT_FINANCE_AUTO_PAYMENTS_FROM = date(
 )
 
 
+def parse_months_from_period(period: str | None = None, months: str | None = None) -> list[int]:
+    """Davr yoki oylar qatoridan oy raqamlari ro'yxatini (1..12) ajratib olish."""
+    raw = months if (months is not None and months.strip()) else period
+    if not raw or raw == "full":
+        return list(range(1, 13))
+
+    clean = raw.strip().lower()
+    if clean == "q1":
+        return [1, 2, 3]
+    if clean == "q2":
+        return [4, 5, 6]
+    if clean == "q3":
+        return [7, 8, 9]
+    if clean == "q4":
+        return [10, 11, 12]
+
+    # "m1"..."m12" ko'rinishida
+    if clean.startswith("m") and clean[1:].isdigit():
+        val = int(clean[1:])
+        if 1 <= val <= 12:
+            return [val]
+
+    # Vergul yoki bo'sh joy bilan ajratilgan sonlar, masalan "1,2,3,4" yoki "2"
+    parsed_months = set()
+    parts = clean.replace(";", ",").replace(" ", ",").split(",")
+    for part in parts:
+        part = part.strip()
+        if part.isdigit():
+            val = int(part)
+            if 1 <= val <= 12:
+                parsed_months.add(val)
+
+    if parsed_months:
+        return sorted(parsed_months)
+
+    return list(range(1, 13))
+
+
 def resolve_finance_period(year: int, period: FinancePeriod) -> tuple[date, date]:
-    if period == "q1":
-        return date(year, 1, 1), date(year, 3, 31)
-    if period == "q2":
-        return date(year, 4, 1), date(year, 6, 30)
-    if period == "q3":
-        return date(year, 7, 1), date(year, 9, 30)
-    if period == "q4":
-        return date(year, 10, 1), date(year, 12, 31)
-    return date(year, 1, 1), date(year, 12, 31)
+    months = parse_months_from_period(period)
+    min_m = min(months)
+    max_m = max(months)
+    last_day = monthrange(year, max_m)[1]
+    return date(year, min_m, 1), date(year, max_m, last_day)
+
+
+def get_contiguous_month_ranges(year: int, months: list[int]) -> list[tuple[date, date]]:
+    """Tartiblangan oylarni ketma-ket (start_date, end_date) oraliqlarga ajratish.
+    Masalan: 2026-yil va [1, 2, 3, 5] -> [(2026-01-01, 2026-03-31), (2026-05-01, 2026-05-31)].
+    """
+    if not months:
+        months = list(range(1, 13))
+    sorted_months = sorted(set(months))
+
+    blocks: list[list[int]] = []
+    current_block: list[int] = []
+    for m in sorted_months:
+        if not current_block or m == current_block[-1] + 1:
+            current_block.append(m)
+        else:
+            blocks.append(current_block)
+            current_block = [m]
+    if current_block:
+        blocks.append(current_block)
+
+    ranges: list[tuple[date, date]] = []
+    for block in blocks:
+        start_month = block[0]
+        end_month = block[-1]
+        last_day = monthrange(year, end_month)[1]
+        ranges.append((date(year, start_month, 1), date(year, end_month, last_day)))
+    return ranges
 
 
 def resolve_all_years_span(
     *,
     year_from: int = TURNOVER_YEAR_START,
     year_to: int = TURNOVER_YEAR_END,
+    months: list[int] | None = None,
 ) -> tuple[date, date]:
-    return date(year_from, 1, 1), date(year_to, 12, 31)
+    if not months:
+        months = list(range(1, 13))
+    min_m = min(months)
+    max_m = max(months)
+    last_day = monthrange(year_to, max_m)[1]
+    return date(year_from, min_m, 1), date(year_to, max_m, last_day)
 
 
 def payment_counting_start(

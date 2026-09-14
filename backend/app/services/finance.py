@@ -21,8 +21,10 @@ from app.services.finance_period import (
     FinancePeriod,
     TURNOVER_YEAR_END,
     TURNOVER_YEAR_START,
+    get_contiguous_month_ranges,
     ledger_includes_payments,
     ledger_payment_date_from,
+    parse_months_from_period,
     payment_counting_start,
     resolve_all_years_span,
     resolve_finance_period,
@@ -196,26 +198,53 @@ def get_finance_turnover(
     *,
     year: int,
     period: FinancePeriod = "full",
+    months: str | list[int] | None = None,
 ) -> FinanceTurnoverRead:
-    period_start, period_end = resolve_finance_period(year, period)
-    total_revenue, total_expense, net_balance = _compute_turnover_for_dates(
-        db,
-        period_start=period_start,
-        period_end=period_end,
-    )
-    expense_summary = get_expense_summary(db, date_from=period_start, date_to=period_end)
+    if isinstance(months, str):
+        parsed_months = parse_months_from_period(months=months)
+    elif isinstance(months, list) and months:
+        parsed_months = sorted(set(months))
+    else:
+        parsed_months = parse_months_from_period(period=period)
+
+    ranges = get_contiguous_month_ranges(year, parsed_months)
+    total_revenue = Decimal("0")
+    total_expense = Decimal("0")
+    category_totals: dict[str, Decimal] = {}
+
+    for p_start, p_end in ranges:
+        rev, exp, _ = _compute_turnover_for_dates(
+            db,
+            period_start=p_start,
+            period_end=p_end,
+        )
+        total_revenue += rev
+        total_expense += exp
+        exp_summary = get_expense_summary(db, date_from=p_start, date_to=p_end)
+        for row in exp_summary.by_category:
+            cat_key = row.category.value if hasattr(row.category, "value") else str(row.category)
+            category_totals[cat_key] = category_totals.get(cat_key, Decimal("0")) + row.total
+
+    min_m = min(parsed_months)
+    max_m = max(parsed_months)
+    date_from = date(year, min_m, 1)
+    date_to = date(year, max_m, monthrange(year, max_m)[1])
+
+    period_repr = period
+    if months is not None:
+        period_repr = ",".join(map(str, parsed_months)) if len(parsed_months) < 12 else "full"
 
     return FinanceTurnoverRead(
         year=year,
-        period=period,
-        date_from=period_start,
-        date_to=period_end,
+        period=period_repr,
+        date_from=date_from,
+        date_to=date_to,
         total_revenue=total_revenue,
         total_expense=total_expense,
-        net_balance=net_balance,
+        net_balance=total_revenue - total_expense,
         expenses_by_category=[
-            FinanceExpenseCategoryAmount(category=row.category.value, total=row.total)
-            for row in expense_summary.by_category
+            FinanceExpenseCategoryAmount(category=row_cat, total=row_tot)
+            for row_cat, row_tot in sorted(category_totals.items(), key=lambda item: item[1], reverse=True)
         ],
     )
 
@@ -224,29 +253,41 @@ def get_finance_turnover_all_years(
     db: Session,
     *,
     period: FinancePeriod = "full",
+    months: str | list[int] | None = None,
     year_from: int = TURNOVER_YEAR_START,
     year_to: int = TURNOVER_YEAR_END,
 ) -> FinanceTurnoverRead:
+    if isinstance(months, str):
+        parsed_months = parse_months_from_period(months=months)
+    elif isinstance(months, list) and months:
+        parsed_months = sorted(set(months))
+    else:
+        parsed_months = parse_months_from_period(period=period)
+
     total_revenue = Decimal("0")
     total_expense = Decimal("0")
     category_totals: dict[str, Decimal] = {}
 
     for year in range(year_from, year_to + 1):
-        row = get_finance_turnover(db, year=year, period=period)
+        row = get_finance_turnover(db, year=year, period=period, months=parsed_months)
         total_revenue += row.total_revenue
         total_expense += row.total_expense
         for item in row.expenses_by_category:
             category_totals[item.category] = category_totals.get(item.category, Decimal("0")) + item.total
 
-    date_from, date_to = resolve_all_years_span(year_from=year_from, year_to=year_to)
+    date_from, date_to = resolve_all_years_span(year_from=year_from, year_to=year_to, months=parsed_months)
     expenses_by_category = [
         FinanceExpenseCategoryAmount(category=category, total=total)
         for category, total in sorted(category_totals.items(), key=lambda item: item[1], reverse=True)
     ]
 
+    period_repr = period
+    if months is not None:
+        period_repr = ",".join(map(str, parsed_months)) if len(parsed_months) < 12 else "full"
+
     return FinanceTurnoverRead(
         year=0,
-        period=period,
+        period=period_repr,
         date_from=date_from,
         date_to=date_to,
         total_revenue=total_revenue,

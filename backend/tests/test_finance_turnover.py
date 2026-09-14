@@ -82,6 +82,53 @@ def test_finance_turnover_period_filter_income_only(client, auth_headers):
     assert Decimal(q2.json()["total_revenue"]) == Decimal("2000000.00")
 
 
+def test_finance_turnover_months_filter(client, auth_headers):
+    client.post(
+        "/api/v1/incomes",
+        headers=auth_headers,
+        json={
+            "category": "sale",
+            "title": "Fevral sotuv",
+            "amount": "1500000.00",
+            "income_date": "2026-02-15",
+        },
+    )
+    client.post(
+        "/api/v1/incomes",
+        headers=auth_headers,
+        json={
+            "category": "sale",
+            "title": "Aprel sotuv",
+            "amount": "2500000.00",
+            "income_date": "2026-04-10",
+        },
+    )
+
+    # Faqat fevral (oy 2)
+    resp_feb = client.get(
+        "/api/v1/finance/turnover",
+        headers=auth_headers,
+        params={"year": 2026, "months": "2"},
+    )
+    assert resp_feb.status_code == 200
+    data_feb = resp_feb.json()
+    assert Decimal(data_feb["total_revenue"]) == Decimal("1500000.00")
+    assert data_feb["date_from"] == "2026-02-01"
+    assert data_feb["date_to"] == "2026-02-28"
+
+    # Fevral va Aprel (1, 2, 3, 4 - yanvar, fevral, mart, aprel)
+    resp_multi = client.get(
+        "/api/v1/finance/turnover",
+        headers=auth_headers,
+        params={"year": 2026, "months": "1,2,3,4"},
+    )
+    assert resp_multi.status_code == 200
+    data_multi = resp_multi.json()
+    assert Decimal(data_multi["total_revenue"]) == Decimal("4000000.00")
+    assert data_multi["date_from"] == "2026-01-01"
+    assert data_multi["date_to"] == "2026-04-30"
+
+
 def test_finance_turnover_all_years_manual_income(client, auth_headers):
     client.post(
         "/api/v1/incomes",
