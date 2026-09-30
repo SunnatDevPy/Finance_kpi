@@ -1,7 +1,15 @@
 import { useState, useEffect, type FormEvent } from "react";
 import { Navigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { LogInIcon, Loader2Icon, LockIcon, UserIcon, AlertCircleIcon } from "lucide-react";
+import {
+  LogInIcon,
+  Loader2Icon,
+  LockIcon,
+  UserIcon,
+  AlertCircleIcon,
+  EyeIcon,
+  EyeOffIcon,
+} from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
 import { SettingsToolbar } from "../components/SettingsToolbar";
@@ -31,6 +39,8 @@ function LoginFormCard({
   onPasswordChange: (value: string) => void;
   onSubmit: (e: FormEvent) => void;
 }) {
+  const [showPassword, setShowPassword] = useState(false);
+
   return (
     <div className="glass-panel relative overflow-hidden p-6 shadow-2xl shadow-black/10 sm:p-10 dark:shadow-black/60">
       <div
@@ -87,16 +97,31 @@ function LoginFormCard({
               <LockIcon className="size-3.5 text-muted-foreground" />
               {t("auth.password")}
             </Label>
-            <Input
-              id="password"
-              type="password"
-              required
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => onPasswordChange(e.target.value)}
-              placeholder="••••••••"
-              className="h-11 focus-visible:border-cyan-500/50 focus-visible:ring-cyan-500/20 dark:focus-visible:border-cyan-400/40 dark:focus-visible:ring-cyan-400/20"
-            />
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                required
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => onPasswordChange(e.target.value)}
+                placeholder="••••••••"
+                className="h-11 pr-11 focus-visible:border-cyan-500/50 focus-visible:ring-cyan-500/20 dark:focus-visible:border-cyan-400/40 dark:focus-visible:ring-cyan-400/20"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute inset-y-0 right-0 flex items-center justify-center px-3.5 text-muted-foreground transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/40 rounded-r-lg"
+                aria-label={showPassword ? t("auth.hidePassword") : t("auth.showPassword")}
+                title={showPassword ? t("auth.hidePassword") : t("auth.showPassword")}
+              >
+                {showPassword ? (
+                  <EyeOffIcon className="size-4" />
+                ) : (
+                  <EyeIcon className="size-4" />
+                )}
+              </button>
+            </div>
           </div>
 
           <AnimatePresence>

@@ -136,6 +136,8 @@ export const uz = {
     subtitle: "Tizimga kirish",
     login: "Login",
     password: "Parol",
+    showPassword: "Parolni ko'rsatish",
+    hidePassword: "Parolni yashirish",
     signIn: "Kirish",
     signingIn: "Kirish...",
     loginFailed: "Kirish muvaffaqiyatsiz",

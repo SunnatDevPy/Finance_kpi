@@ -138,6 +138,8 @@ export const ru: TranslationDict = {
     subtitle: "Вход в систему",
     login: "Логин",
     password: "Пароль",
+    showPassword: "Показать пароль",
+    hidePassword: "Скрыть пароль",
     signIn: "Войти",
     signingIn: "Вход...",
     loginFailed: "Ошибка входа",
